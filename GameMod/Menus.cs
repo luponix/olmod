@@ -620,6 +620,30 @@ namespace GameMod {
                         SelectAndDrawSliderItem(__instance, Loc.LS("LIMIT SHIPS DIVING INTO WALLS"), position, 11, Menus.mms_lag_compensation_collision_limit, 100, "LIMIT HOW FAR SHIPS MIGHT DIVE INTO WALLS (BUT SHIPS MIGHT APPEAR STUCK AT THE WALLS FOR SHORT MOMENTS INSTEAD)." + Environment.NewLine + "0 FOR UNLIMITED (NO CALCULATION OVERHEAD), OTHERWISE PERCENTAGE OF SHIP DIAMETER WHICH MUST REMAIN VISIBLE (100 = NO DIVE-IN AT ALL).");
                     }
                     break;
+                case 3:
+                    // Audio Taunt Menu
+                    if ( MPAudioTaunts.initialized )
+                    {
+                        position.x -= 150f;
+                        position.y += 40f;
+                        for (int i = 0; i < 6; i++)
+                        {
+                            //"SLOT "+(1+i).ToString()
+                            __instance.SelectAndDrawStringOptionItem("", position, 16+i, MPAudioTaunts.local_taunts[i].name, string.Empty, 0.49f, false);
+                            position.y += 150f;
+
+
+
+                            position.x -= 150f;
+                            position.y += 71f;
+                        }
+
+
+
+                        position.x += 150f;
+                        
+                    }
+                    break;
                 default:
                     break;
             }
@@ -635,17 +659,19 @@ namespace GameMod {
 
         public static void DrawTabs(UIElement uie, Vector2 pos, int tab_selected)
         {
-            float w = 378f;
+            float w = 508f;
             uie.DrawWideBox(pos, w, 22f, UIManager.m_col_ub2, uie.m_alpha, 7);
             string[] array = new string[]
             {
                 "GENERAL",
                 "TEAM",
-                "LAG COMPENSATION"
+                "LAG COMPENSATION",
+                "AUDIO TAUNTS"
             };
             for (int i = 0; i < array.Length; i++)
             {
-                pos.x = ((float)i - 1f) * 265f;
+                pos.x = -133f + ((float)i - 1f) * 265f;
+                uConsole.Log(UIManager.m_mouse_pos.x.ToString());
                 uie.TestMouseInRect(pos, 112f, 16f, 200 + i, false);
                 if (UIManager.m_menu_selection == 200 + i)
                 {
@@ -766,6 +792,7 @@ namespace GameMod {
                             case 200:
                             case 201:
                             case 202:
+                            case 203:
                                 MenuManager.m_menu_micro_state = UIManager.m_menu_selection - 200;
                                 MenuManager.UIPulse(1f);
                                 _MenuManager_PlayHighlightSound_Method.Invoke(null, new object[] { 0.4f, 0.07f });
@@ -905,6 +932,8 @@ namespace GameMod {
                                         break;
                                 }
                                 break;
+                            case 3:
+
                             default:
                                 break;
                         }
