@@ -11,34 +11,31 @@ namespace GameMod
 {
     class MPAudioTaunts
     {
-        // 
-        // DONE 2. Load the ressources in that folder
-        // DONE 3. Test wether these can be played by the press of a button ingame
-        // DONE 4. check the length/size of these clips and reject those that are to long or to big
+        
         // 5. create infrastructure for sharing the selected 6 clips of all players through the server before the match starts and handle join in progress properly
-        // 6. build a gui that allows playing the audiotaunts, selecting 6 of them and binding them to keys
-        // 7. store the keys and selected clips in the player.xprefsmod
-        // 8. implement a 1 second cooldown between audiotaunt activation
-        // 9. add a slider in the sound options that controls the volume of audiotaunts (at 0 dont play the clips in the first place)
         // 10. dont distribute audiotaunts and playsignals by people that are kicked/banned
-        // 11. Update the local taunts when the pilot changes
         // 12. empty the external taunts dictionary when entering a game
+        // 13. Allow playing audiotaunts ingame by the press of a button
+        // 14. Server/Client communication
+        // 15. Audio visualisation using the Spectrum Data
 
         //  CLIENT
-        public static bool isActive = true;
         public static bool initialized = false;
         public static string LocalAudioTauntDirectory = "";         // path towards the directory where the audiotaunts from the local installation are saved
         public static string ExternalAudioTauntDirectory = "";      // path towards the directory where the audiotaunts of other players get saved
+        public static string loaded_local_taunts = "";              // holds the hashes of the local taunts
+
         public static List<Taunt> taunts = new List<Taunt>();       // a list of all locally loaded audio taunts
-        
-        public static Taunt[] local_taunts = new Taunt[6];          // contains the audio taunts that this pilot has chosen, can not change during a game 
-        public static int[] keybinds = new int[6];
-        public static float audio_taunt_volume = 1f;
-        
         public static Dictionary<string, Taunt> external_taunts = new Dictionary<string, Taunt>();  // contains the audio taunts of the other players during a game
-        public const float default_taunt_cooldown = 3f;             // defines the minimum intervall between sending taunts for the client
-        public static float remaining_cooldown = 0f;                // tracks the current state of the cooldown. gets reduced with each update. the client is allowed to send another taunt after 'remaining_cooldown' is at or below 0.0
+        public static Taunt[] local_taunts = new Taunt[6];          // contains the audio taunts that this pilot has chosen, can not change during a game 
+        public static int[] keybinds = new int[6];                  // 
+
+        public static int selected_audio_slot = 0;
         public const int audio_taunt_size_limit_kB = 131072;        // 128 kB
+        public static int audio_taunt_volume = 50;
+        public const float default_taunt_cooldown = 6f;             // defines the minimum intervall between sending taunts for the client
+        public static float remaining_cooldown = 0f;                // tracks the current state of the cooldown. gets reduced with each update. the client is allowed to send another taunt after 'remaining_cooldown' is at or below 0.0
+        
 
         public class Taunt
         {
@@ -70,66 +67,27 @@ namespace GameMod
                         Debug.Log("Did not find a directory for external audiotaunts, creating one at: " + ExternalAudioTauntDirectory);
                         Directory.CreateDirectory(ExternalAudioTauntDirectory);
                     }
-
                 }
 
                 ImportAudioTaunts(LocalAudioTauntDirectory, new List<string>());
-
-                local_taunts[0] = new Taunt
+                for (int i = 0; i < 6; i++)
                 {
-                    hash = "EMPTY",
-                    name = "EMPTY",
-                    audioclip = null
-                };
-                local_taunts[1] = new Taunt
-                {
-                    hash = "EMPTY",
-                    name = "EMPTY",
-                    audioclip = null
-                };
-                local_taunts[2] = new Taunt
-                {
-                    hash = "EMPTY",
-                    name = "EMPTY",
-                    audioclip = null
-                };
-                local_taunts[3] = new Taunt
-                {
-                    hash = "EMPTY",
-                    name = "EMPTY",
-                    audioclip = null
-                };
-                local_taunts[4] = new Taunt
-                {
-                    hash = "EMPTY",
-                    name = "EMPTY",
-                    audioclip = null
-                };
-                local_taunts[5] = new Taunt
-                {
-                    hash = "EMPTY",
-                    name = "EMPTY",
-                    audioclip = null
-                };
-
-                //List<string> l = new List<string>();
-                //l.Add("5376e3f20f495672db82035f2923170e-game-won.ogg");
-                //ImportAudioTaunts(LocalAudioTauntDirectory, l);
-
-                local_taunts[0] = taunts[0];
-                local_taunts[1] = taunts[1];
-                local_taunts[2] = taunts[2];
-                local_taunts[3] = taunts[3];
-                local_taunts[4] = taunts[4];
-                local_taunts[5] = taunts[5];
-                // POPULATE THIS WHEN LOADING PILOT FILES INSTEAD
-
+                    local_taunts[i] = new Taunt
+                    {
+                        hash = "EMPTY",
+                        name = "EMPTY",
+                        audioclip = null
+                    };
+                    keybinds[i] = -1;
+                }
+                LoadLocalAudioTauntsFromPilotPrefs();
 
                 initialized = true;
             }
         }
 
-        // if files_to_load is empty ImportAudioTaunts will load all eligible audio taunts in the 
+        // Imports either the in 'files_to_load' specified taunts or all taunts from that directory
+        // (under the condition that they have yet to be imported and are valid formats and that their size is not beyond 128 kB) 
         public static void ImportAudioTaunts(string path_to_directory, List<String> files_to_load)
         {
             Debug.Log("Attempting to import AudioTaunts from: "+path_to_directory);
@@ -142,9 +100,9 @@ namespace GameMod
 
                     Taunt t = new Taunt
                     {
-                        hash = CalculateMD5(Path.Combine(path_to_directory, file.Name)),
+                        hash = CalculateMD5ForFile(Path.Combine(path_to_directory, file.Name)),
                         name = file.Name,
-                        audioclip = MPAudioTaunts.LoadAudioClip(file.Name, file.Extension, path_to_directory)//Resources.Load<AudioClip>("AudioTaunts/" + file.Name)
+                        audioclip = MPAudioTaunts.LoadAsAudioClip(file.Name, file.Extension, path_to_directory)//Resources.Load<AudioClip>("AudioTaunts/" + file.Name)
                     };
 
                     if(t.name.StartsWith(t.hash))
@@ -163,9 +121,24 @@ namespace GameMod
             }
         }
 
+        private static AudioClip LoadAsAudioClip(string filename, string ext, string path2)
+        {
+            string path = Path.Combine(path2, filename);
+            if (path != null)
+            {
+                WWW www = new WWW("file:///" + path);
+                while (!www.isDone) { }
+                if (string.IsNullOrEmpty(www.error))
+                {
+                    return www.GetAudioClip(true, false);
+                }
+                else Debug.Log("Error in 'LoadAudioClip': " + www.error + " :" + filename + ":" + ext + ":" + path2);
+            }
+            return null;
+        }
 
-        // taken from https://stackoverflow.com/a/10520086/10955803
-        static string CalculateMD5(string filename)
+        // used to calculate a hash for each audio taunt file to avoid filename collisions
+        private static string CalculateMD5ForFile(string filename)
         {
             using (var md5 = MD5.Create())
             {
@@ -177,41 +150,66 @@ namespace GameMod
             }
         }
 
-
-        public static AudioClip LoadAudioClip(string filename, string ext, string path2)
+        // Splits the hashes that get stored as a single string in loaded_local_taunts and finds the corresponding taunts
+        // to populate the 6 audio taunt slots. '/' is used as the seperator of the slots
+        public static void LoadLocalAudioTauntsFromPilotPrefs()
         {
-            string path = Path.Combine(path2, filename);
-            if (path != null)
+            string[] file_hashes = loaded_local_taunts.Split('/');
+            int index = 0;
+            foreach(string hash in file_hashes)
             {
-                WWW www = new WWW("file:///" + path);
-                while (!www.isDone){ }
-                if (string.IsNullOrEmpty(www.error))
+                if(index < 6)
                 {
-                    return www.GetAudioClip(true, false);
+                    Taunt at = taunts.Find(t => t.hash.Equals(hash) );
+                    if(at == null)
+                    {
+                        at = new Taunt
+                        {
+                            hash = "EMPTY",
+                            name = "EMPTY",
+                            audioclip = null
+                        };
+                    }
+                    local_taunts[index] = at;
                 }
-                else Debug.Log("Error in 'LoadAudioClip': " + www.error + " :" + filename + ":" + ext + ":" + path2);
+                index++;
             }
-            return null;
         }
 
-        public static void PlayAudioTaunt(int id)
+        public static void PlayAudioTauntFromAudioclip(AudioClip audioClip)
         {
-            if (taunts == null) return;
-            if (id >= taunts.Count | id < 0) return;
-
-            if (taunts[id].audioclip == null) uConsole.Log("AUDIOCLIP IS EMPTY");
+            if (audio_taunt_volume == 0 | audioClip == null)
+                return;
 
             AudioSource audioSource = new GameObject().AddComponent<AudioSource>();
-            audioSource.clip = taunts[id].audioclip;
-            audioSource.volume = 1f;
+            audioSource.clip = audioClip;
+            audioSource.volume = audio_taunt_volume / 100f;
             audioSource.timeSamples = 0;
             audioSource.bypassReverbZones = true;
-            audioSource.reverbZoneMix = 0f;//UnityEngine.Random.Range(0f, 0.002f);
-            audioSource.Play();
-            Debug.Log("started playing "+ taunts[id].name);
+            audioSource.reverbZoneMix = 0f;
+            audioSource.PlayScheduled(AudioSettings.dspTime);
+            audioSource.SetScheduledEndTime(AudioSettings.dspTime + 5);
         }
 
+        [HarmonyPatch(typeof(PlayerShip), "UpdateReadImmediateControls")]
+        internal class MPAudioTaunts_PlayerShip_UpdateReadImmediateControls
+        {
+            static void Postfix()
+            {
+                if (remaining_cooldown > 0f)
+                    remaining_cooldown -= Time.deltaTime;
+                for(int i = 0; i < 6; i++)
+                {
+                    if(remaining_cooldown <= 0f && keybinds[i] > 0 && Input.GetKeyDown((KeyCode)keybinds[i]))
+                    {
+                        remaining_cooldown = default_taunt_cooldown;
+                        PlayAudioTauntFromAudioclip(local_taunts[i].audioclip);
+                    }
+                }
+            }
 
+
+        }
 
 
 
@@ -238,31 +236,25 @@ namespace GameMod
 
 
 
-       // FOR DEBUGGING
-       [HarmonyPatch(typeof(MenuManager), "ApplyResolution")]
-        class MPAudioTaunts_GameManager_Awake2
+
+
+
+        public static int index = 0;
+
+        public static void PlayAudioTaunt(int id)
         {
-            static void Postfix()
-            {
-                //GameManager.m_audio.PlayVoiceMessage(taunts[0].audioclip, 0, true);
-                if (taunts[0].audioclip == null) uConsole.Log("AUDIOCLIP IS EMPTY");
+            if (audio_taunt_volume == 0 | taunts == null | id >= taunts.Count | id < 0 | taunts[id].audioclip == null)
+                return;
 
-                AudioSource audioSource = new GameObject().AddComponent<AudioSource>();
-                audioSource.clip = taunts[0].audioclip;
-                audioSource.volume = 1f;
-                audioSource.timeSamples = 0;
-                audioSource.bypassReverbZones = true;
-                audioSource.reverbZoneMix = 0f;//UnityEngine.Random.Range(0f, 0.002f);
-                audioSource.Play();
-                Debug.Log("started playing");//+ taunts[0].name);
-            }
+            AudioSource audioSource = new GameObject().AddComponent<AudioSource>();
+            audioSource.clip = taunts[id].audioclip;
+            audioSource.volume = audio_taunt_volume / 100f;
+            audioSource.timeSamples = 0;
+            audioSource.bypassReverbZones = true;
+            audioSource.reverbZoneMix = 0f;
+            audioSource.PlayScheduled(AudioSettings.dspTime);
+            audioSource.SetScheduledEndTime(AudioSettings.dspTime + 5);
         }
-
-
-
-
-
-
 
         // FOR DEBUGGING
         [HarmonyPatch(typeof(GameManager), "Start")]
@@ -272,7 +264,7 @@ namespace GameMod
             {
                 uConsole.RegisterCommand("playat", "", new uConsole.DebugCommand(CmdPlay));
                 uConsole.RegisterCommand("showat", "", new uConsole.DebugCommand(CmdPrintAllTaunts));
-                uConsole.RegisterCommand("microstate", "", new uConsole.DebugCommand(CmdSetMicrostate));
+                uConsole.RegisterCommand("setatvolume", "", new uConsole.DebugCommand(CmdSetMicrostate));
             }
 
             private static void CmdPlay()
@@ -291,7 +283,8 @@ namespace GameMod
 
             private static void CmdSetMicrostate()
             {
-                MenuManager.m_menu_micro_state = uConsole.GetInt();
+                audio_taunt_volume = (int)(uConsole.GetFloat() * 100);
+
             }
 
             private static void Cmd3()
