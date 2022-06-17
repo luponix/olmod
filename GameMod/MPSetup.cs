@@ -180,7 +180,7 @@ namespace GameMod {
             m_prefs_hashtable.Add(key, defaultValue);
             return defaultValue;
         }
-        
+
         public static void SetInt(string key, int value)
         {
             m_prefs_hashtable[key] = value;
@@ -249,6 +249,16 @@ namespace GameMod {
                 Menus.mms_team_color_enemy = ModPrefs.GetInt("MP_PM_TEAM_COLOR_ENEMY", Menus.mms_team_color_enemy);
                 HUDVelocity.MenuManagerEnabled = ModPrefs.GetBool("MP_PM_SHOWHUDVELOCITY", HUDVelocity.MenuManagerEnabled);
                 Menus.mms_show_framerate = ModPrefs.GetBool("MP_PM_SHOWFRAMERATE", Menus.mms_show_framerate);
+                MPAudioTaunts.loaded_local_taunts = ModPrefs.GetString("MP_LOCAL_AUDIOTAUNTS", MPAudioTaunts.loaded_local_taunts);
+                MPAudioTaunts.LoadLocalAudioTauntsFromPilotPrefs();
+                MPAudioTaunts.audio_taunt_volume = ModPrefs.GetInt("MP_AUDIOTAUNT_VOLUME", 50);
+                MPAudioTaunts.keybinds[0] = ModPrefs.GetInt("MP_AUDIOTAUNT_KEYBIND_0", -1);
+                MPAudioTaunts.keybinds[1] = ModPrefs.GetInt("MP_AUDIOTAUNT_KEYBIND_1", -1);
+                MPAudioTaunts.keybinds[2] = ModPrefs.GetInt("MP_AUDIOTAUNT_KEYBIND_2", -1);
+                MPAudioTaunts.keybinds[3] = ModPrefs.GetInt("MP_AUDIOTAUNT_KEYBIND_3", -1);
+                MPAudioTaunts.keybinds[4] = ModPrefs.GetInt("MP_AUDIOTAUNT_KEYBIND_4", -1);
+                MPAudioTaunts.keybinds[5] = ModPrefs.GetInt("MP_AUDIOTAUNT_KEYBIND_5", -1);
+
             }
             else // for compatability with old olmod, no need to add new settings
             {
@@ -310,6 +320,14 @@ namespace GameMod {
             ModPrefs.SetInt("MP_PM_TEAM_COLOR_ENEMY", Menus.mms_team_color_enemy);
             ModPrefs.SetBool("MP_PM_SHOWHUDVELOCITY", HUDVelocity.MenuManagerEnabled);
             ModPrefs.SetBool("MP_PM_SHOWFRAMERATE", Menus.mms_show_framerate);
+            ModPrefs.SetString("MP_LOCAL_AUDIOTAUNTS", MPAudioTaunts.local_taunts[0].hash + "/"+ MPAudioTaunts.local_taunts[1].hash + "/" + MPAudioTaunts.local_taunts[2].hash + "/" + MPAudioTaunts.local_taunts[3].hash + "/" + MPAudioTaunts.local_taunts[4].hash + "/" + MPAudioTaunts.local_taunts[5].hash);
+            ModPrefs.SetInt("MP_AUDIOTAUNT_VOLUME", MPAudioTaunts.audio_taunt_volume );
+            ModPrefs.SetInt("MP_AUDIOTAUNT_KEYBIND_0", MPAudioTaunts.keybinds[0]);
+            ModPrefs.SetInt("MP_AUDIOTAUNT_KEYBIND_1", MPAudioTaunts.keybinds[1]);
+            ModPrefs.SetInt("MP_AUDIOTAUNT_KEYBIND_2", MPAudioTaunts.keybinds[2]);
+            ModPrefs.SetInt("MP_AUDIOTAUNT_KEYBIND_3", MPAudioTaunts.keybinds[3]);
+            ModPrefs.SetInt("MP_AUDIOTAUNT_KEYBIND_4", MPAudioTaunts.keybinds[4]);
+            ModPrefs.SetInt("MP_AUDIOTAUNT_KEYBIND_5", MPAudioTaunts.keybinds[5]);
             ModPrefs.Flush(filename + "mod");
         }
 
