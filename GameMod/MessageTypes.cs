@@ -39,6 +39,12 @@ namespace GameMod
 
         public const short MsgSetTurnRampMode = 145;
         public const short MsgChangeTeam = 146;
+        public const short MsgShareAudioTauntIdentifiers = 147;
+        public const short MsgRequestAudioTauntFromClient = 148;
+        public const short MsgRequestAudioTauntFromServer = 149;
+        public const short MsgUploadTauntToClient = 150;
+        public const short MsgUploadTauntToServer = 151;
+
         // Do not use 400, it is in use by Mod-Projdata.dll.
     }
 }

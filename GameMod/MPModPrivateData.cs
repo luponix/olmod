@@ -1242,6 +1242,12 @@ END_ENTRY
             set { JoystickRotationFix.server_support = value; }
         }
 
+        public static bool AudioTauntsSupported
+        {
+            get { return true; }
+            set { MPAudioTaunts.server_supports_audiotaunts = value; }
+        }
+
         public static JObject Serialize()
         {
             JObject jobject = new JObject();
@@ -1264,6 +1270,7 @@ END_ENTRY
             jobject["matchtimelimit"] = MatchTimeLimit;
             jobject["assistscoring"] = AssistScoring;
             jobject["joystickrotationfixsupported"] = JoystickRotationFixSupported;
+            jobject["audiotauntsupport"] = AudioTauntsSupported;
             return jobject;
         }
 
@@ -1292,6 +1299,7 @@ END_ENTRY
                 NetworkMatch.m_match_time_limit_seconds = MatchTimeLimit;
             AssistScoring = root["assistscoring"].GetBool(true);
             JoystickRotationFixSupported = root["joystickrotationfixsupported"].GetBool(false);
+            AudioTauntsSupported = root["audiotauntsupport"].GetBool(false);
         }
 
         public static string GetModeString(MatchMode mode)
