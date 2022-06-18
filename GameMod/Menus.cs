@@ -637,7 +637,6 @@ namespace GameMod
                         {
                             // Draws the Item slider for selecting an audio taunt
                             __instance.SelectAndDrawStringOptionItem("", position, 16 + i, MPAudioTaunts.local_taunts[i].name, string.Empty, 0.49f, false);
-
                             // Draws the buttons that play the selected audio taunt of the respective slot
                             position.x -= 171f;
                             __instance.TestMouseInRect(position, 25f, 25f, 1610 + i, true);
@@ -661,6 +660,20 @@ namespace GameMod
                             position.y += 71f;
                         }
                         position.x += 150f;
+
+                        //Vector2 pos2 = new Vector2(270, -100);
+                        //__instance.DrawStringSmall(MPAudioTaunts.LocalAudioTauntDirectory, pos2, 0.3f, StringOffset.LEFT, UIManager.m_col_ui2 * 0.7f, 1f, -1f);
+                        // FOR TESTING PURPOSES
+                        /*
+                        Vector2 pos = new Vector2(-570, 0);
+                        float[] freqBand = MPAudioTaunts.calculateFrequencyBand();
+                        for (int i = 0; i < 8; i++)
+                        {
+                            if (freqBand.Length == 8) UIManager.DrawBarVertical(pos, new Vector2(1.7f,1f), freqBand[i] * 9f, Color.green *0.7f, 199);//UIManager.DrawQuadBarVertical(pos, 6f, 1f, freqBand[i] * 50f, Color.yellow, 199); //(pos, new Vector2(pos.x, -freqBand[i] * 200f), 1f, 0f, Color.yellow, 4);
+                            pos.x += 5f;
+                        }
+                        */
+
 
 
                         if (MenuManager.m_menu_micro_state == 4)
@@ -999,7 +1012,8 @@ namespace GameMod
                                         if (MPAudioTaunts.initialized)
                                         {
                                             //MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                                            MPAudioTaunts.PlayAudioTaunt(MPAudioTaunts.taunts.IndexOf(MPAudioTaunts.local_taunts[menu_selection - 1610]));
+                                            MPAudioTaunts.PlayAudioTauntFromAudioclip(MPAudioTaunts.local_taunts[menu_selection - 1610].audioclip);
+                                            //MPAudioTaunts.PlayAudioTaunt(MPAudioTaunts.taunts.IndexOf(MPAudioTaunts.local_taunts[menu_selection - 1610]));
                                         }
                                         goto AVOID_INPUTMAPPING_DIALOG;
                                     case 1810:
