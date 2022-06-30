@@ -543,6 +543,7 @@ namespace GameMod
     [HarmonyPatch(typeof(UIElement), "DrawMpOptions")]
     class Menus_UIElement_DrawMpOptions
     {
+
         static bool Prefix(UIElement __instance)
         {
             UIManager.X_SCALE = 0.2f;
@@ -664,7 +665,7 @@ namespace GameMod
                         //Vector2 pos2 = new Vector2(270, -100);
                         //__instance.DrawStringSmall(MPAudioTaunts.LocalAudioTauntDirectory, pos2, 0.3f, StringOffset.LEFT, UIManager.m_col_ui2 * 0.7f, 1f, -1f);
                         // FOR TESTING PURPOSES
-                        /*
+                        
                         Vector2 pos = new Vector2(-570, 0);
                         float[] freqBand = MPAudioTaunts.calculateFrequencyBand();
                         for (int i = 0; i < 8; i++)
@@ -672,7 +673,7 @@ namespace GameMod
                             if (freqBand.Length == 8) UIManager.DrawBarVertical(pos, new Vector2(1.7f,1f), freqBand[i] * 9f, Color.green *0.7f, 199);//UIManager.DrawQuadBarVertical(pos, 6f, 1f, freqBand[i] * 50f, Color.yellow, 199); //(pos, new Vector2(pos.x, -freqBand[i] * 200f), 1f, 0f, Color.yellow, 4);
                             pos.x += 5f;
                         }
-                        */
+                        
 
 
 
