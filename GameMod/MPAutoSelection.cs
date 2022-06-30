@@ -21,10 +21,18 @@ namespace GameMod
                 uConsole.RegisterCommand("toggleprimaryorder", "toggles all Weapon Selection logic related to primary weapons", new uConsole.DebugCommand(CommandsAndInitialisationPatch.CmdTogglePrimary));
                 uConsole.RegisterCommand("togglesecondaryorder", "toggles all Weapon Selection logic related to secondary weapons", new uConsole.DebugCommand(CommandsAndInitialisationPatch.CmdToggleSecondary));
                 uConsole.RegisterCommand("toggle_hud", "Toggles some HUD elements", new uConsole.DebugCommand(CommandsAndInitialisationPatch.CmdToggleHud));
+                uConsole.RegisterCommand("toggle_audiotaunts", "", new uConsole.DebugCommand(CmdToggleAudiotaunts));
                 Initialise();
             }
 
             // COMMANDS
+            private static void CmdToggleAudiotaunts()
+            {
+                MPAudioTaunts.active = !MPAudioTaunts.active;
+                uConsole.Log("Audiotaunts are now"+ (MPAudioTaunts.active ? "enabled" : "disabled"));
+
+            }
+
             private static void CmdToggleHud()
             {
                 miasmic = !miasmic;
