@@ -20,51 +20,57 @@ namespace GameMod
         // 5. create infrastructure for sharing the selected 6 clips of all players through the server before the match starts and handle join in progress properly
         // 10. dont distribute audiotaunts and playsignals by people that are kicked/banned
         // 12. empty the external taunts dictionary when entering a game
-        // 13. Allow playing audiotaunts ingame by the press of a button
-        // 14. Server/Client communication
         // 15. Audio visualisation using the Spectrum Data
 
-        //  CLIENT
+
+
+
+
+
 
         public static bool active = true;
-
         public static bool initialized = false;
         public static string LocalAudioTauntDirectory = "";         // path towards the directory where the audiotaunts from the local installation are saved
         public static string ExternalAudioTauntDirectory = "";      // path towards the directory where the audiotaunts of other players get saved
-        public static string loaded_local_taunts = "";              // holds the hashes of the local taunts
+        public static string loaded_local_taunts = "";              // temporary holder (necessary till the execution of LoadLocalAudioTauntsFromPilotPrefs()) of the hashes of the local taunts, gets populated from the pilots config files
 
-        public static List<Taunt> taunts = new List<Taunt>();       // a list of all locally loaded audio taunts
-        public static Dictionary<string, Taunt> external_taunts = new Dictionary<string, Taunt>();  // contains the audio taunts of the other players during a game
-        public static Taunt[] local_taunts = new Taunt[6];          // contains the audio taunts that this pilot has chosen, can not change during a game 
-        public static int[] keybinds = new int[6];                  // 
-        public static AudioSource[] audioSources = new AudioSource[3];
-
-        public static int selected_audio_slot = 0;
-        public const int audio_taunt_size_limit = 131072;        // 128 kB
-        public static int audio_taunt_volume = 50;
-        public const float default_taunt_cooldown = 4.5f;             // defines the minimum intervall between sending taunts for the client
-        public static float remaining_cooldown = 0f;                // tracks the current state of the cooldown. gets reduced with each update. the client is allowed to send another taunt after 'remaining_cooldown' is at or below 0.0
+        public const int audio_taunt_size_limit = 131072;           // 128 kB
+        public const int packet_payload_size = 400;
         public static bool server_supports_audiotaunts = false;
         public static WaitForSecondsRealtime delay = new WaitForSecondsRealtime(0.016f);
 
-        public class Taunt
+        public static AudioSource[] audioSources = new AudioSource[3];
+        public static int audio_taunt_volume = 50;                  // range: 0-100
+        public const float default_taunt_cooldown = 4.5f;           // defines the minimum intervall between sending taunts for the client
+        public static float remaining_cooldown = 0f;                // tracks the current state of the cooldown. gets reduced with each update. the client is allowed to send another taunt after 'remaining_cooldown' is at or below 0.0
+
+
+
+
+        public static List<AudioTaunt> taunts = new List<AudioTaunt>();                                     // a list of all locally loaded audio taunts
+        public static Dictionary<string, AudioTaunt> external_taunts = new Dictionary<string, AudioTaunt>();// contains the audio taunts of the other players during a game
+
+        public static AudioTaunt[] local_taunts = new AudioTaunt[6];// contains the audio taunts that this client has chosen, can not change during a game 
+        public static int[] keybinds = new int[6];                  // keybinds[i] holds the keycode that triggers the playing of local_taunts[i] 
+        public static int selected_audio_slot = 0;                  // temporary variable that is used in the menu code to differentiate between the 6 local taunt slots
+
+
+        // this should probably also hold a timestamp to indicate when a file transfer started or last got updated
+        public class AudioTaunt
         {
-            public string hash = "";
-            public string name = "";
+            public string hash;
+            public string name;
+            public byte[] audio_taunt_data;         // temporary holder of incoming bytes till the full audio clip is assembled (or permanently on the server to buffer it incase other clients request this data)
+            // Client
+            public bool ready_to_play;              // indicates wether the audio clip is in a playable state
+            public bool requested_taunt;
             public AudioClip audioclip;
+            // Server
+            public int uploader_connection_id;
+            public List<int> requesting_clients;    // A list of all connection ids that have requested this audioclip
         }
 
-        public class FileData
-        {
-            public int netid;
-            public int pos;
-            public string identifier;
-            public byte[] bytes;
-        }
 
-        // INITIALISATION:
-        //  - check if the directory exists
-        //  - load local audio taunts
         [HarmonyPatch(typeof(GameManager), "Awake")]
         class MPAudioTaunts_GameManager_Awake
         {
@@ -93,11 +99,13 @@ namespace GameMod
                     ImportAudioTaunts(ExternalAudioTauntDirectory, new List<string>());
                     for (int i = 0; i < 6; i++)
                     {
-                        local_taunts[i] = new Taunt
+                        local_taunts[i] = new AudioTaunt
                         {
                             hash = "EMPTY",
                             name = "EMPTY",
-                            audioclip = null
+                            audioclip = null,
+                            ready_to_play = false,
+                            requested_taunt = false
                         };
                         keybinds[i] = -1;
                     }
@@ -174,11 +182,13 @@ namespace GameMod
                 if ((files_to_load.Contains(file.Name) | load_all_files) && taunts.Find(t => t.name.Equals(file.Name)) == null && (file.Extension.Equals(".ogg") || file.Extension.Equals(".wav")) && file.Length <= audio_taunt_size_limit)
                 {
 
-                    Taunt t = new Taunt
+                    AudioTaunt t = new AudioTaunt
                     {
                         hash = CalculateMD5ForFile(Path.Combine(path_to_directory, file.Name)),
                         name = file.Name,
-                        audioclip = MPAudioTaunts.LoadAsAudioClip(file.Name, file.Extension, path_to_directory)//Resources.Load<AudioClip>("AudioTaunts/" + file.Name)
+                        audioclip = MPAudioTaunts.LoadAsAudioClip(file.Name, file.Extension, path_to_directory),//Resources.Load<AudioClip>("AudioTaunts/" + file.Name)
+                        ready_to_play = true,
+                        requested_taunt = false
                     };
 
                     if (t.name.StartsWith(t.hash))
@@ -236,14 +246,15 @@ namespace GameMod
             {
                 if (index < 6)
                 {
-                    Taunt at = taunts.Find(t => t.hash.Equals(hash));
+                    AudioTaunt at = taunts.Find(t => t.hash.Equals(hash));
                     if (at == null)
                     {
-                        at = new Taunt
+                        at = new AudioTaunt
                         {
                             hash = "EMPTY",
                             name = "EMPTY",
-                            audioclip = null
+                            audioclip = null,
+                            ready_to_play = false
                         };
                     }
                     local_taunts[index] = at;
@@ -292,7 +303,7 @@ namespace GameMod
             }
         }
 
-
+        // Todo: simplify this and buffer its result
         public static float[] calculateFrequencyBand()
         {
             float[] freqBand = new float[8];
@@ -332,9 +343,6 @@ namespace GameMod
             return new float[8];
         }
 
-
-
-
         [HarmonyPatch(typeof(PlayerShip), "UpdateReadImmediateControls")]
         internal class MPAudioTaunts_PlayerShip_UpdateReadImmediateControls
         {
@@ -356,7 +364,6 @@ namespace GameMod
                 }
             }
         }
-
 
         // Send the file names of your audio taunts to the server when entering a game // Client OnAcceptedToLobby OnMatchStart
         [HarmonyPatch(typeof(Client), "OnAcceptedToLobby")]
@@ -411,6 +418,7 @@ namespace GameMod
             }
         }
 
+        /*
         // Todo: move the key check here
         [HarmonyPatch(typeof(GameManager), "Update")]
         class MPAudioTaunts_GameManager_Update
@@ -427,15 +435,19 @@ namespace GameMod
                     }
                 }
             }
-        }
+        }*/
 
                                        
         [HarmonyPatch(typeof(Client), "RegisterHandlers")]
         class MPAudioTaunts_Client_RegisterHandlers
         {
+
+            public static bool isUploading = false;
+            public static List<AudioTaunt> queued_uploads = new List<AudioTaunt>();
+
             private static void OnShareAudioTauntIdentifiers(NetworkMessage rawMsg)
             {
-                //if (!active) return;
+                if (!active) return;
 
                 Debug.Log("[AudioTaunts]  Received AudioTauntIdentifiers from Server");
                 //rawMsg.reader.SeekZero();
@@ -453,7 +465,7 @@ namespace GameMod
                         p = hash.Split('-');
                         if (p.Length == 2 && p[0] != null && p[1] != null)
                         {
-                            Taunt taunt = taunts.Find(t => t.hash.Equals(p[0]) & t.name.Equals(p[1]));
+                            AudioTaunt taunt = taunts.Find(t => t.hash.Equals(p[0]) & t.name.Equals(p[1]));
                             if (taunt != null)
                             {
                                 Debug.Log("[AudioTaunts]  Found Audiotaunt in the local data: " + hash);
@@ -467,6 +479,16 @@ namespace GameMod
                                     Debug.Log("[AudioTaunts]  MPAudioTaunts_Client_RegisterHandlers: no client?");
                                     return;
                                 }
+                                // to prepare for an incoming answer to our request we create a context to collect the bytes from the server
+                                external_taunts.Add(hash, new AudioTaunt
+                                {
+                                    hash = p[0],
+                                    name = p[1],
+                                    audio_taunt_data = new byte[audio_taunt_size_limit],
+                                    ready_to_play = false,
+                                    requested_taunt = true
+                                });
+
                                 Client.GetClient().Send(MessageTypes.MsgRequestAudioTaunt,
                                     new RequestAudioTaunt
                                     {
@@ -479,14 +501,11 @@ namespace GameMod
                 }
             }
 
-            public static List<FileData> queued_uploads = new List<FileData>();
-            public static bool isUploading = false;
             private static void OnRequestAudioTaunt(NetworkMessage rawMsg)
             {
-                //if (!active) return;
+                if (!active) return;
 
                 // start a transmission to the server
-                //rawMsg.reader.SeekZero();
                 var msg = rawMsg.ReadMessage<RequestAudioTaunt>();
                 string filename = msg.identifier;
                 Debug.Log("[AudioTaunts]  Server requested audiotaunt: " + filename);
@@ -499,20 +518,16 @@ namespace GameMod
                     Debug.Log("[AudioTaunts]  starting the upload or putting it in the queue: " + filename);
                     if (!isUploading)
 
-                        GameManager.m_gm.StartCoroutine(UploadAudioTauntToServer(new FileData
+                        GameManager.m_gm.StartCoroutine(UploadAudioTauntToServer(new AudioTaunt
                         {
-                            netid = 0,
-                            pos = 0,
-                            identifier = filename,
-                            bytes = data
+                            hash = msg.identifier,
+                            audio_taunt_data = data
                         }));
                     else
-                        queued_uploads.Add(new FileData
+                        queued_uploads.Add(new AudioTaunt
                         {
-                            netid = 0,
-                            pos = 0,
-                            identifier = filename,
-                            bytes = data
+                            hash = msg.identifier,
+                            audio_taunt_data = data
                         });
                 }
                 else
@@ -521,51 +536,67 @@ namespace GameMod
                 }
             }
 
-            public static IEnumerator UploadAudioTauntToServer( FileData data )
+            public static IEnumerator UploadAudioTauntToServer( AudioTaunt data )
             {
                 isUploading = true;
                 Debug.Log("[AudioTaunts] Started uploading AudioTaunt to server");
-
+                int _packet_id = 0;
                 int position = 0;
-                while (position < data.bytes.Length)
+                while (position < data.audio_taunt_data.Length)
                 {
                     int index = 0;
-                    byte[] to_send = new byte[512];
-                    while (index < 512 & ((position + index) < data.bytes.Length))
+                    byte[] to_send = new byte[packet_payload_size];
+                    while (index < packet_payload_size & ((position + index) < data.audio_taunt_data.Length))
                     {
-                        to_send[index] = data.bytes[position + index];
+                        to_send[index] = data.audio_taunt_data[position + index];
                         index++;
                     }
 
-                    UploadAudioTaunt packet = new UploadAudioTaunt
+                    AudioTauntPacket packet = new AudioTauntPacket
                     {
-                        size_of_file = data.bytes.Length,
+                        filesize = data.audio_taunt_data.Length,
                         amount_of_bytes_sent = index,
-                        identifier = data.identifier,
+                        identifier = data.hash,
+                        packet_id = _packet_id,
                         data = to_send,//Convert.ToBase64String(to_send)
                     };
                     
                     Client.GetClient().connection.Send(MessageTypes.MsgUploadAudioTaunt,packet);
-                    Debug.Log("[AudioTaunts]    upload: " + (position + index) + " / " + data.bytes.Length + "  for" + data.identifier);
+                    Debug.Log("[AudioTaunts]    upload: " + (position + index) + " / " + data.audio_taunt_data.Length + "  for" + data.hash);
                     yield return delay;
-                    position += 512;
+                    position += packet_payload_size;
+                    _packet_id++;
                 }
 
                 isUploading = false;
             }
 
-            public static List<FileData> received_files = new List<FileData>();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             private static void OnUploadAudioTaunt(NetworkMessage rawMsg)
             {
                 if (!active ) 
                     return;
 
-                var msg = rawMsg.ReadMessage<UploadAudioTaunt>();
+                var msg = rawMsg.ReadMessage<AudioTauntPacket>();
 
                 // split message into identifier,file_size and data
                 //int index = msg.data.IndexOf('/');
                 string file_identifier = msg.identifier;//msg.data.Substring(0, index);
-                int total_file_size = msg.size_of_file;//Int32.Parse(msg.data.Substring(index + 1, msg.data.IndexOf('/', index + 1) - (index + 1)));
+                int total_file_size = msg.filesize;//Int32.Parse(msg.data.Substring(index + 1, msg.data.IndexOf('/', index + 1) - (index + 1)));
                 byte[] decoded_data = msg.data;//Convert.FromBase64String(msg.data);//Convert.FromBase64String(msg.data.Remove(0, msg.data.IndexOf('/', index + 1) + 1));
 
                 FileData fd = received_files.Find(f => f.identifier.Equals(file_identifier));
@@ -827,9 +858,9 @@ namespace GameMod
                         index++;
                     }
 
-                    UploadAudioTaunt packet = new UploadAudioTaunt
+                    AudioTauntPacket packet = new AudioTauntPacket
                     {
-                        size_of_file = data.bytes.Length,
+                        filesize = data.bytes.Length,
                         amount_of_bytes_sent = index,
                         identifier = data.identifier,
                         data = to_send,//Convert.ToBase64String(to_send)
@@ -849,13 +880,13 @@ namespace GameMod
                     return;
 
                 Debug.Log("[AudioTaunts]        Received a Fragment of an Audiotaunt");
-                var msg = rawMsg.ReadMessage<UploadAudioTaunt>();
+                var msg = rawMsg.ReadMessage<AudioTauntPacket>();
                 Debug.Log("[AudioTaunts]            Marker ");
                 // split message into identifier,file_size and data
                 //int index = msg.data.IndexOf('/');
                 string file_identifier = msg.identifier;//msg.data.Substring(0, index);
                 Debug.Log("[AudioTaunts]            Marker ");
-                int total_file_size = msg.size_of_file;//Int32.Parse(msg.data.Substring(index + 1, msg.data.IndexOf('/', index + 1) - (index + 1)));
+                int total_file_size = msg.filesize;//Int32.Parse(msg.data.Substring(index + 1, msg.data.IndexOf('/', index + 1) - (index + 1)));
                 Debug.Log("[AudioTaunts]            Marker ");
                 byte[] decoded_data = msg.data;//Convert.FromBase64String(msg.data);//Convert.FromBase64String(msg.data.Remove(0, msg.data.IndexOf('/', index + 1) + 1));
                 Debug.Log("[AudioTaunts]            Marker ");
@@ -1009,7 +1040,9 @@ namespace GameMod
                 NetworkServer.RegisterHandler(MessageTypes.MsgUploadAudioTaunt, OnUploadAudioTaunt);
                 NetworkServer.RegisterHandler(MessageTypes.MsgPlayAudioTaunt, OnPlayAudioTaunt);
             }
-        }
+        } 
+
+
 
         public class ShareAudioTauntIdentifiers : MessageBase
         {
@@ -1041,42 +1074,10 @@ namespace GameMod
             }
         }
 
-        public class UploadAudioTaunt : MessageBase
-        {
-            //public int pos_of_first_byte;
-            public int size_of_file;
-            public int amount_of_bytes_sent;
-            public string identifier;
-            public byte[] data;
-
-
-            public override void Serialize(NetworkWriter writer)
-            {
-                //writer.Write(pos_of_first_byte);
-                writer.Write(size_of_file);
-                writer.Write(amount_of_bytes_sent);
-                writer.Write(identifier);
-                for(int i = 0; i < amount_of_bytes_sent; i++)
-                {
-                    writer.Write(data[i]);
-                } 
-            }
-            public override void Deserialize(NetworkReader reader)
-            {
-                reader.SeekZero();
-                //pos_of_first_byte = reader.ReadInt32();
-                size_of_file = reader.ReadInt32();
-                amount_of_bytes_sent = reader.ReadInt32();
-                identifier = reader.ReadString();
-                data = reader.ReadBytes(amount_of_bytes_sent);
-
-            }
-        }
-
         public class PlayAudioTaunt : MessageBase
         {
             public string identifier;
-            
+
             public override void Serialize(NetworkWriter writer)
             {
                 writer.Write(identifier);
@@ -1087,6 +1088,70 @@ namespace GameMod
                 identifier = reader.ReadString();
             }
         }
+
+        // Todo:
+        public class Ack : MessageBase
+        {
+            public string identifier;
+            public int packet_id;
+
+            public override void Serialize(NetworkWriter writer)
+            {
+                writer.Write(packet_id.ToString()+"/");
+                writer.Write(identifier);
+            }
+            public override void Deserialize(NetworkReader reader)
+            {
+                reader.SeekZero();
+                var msg = reader.ReadString().Split('/');
+                packet_id = int.Parse(msg[0]);
+                identifier = msg[1];
+            }
+        }
+
+
+
+        // Todo: test this
+        public class AudioTauntPacket : MessageBase
+        {
+            public int filesize;
+            public int amount_of_bytes_sent;
+            public string identifier;
+            public int packet_id;
+            public byte[] data;
+
+            public override void Serialize(NetworkWriter writer)
+            {
+                writer.Write(packet_id.ToString()+ "/");
+                writer.Write(filesize.ToString()+ "/");
+                writer.Write(amount_of_bytes_sent.ToString()+ "/");
+                writer.Write(identifier+ "/");
+                writer.Write(Convert.ToBase64String(data));
+            }
+            public override void Deserialize(NetworkReader reader)
+            {
+                string msg = reader.ReadString();
+                int pos = msg.IndexOf("/");
+                packet_id = int.Parse(msg.Substring(0, pos));
+                msg = msg.Remove(0, pos + 1);
+
+                pos = msg.IndexOf("/");
+                filesize = int.Parse(msg.Substring(0, pos));
+                msg = msg.Remove(0, pos + 1);
+
+                pos = msg.IndexOf("/");
+                amount_of_bytes_sent = int.Parse(msg.Substring(0, pos));
+                msg = msg.Remove(0, pos + 1);
+
+                pos = msg.IndexOf("/");
+                identifier = msg.Substring(0, pos);
+                msg = msg.Remove(0, pos + 1);
+
+                data = Convert.FromBase64String(msg);
+            }
+        }
+
+
 
 
 
