@@ -561,7 +561,7 @@ namespace GameMod
                         data = to_send,//Convert.ToBase64String(to_send)
                     };
                     
-                    Client.GetClient().connection.Send(MessageTypes.MsgUploadAudioTaunt,packet);
+                    Client.GetClient().connection.Send(MessageTypes.MsgAudioTauntPacket,packet);
                     Debug.Log("[AudioTaunts]    upload: " + (position + index) + " / " + data.audio_taunt_data.Length + "  for" + data.hash);
                     yield return delay;
                     position += packet_payload_size;
@@ -586,7 +586,7 @@ namespace GameMod
 
 
 
-            private static void OnUploadAudioTaunt(NetworkMessage rawMsg)
+            private static void OnAudioTauntPacket(NetworkMessage rawMsg)
             {
                 if (!active ) 
                     return;
@@ -738,7 +738,7 @@ namespace GameMod
 
                 Client.GetClient().RegisterHandler(MessageTypes.MsgShareAudioTauntIdentifiers, OnShareAudioTauntIdentifiers);
                 Client.GetClient().RegisterHandler(MessageTypes.MsgRequestAudioTaunt, OnRequestAudioTaunt);
-                Client.GetClient().RegisterHandler(MessageTypes.MsgUploadAudioTaunt, OnUploadAudioTaunt);
+                Client.GetClient().RegisterHandler(MessageTypes.MsgAudioTauntPacket, OnAudioTauntPacket);
                 Client.GetClient().RegisterHandler(MessageTypes.MsgPlayAudioTaunt, OnPlayAudioTaunt);
             }
         }
@@ -865,7 +865,7 @@ namespace GameMod
                         identifier = data.identifier,
                         data = to_send,//Convert.ToBase64String(to_send)
                     };
-                    NetworkServer.SendToClient(data.netid, MessageTypes.MsgUploadAudioTaunt, packet);
+                    NetworkServer.SendToClient(data.netid, MessageTypes.MsgAudioTauntPacket, packet);
                     Debug.Log("[AudioTaunts]    upload: "+(position+index)+" / "+data.bytes.Length+"  for" + data.identifier);
                     yield return delay;
                     position += 512;
@@ -1037,7 +1037,7 @@ namespace GameMod
             {
                 NetworkServer.RegisterHandler(MessageTypes.MsgShareAudioTauntIdentifiers, OnShareAudioTauntIdentifiers);
                 NetworkServer.RegisterHandler(MessageTypes.MsgRequestAudioTaunt, OnRequestAudioTaunt);
-                NetworkServer.RegisterHandler(MessageTypes.MsgUploadAudioTaunt, OnUploadAudioTaunt);
+                NetworkServer.RegisterHandler(MessageTypes.MsgAudioTauntPacket, OnUploadAudioTaunt);
                 NetworkServer.RegisterHandler(MessageTypes.MsgPlayAudioTaunt, OnPlayAudioTaunt);
             }
         } 
