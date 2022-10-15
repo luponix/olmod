@@ -1012,7 +1012,7 @@ namespace GameMod
                                     case 1615:
                                         if (MPAudioTaunts.initialized)
                                         {
-                                            //MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
+                                            MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
                                             MPAudioTaunts.PlayAudioTauntFromAudioclip(MPAudioTaunts.local_taunts[menu_selection - 1610].audioclip);
                                             //MPAudioTaunts.PlayAudioTaunt(MPAudioTaunts.taunts.IndexOf(MPAudioTaunts.local_taunts[menu_selection - 1610]));
                                         }

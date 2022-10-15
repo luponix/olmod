@@ -24,7 +24,7 @@ namespace GameMod
 
 
 
-
+        // Add console commands here 
 
 
 
@@ -176,6 +176,7 @@ namespace GameMod
         {
             Debug.Log("Attempting to import AudioTaunts from: " + path_to_directory);
             bool load_all_files = files_to_load == null | files_to_load.Count == 0;
+            Debug.Log(" load all files: "+load_all_files);
             var fileInfo = new DirectoryInfo(path_to_directory).GetFiles();
             foreach (FileInfo file in fileInfo)
             {
@@ -209,6 +210,7 @@ namespace GameMod
 
         private static AudioClip LoadAsAudioClip(string filename, string ext, string path2)
         {
+            Debug.Log("  Attempting to load file as audio clip: "+filename);
             string path = Path.Combine(path2, filename);
             if (path != null)
             {
@@ -285,7 +287,8 @@ namespace GameMod
                 Debug.Log("Couldnt play Audio taunt. All audio sources are occupied!");
                 return;
             }
-            audioSources[index].clip = audioClip;
+            Debug.Log("Playing AudioTaunt");
+            audioSources[index].clip = GameManager.m_audio.GetClip(300);//audioClip;
             audioSources[index].volume = audio_taunt_volume / 100f;
             audioSources[index].timeSamples = 0;
             audioSources[index].bypassReverbZones = true;
@@ -581,7 +584,7 @@ namespace GameMod
 
 
 
-
+            /*
 
 
 
@@ -712,7 +715,7 @@ namespace GameMod
                         }
                     }
                 }*/
-            }
+           /* }
 
             private static void OnPlayAudioTaunt(NetworkMessage rawMsg)
             {
@@ -726,7 +729,7 @@ namespace GameMod
                     external_taunts.TryGetValue(msg.identifier, out Taunt t);
                     PlayAudioTauntFromAudioclip(t.audioclip);
                 }
-            }
+            }*/
 
             static void Postfix()
             {
@@ -738,8 +741,8 @@ namespace GameMod
 
                 Client.GetClient().RegisterHandler(MessageTypes.MsgShareAudioTauntIdentifiers, OnShareAudioTauntIdentifiers);
                 Client.GetClient().RegisterHandler(MessageTypes.MsgRequestAudioTaunt, OnRequestAudioTaunt);
-                Client.GetClient().RegisterHandler(MessageTypes.MsgAudioTauntPacket, OnAudioTauntPacket);
-                Client.GetClient().RegisterHandler(MessageTypes.MsgPlayAudioTaunt, OnPlayAudioTaunt);
+               // Client.GetClient().RegisterHandler(MessageTypes.MsgAudioTauntPacket, OnAudioTauntPacket);
+               // Client.GetClient().RegisterHandler(MessageTypes.MsgPlayAudioTaunt, OnPlayAudioTaunt);
             }
         }
 
@@ -754,7 +757,7 @@ namespace GameMod
 
         public static List<int> connectionids = new List<int>();                 // contains the connection ids of the clients that support audiotaunts
         public static Dictionary<string, int> active_files = new Dictionary<string, int>();     // contains the filenames of all audiotaunts that can get used and requested in the current game. string = filename, int = connection id
-        public static Dictionary<string, FileData> server_audio_taunts = new Dictionary<string, FileData>();
+       // public static Dictionary<string, FileData> server_audio_taunts = new Dictionary<string, FileData>();
 
         [HarmonyPatch(typeof(Server), "RegisterHandlers")]
         class MPAudioTaunts_Server_RegisterHandlers
@@ -800,7 +803,7 @@ namespace GameMod
             }
 
             public static List<Request> requests = new List<Request>();
-            private static void OnRequestAudioTaunt(NetworkMessage rawMsg)
+            /*private static void OnRequestAudioTaunt(NetworkMessage rawMsg)
             {
                 // check if the file exists in server_audio_taunts and start a coroutine that uses
                 // a series of UploadAudioTaunt packets to deliver the file to the client
@@ -1010,7 +1013,7 @@ namespace GameMod
                 }
                 */
 
-
+/*
             }
 
 
@@ -1032,13 +1035,13 @@ namespace GameMod
                 }
                 
             }
-
+*/
             static void Postfix()
             {
                 NetworkServer.RegisterHandler(MessageTypes.MsgShareAudioTauntIdentifiers, OnShareAudioTauntIdentifiers);
-                NetworkServer.RegisterHandler(MessageTypes.MsgRequestAudioTaunt, OnRequestAudioTaunt);
-                NetworkServer.RegisterHandler(MessageTypes.MsgAudioTauntPacket, OnUploadAudioTaunt);
-                NetworkServer.RegisterHandler(MessageTypes.MsgPlayAudioTaunt, OnPlayAudioTaunt);
+                //NetworkServer.RegisterHandler(MessageTypes.MsgRequestAudioTaunt, OnRequestAudioTaunt);
+                //NetworkServer.RegisterHandler(MessageTypes.MsgAudioTauntPacket, OnUploadAudioTaunt);
+                //NetworkServer.RegisterHandler(MessageTypes.MsgPlayAudioTaunt, OnPlayAudioTaunt);
             }
         } 
 
