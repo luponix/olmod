@@ -6,6 +6,7 @@ using System.Reflection.Emit;
 
 namespace GameMod
 {
+    /*
 	public static class MPSoundOcclusion
     {	
 		//									N/A		LOW		MED		STRONG			
@@ -56,10 +57,11 @@ namespace GameMod
 			}
 		}
 	}
-
+*/
 	[HarmonyPatch(typeof(UnityAudio), "PlaySound")]
 	internal class MPSoundOcclusion_UnityAudio_PlaySound
 	{
+        /*
 		static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
 		{
 			foreach (var code in codes)
@@ -137,5 +139,9 @@ namespace GameMod
 				MPSoundExt.m_a_source[__result].Play();  // Nop'd out in the transpiler
 			}
 		}
+    */
+        static void Postfix()
+        {
+        }
 	}
 }
