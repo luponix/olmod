@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection.Emit;
 using UnityEngine;
 
+/*
 /// <summary>
 /// Converts the 2D homing weapon warning cues into 3D ones coming from the actual projectile angle
 /// </summary>
@@ -71,3 +72,4 @@ namespace GameMod
         }
     }
 }
+*/
