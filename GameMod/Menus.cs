@@ -53,24 +53,6 @@ namespace GameMod {
             return MenuManager.GetToggleSetting(Convert.ToInt32(RearView.MPMenuManagerEnabled));
         }
 
-        public static int mms_audio_occlusion_strength { get; set; } = 0;
-        public static string GetMMSAudioOcclusionStrength()
-        {
-            switch (mms_audio_occlusion_strength)
-            {
-                case 0:
-                    return "OFF";
-                case 1:
-                    return "WEAK";
-                case 2:
-                    return "MEDIUM";
-                case 3:
-                    return "STRONG";
-                default:
-                    return "UNKNOWN";
-            }
-        }
-
         public static string GetMMSAlwaysCloaked()
         {
             return MenuManager.GetToggleSetting(Convert.ToInt32(mms_always_cloaked));
@@ -1027,8 +1009,6 @@ namespace GameMod {
         private static void DrawSoundReload(UIElement uie, ref Vector2 position)
         {
             position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("AUDIO OCCLUSION STRENGTH"), position, 6, Menus.GetMMSAudioOcclusionStrength());
-            position.y += 62f;
             uie.SelectAndDrawItem("REINITIALIZE AUDIO DEVICE", position, 5, false);
         }
 
@@ -1067,14 +1047,6 @@ namespace GameMod {
             {
                 case 5:
                     AudioSettings.Reset(AudioSettings.GetConfiguration());
-                    MenuManager.PlaySelectSound(1f);
-                    break;
-                case 6:
-                    Menus.mms_audio_occlusion_strength = (Menus.mms_audio_occlusion_strength + UIManager.m_select_dir) % 4;
-                    if (Menus.mms_audio_occlusion_strength < 0)
-                    {
-                        Menus.mms_audio_occlusion_strength = 3;
-                    }
                     MenuManager.PlaySelectSound(1f);
                     break;
             }

@@ -253,7 +253,6 @@ namespace GameMod {
                 Menus.mms_team_health = ModPrefs.GetBool("MP_PM_TEAM_HEALTH", Menus.mms_team_health);
                 HUDVelocity.MenuManagerEnabled = ModPrefs.GetBool("MP_PM_SHOWHUDVELOCITY", HUDVelocity.MenuManagerEnabled);
                 Menus.mms_show_framerate = ModPrefs.GetBool("MP_PM_SHOWFRAMERATE", Menus.mms_show_framerate);
-                Menus.mms_audio_occlusion_strength = ModPrefs.GetInt("MP_PM_AUDIO_OCCLUSION_STRENGTH", Menus.mms_audio_occlusion_strength);
 
                 MPLoadouts.Loadouts[0].weapons[0] = (WeaponType)ModPrefs.GetInt("MP_PM_LOADOUT_BOMBER1_W1", (int)MPLoadouts.Loadouts[0].weapons[0]);
                 MPLoadouts.Loadouts[0].missiles[0] = (MissileType)ModPrefs.GetInt("MP_PM_LOADOUT_BOMBER1_M1", (int)MPLoadouts.Loadouts[0].missiles[0]);
@@ -332,7 +331,6 @@ namespace GameMod {
             ModPrefs.SetBool("MP_PM_TEAM_HEALTH", Menus.mms_team_health);
             ModPrefs.SetBool("MP_PM_SHOWHUDVELOCITY", HUDVelocity.MenuManagerEnabled);
             ModPrefs.SetBool("MP_PM_SHOWFRAMERATE", Menus.mms_show_framerate);
-            ModPrefs.SetInt("MP_PM_AUDIO_OCCLUSION_STRENGTH", Menus.mms_audio_occlusion_strength);
             ModPrefs.SetInt("MP_PM_LOADOUT_BOMBER1_W1", (int)MPLoadouts.Loadouts[0].weapons[0]);
             ModPrefs.SetInt("MP_PM_LOADOUT_BOMBER1_M1", (int)MPLoadouts.Loadouts[0].missiles[0]);
             ModPrefs.SetInt("MP_PM_LOADOUT_BOMBER1_M2", (int)MPLoadouts.Loadouts[0].missiles[1]);
