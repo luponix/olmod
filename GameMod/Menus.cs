@@ -40,12 +40,13 @@ namespace GameMod {
         public static bool mms_always_cloaked { get; set; }
         public static bool mms_allow_smash { get; set; }
         public static bool mms_damage_numbers { get; set; }
+        public static bool mms_client_damage_numbers { get; set; } = true;
         public static bool mms_assist_scoring { get; set; } = true;
         public static bool mms_team_color_default { get; set; } = true;
         public static int mms_team_color_self = 5;
         public static int mms_team_color_enemy = 6;
 
-        public static bool mms_team_health = true;
+        public static bool mms_team_health { get; set; } = true;
         public static MpTeam? mms_team_selection { get; set; } = null;
 
         public static string GetMMSRearViewPIP()
@@ -53,10 +54,22 @@ namespace GameMod {
             return MenuManager.GetToggleSetting(Convert.ToInt32(RearView.MPMenuManagerEnabled));
         }
 
-        public static bool mms_loadout_hotkeys { get; set; } = true;
+        public static int mms_loadout_hotkeys { get; set; } = 1;
         public static string GetMMSLoadoutHotkeys()
         {
-            return MenuManager.GetToggleSetting(Convert.ToInt32(mms_loadout_hotkeys));
+            switch (mms_loadout_hotkeys)
+            {
+                case 0:
+                    return "OFF";
+                case 1:
+                    return "PRIMARY SELECT KEYS";
+                case 2:
+                    return "SEPARATE PRIMARIES";
+                case 3:
+                    return "NUMBER KEYS 1-4";
+                default:
+                    return "UNKNOWN";
+            }
         }
 
         public static string GetMMSAlwaysCloaked()
@@ -631,7 +644,7 @@ namespace GameMod {
                     position.y += 52f;
                     __instance.SelectAndDrawStringOptionItem(Loc.LS("PROFANITY FILTER"), position, 8, DisableProfanityFilter.profanity_filter ? "ON" : "OFF", Loc.LS(""));
                     position.y += 52f;
-                    __instance.SelectAndDrawStringOptionItem(Loc.LS("ENABLE LOADOUT SELECTION HOTKEYS"), position, 9, Menus.GetMMSLoadoutHotkeys(), Loc.LS("WEAPON SELECTION HOTKEYS WILL QUICK-SWAP BETWEEN LOADOUTS"));
+                    __instance.SelectAndDrawStringOptionItem(Loc.LS("LOADOUT SELECTION HOTKEYS"), position, 9, Menus.GetMMSLoadoutHotkeys(), Loc.LS("WEAPON SELECTION HOTKEYS WILL QUICK-SWAP BETWEEN LOADOUTS"));
                     position.y += 68f;
                     __instance.SelectAndDrawItem(Loc.LS("QUICK CHAT"), position, 1, false, 1f, 0.75f);
                     break;
@@ -645,6 +658,8 @@ namespace GameMod {
                     __instance.SelectAndDrawStringOptionItem(Loc.LS("ENEMY TEAM"), position, 3, Menus.GetMMSTeamColorEnemy(), "", 1.5f, Menus.mms_team_color_default);
                     position.y += 64f;
                     __instance.SelectAndDrawStringOptionItem(Loc.LS("SHOW TEAM HEALTH"), position, 4, Menus.mms_team_health ? "ON" : "OFF", "SETS WHETHER THE HEALTH OF TEAMMATES SHOULD GET DISPLAYED", 1.5f, false);
+                    position.y += 64;
+                    __instance.SelectAndDrawStringOptionItem(Loc.LS("SHOW DAMAGE NUMBERS"), position, 5, Menus.mms_client_damage_numbers ? "ON" : "OFF", "SETS WHETHER DAMAGE NUMBERS ARE SHOWN IN GAMES WITH THEM ENABLED", 1.5f, false);
                     break;
                 case 2:
                     __instance.SelectAndDrawStringOptionItem(Loc.LS("LAG COMPENSATION"), position, 1, Menus.GetMMSLagCompensation(), "ENABLE LAG COMPENSATION FOR MULTIPLAYER GAMES", 1.5f, false);
@@ -884,7 +899,11 @@ namespace GameMod {
                                         MenuManager.PlaySelectSound(1f);
                                         break;
                                     case 9:
-                                        Menus.mms_loadout_hotkeys = !Menus.mms_loadout_hotkeys;
+                                        Menus.mms_loadout_hotkeys = (Menus.mms_loadout_hotkeys + UIManager.m_select_dir) % 4;
+                                        if (Menus.mms_loadout_hotkeys < 0)
+                                        {
+                                            Menus.mms_loadout_hotkeys = 3;
+                                        }
                                         MenuManager.PlaySelectSound(1f);
                                         break;
                                 }
@@ -917,6 +936,10 @@ namespace GameMod {
                                         break;
                                     case 4:
                                         Menus.mms_team_health = !Menus.mms_team_health;
+                                        MenuManager.PlaySelectSound(1f);
+                                        break;
+                                    case 5:
+                                        Menus.mms_client_damage_numbers = !Menus.mms_client_damage_numbers;
                                         MenuManager.PlaySelectSound(1f);
                                         break;
                                 }
