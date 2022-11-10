@@ -270,7 +270,6 @@ namespace GameMod
             if (audio_taunt_volume == 0 | audioClip == null | !active )
                 return;
 
-            //AudioSource audioSource = new GameObject().AddComponent<AudioSource>();
             int index = -1;
             for (int i = 0; i < audioSources.Length; i++)
             {
@@ -288,7 +287,7 @@ namespace GameMod
                 return;
             }
             Debug.Log("Playing AudioTaunt");
-            audioSources[index].clip = GameManager.m_audio.GetClip(300);//audioClip;
+            audioSources[index].clip = audioClip;
             audioSources[index].volume = audio_taunt_volume / 100f;
             audioSources[index].timeSamples = 0;
             audioSources[index].bypassReverbZones = true;
