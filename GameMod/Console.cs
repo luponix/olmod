@@ -168,6 +168,7 @@ namespace GameMod {
             uConsole.RegisterCommand("ui_color", "Set UI color #aabbcc", new uConsole.DebugCommand(CmdUIColor));
             uConsole.RegisterCommand("vr_scale", "Set VR scale (0.1 to 10)", new uConsole.DebugCommand(CmdVRScale));
             uConsole.RegisterCommand("xp", "Set XP", new uConsole.DebugCommand(CmdXP));
+            uConsole.RegisterCommand("parse_level_as_obj", "Parses the actively loaded level's vertices and faces as an .obj", new uConsole.DebugCommand(LevelGeometryConverter.Save));
         }
     }
 
