@@ -12,71 +12,13 @@ namespace GameMod
 {
     class MPAutoSelection
     {
-        
-        [HarmonyPatch(typeof(GameManager), "Start")]
-        internal class CommandsAndInitialisationPatch
-        {
-            private static void Postfix(GameManager __instance)
-            {
-                uConsole.RegisterCommand("toggleprimaryorder", "toggles all Weapon Selection logic related to primary weapons", new uConsole.DebugCommand(CommandsAndInitialisationPatch.CmdTogglePrimary));
-                uConsole.RegisterCommand("togglesecondaryorder", "toggles all Weapon Selection logic related to secondary weapons", new uConsole.DebugCommand(CommandsAndInitialisationPatch.CmdToggleSecondary));
-                uConsole.RegisterCommand("toggle_hud", "Toggles some HUD elements", new uConsole.DebugCommand(CommandsAndInitialisationPatch.CmdToggleHud));
-                Initialise();
-            }
-
-            // COMMANDS
-            private static void CmdToggleHud()
-            {
-                miasmic = !miasmic;
-                uConsole.Log("Toggled HUD! current state : " + miasmic);
-                ExtendedConfig.Section_AutoSelect.Set(true);
-            }
-
-            private static void CmdTogglePrimary()
-            {
-                primarySwapFlag = !primarySwapFlag;
-                uConsole.Log("[AS] Primary weapon swapping: " + primarySwapFlag);
-                ExtendedConfig.Section_AutoSelect.Set(true);
-            }
-
-            private static void CmdToggleSecondary()
-            {
-                secondarySwapFlag = !secondarySwapFlag;
-                uConsole.Log("[AS] Secondary weapon swapping: " + secondarySwapFlag);
-                ExtendedConfig.Section_AutoSelect.Set(true);
-            }
-        }
 
 
 
 
 
-        [HarmonyPatch(typeof(UIElement), "DrawHUDArmor")]
-        internal class MaybeDrawHUDElement1
-        {
-            public static bool Prefix(UIElement __instance)
-            {
-                return !miasmic;
-            }
-        }
 
-        [HarmonyPatch(typeof(UIElement), "DrawHUDEnergyAmmo")]
-        internal class MaybeDrawHUDElement2
-        {
-            public static bool Prefix()
-            {
-                return !miasmic;
-            }
-        }
 
-        [HarmonyPatch(typeof(UIElement), "DrawHUDIndicators")]
-        internal class MaybeDrawHUDElement3
-        {
-            public static bool Prefix(UIElement __instance)
-            {
-                return !miasmic;
-            }
-        }
 
 
 
