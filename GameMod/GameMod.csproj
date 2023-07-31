@@ -79,6 +79,10 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>$(OverloadDir)\Overload_Data\Managed\UnityEngine.Networking.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.UNETModule, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>$(OverloadDir)\Overload_Data\Managed\UnityEngine.UNETModule.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine.ParticleSystemModule, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>$(OverloadDir)\Overload_Data\Managed\UnityEngine.ParticleSystemModule.dll</HintPath>
@@ -98,10 +102,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AddOnLevelSort.cs" />
+    <Compile Include="AmbientUnload.cs" />
+    <Compile Include="AxisCountFix.cs" />
+    <Compile Include="FramerateLimiter.cs" />
+    <Compile Include="MPShips.cs" />
+    <Compile Include="MPColliderSwap.cs" />
+    <Compile Include="MPPacketStatus.cs" />
     <Compile Include="Config.cs" />
     <Compile Include="Console.cs" />
     <Compile Include="Controllers.cs" />
+    <Compile Include="ControlsExt.cs" />
     <Compile Include="CrusherTrails.cs" />
+    <Compile Include="HUDVelocity.cs" />
+    <Compile Include="DisableProfanityFilter.cs" />
     <Compile Include="MatchModeCTF.cs" />
     <Compile Include="CustomDoorAutomap.cs" />
     <Compile Include="CustomLevelResources.cs" />
@@ -119,22 +132,32 @@
     <Compile Include="MoreAudio.cs" />
     <Compile Include="MPAlwaysCloaked.cs" />
     <Compile Include="MPAnticheat.cs" />
+    <Compile Include="MPAudioTaunts.cs" />
     <Compile Include="MPAutomap.cs" />
     <Compile Include="MPAutoSelection.cs" />
     <Compile Include="MPAutoSelectionUI.cs" />
+    <Compile Include="MPBanPlayers.cs" />
     <Compile Include="MPCeiling.cs" />
+    <Compile Include="MPChatCommands.cs" />
     <Compile Include="MPClassic.cs" />
     <Compile Include="MPClientExtrapolation.cs" />
     <Compile Include="MPCloak.cs" />
+    <Compile Include="MPColoredPlayerNames.cs" />
     <Compile Include="MPContinue.cs" />
     <Compile Include="MPCreeperSync.cs" />
     <Compile Include="MPCustomModeFile.cs" />
     <Compile Include="MPDamageEffects.cs" />
     <Compile Include="MPDeathExplosion.cs" />
     <Compile Include="MPDeathReview.cs" />
+    <Compile Include="MPDeathRollSync.cs" />
+    <Compile Include="MPDirectionalWarning.cs" />
     <Compile Include="MPErrorSmoothingFix.cs" />
     <Compile Include="MPFixGhostProjectiles.cs" />
     <Compile Include="MPHUDMessage.cs" />
+    <Compile Include="MPIPLogging.cs" />
+    <Compile Include="MPItemSpawns.cs" />
+    <Compile Include="MPDownloadLevelAlgorithm.cs" />
+    <Compile Include="MPLoadouts.cs" />
     <Compile Include="MPLongPwd.cs" />
     <Compile Include="MPMatchPresets.cs" />
     <Compile Include="MPMatchTimeLimits.cs" />
@@ -143,18 +166,24 @@
     <Compile Include="MPMonoDNSFix.cs" />
     <Compile Include="MPNoDupes.cs" />
     <Compile Include="MPNoPositionCompression.cs" />
+    <Compile Include="MPOpponentCockpits.cs" />
     <Compile Include="MPPickupCheck.cs" />
     <Compile Include="MPPrimaries.cs" />
+    <Compile Include="MPReduceJoinTimeout.cs" />
     <Compile Include="MPRespawn.cs" />
     <Compile Include="MPScoreboards.cs" />
     <Compile Include="MPServerBrowser.cs" />
     <Compile Include="MPSmash.cs" />
     <Compile Include="MPSniperPackets.cs" />
+    <Compile Include="MPSoundExt.cs" />
+    <Compile Include="MPSoundOcclusion.cs" />
     <Compile Include="MPSpawnInitialization.cs" />
+    <Compile Include="MPSpawnInvuln.cs" />
     <Compile Include="MPSpew.cs" />
     <Compile Include="MPSuddenDeath.cs" />
     <Compile Include="MPSuperCheck.cs" />
     <Compile Include="MPTags.cs" />
+    <Compile Include="MPThunderboltPassthrough.cs" />
     <Compile Include="MPTriggers.cs" />
     <Compile Include="MPDownloadLevel.cs" />
     <Compile Include="MPInternet.cs" />
@@ -172,11 +201,16 @@
     <Compile Include="MPProjInit.cs" />
     <Compile Include="MPPwdPaste.cs" />
     <Compile Include="MPSetup.cs" />
+    <Compile Include="MPSkipClientResimulation.cs" />
     <Compile Include="MPTeams.cs" />
     <Compile Include="MPTeamsEnemyArrow.cs" />
     <Compile Include="MPTweaks.cs" />
     <Compile Include="MPUnlockAll.cs" />
+    <Compile Include="MPValidatePlayerNames.cs" />
+    <Compile Include="MPWeaponBehavior.cs" />
+    <Compile Include="MPWeaponCycling.cs" />
     <Compile Include="MusicCustom.cs" />
+    <Compile Include="PoorMansProfiler.cs" />
     <Compile Include="PrevWeaponFix.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PresetData.cs" />
@@ -189,11 +223,15 @@
     <Compile Include="ServerTrackerPost.cs" />
     <Compile Include="Menus.cs" />
     <Compile Include="Shaders.cs" />
+    <Compile Include="WarperOrientation.cs" />
+    <Compile Include="ExitCutscene.cs" />
     <Compile Include="UIMeshColliderNoRender.cs" />
     <Compile Include="VersionHandling\OlmodVersion.cs" />
     <Compile Include="VersionHandling\PatchVersionInfo.cs" />
     <Compile Include="VRScale.cs" />
     <Compile Include="VSync.cs" />
+    <Compile Include="Boss2B.cs" />
+    <Compile Include="MatcenHp.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="0Harmony.dll" />
@@ -201,6 +239,7 @@
   <ItemGroup>
     <None Include="Directory.Build.targets" />
     <None Include="olmodsettings.json" />
+    <EmbeddedResource Include="Resources\meshes" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

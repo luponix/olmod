@@ -1220,15 +1220,18 @@ END_ENTRY
             get { return CTF.CarrierBoostEnabled; }
             set { CTF.CarrierBoostEnabled = value; }
         }
-        public static bool AlwaysCloaked {
+        public static bool AlwaysCloaked
+        {
             get { return MPAlwaysCloaked.Enabled; }
             set { MPAlwaysCloaked.Enabled = value; }
         }
         public static string CustomProjdata { get; set; }
-        public static bool AllowSmash {
+        public static bool AllowSmash
+        {
             get { return MPSmash.Enabled; }
             set { MPSmash.Enabled = value; }
         }
+
         public static int MatchTimeLimit
         {
             get { return MPMatchTimeLimits.MatchTimeLimit; }
@@ -1240,6 +1243,30 @@ END_ENTRY
         {
             get { return true; }
             set { JoystickRotationFix.server_support = value; }
+        }
+
+        public static int ShipMeshCollider
+        {
+            get { return MPColliderSwap.selectedCollider; }
+            set { MPColliderSwap.selectedCollider = value; }
+        }
+
+        public static bool ThunderboltPassthrough
+        {
+            get { return MPThunderboltPassthrough.isAllowed; }
+            set { MPThunderboltPassthrough.isAllowed = value; }
+        }
+
+        public static bool DamageNumbers
+        {
+            get { return MPObserver.DamageNumbersEnabled; }
+            set { MPObserver.DamageNumbersEnabled = value; }
+        }
+
+        public static bool AudioTauntsSupported
+        {
+            get { return true; }
+            set { MPAudioTaunts.AServer.server_supports_audiotaunts = value; }
         }
 
         public static JObject Serialize()
@@ -1264,6 +1291,10 @@ END_ENTRY
             jobject["matchtimelimit"] = MatchTimeLimit;
             jobject["assistscoring"] = AssistScoring;
             jobject["joystickrotationfixsupported"] = JoystickRotationFixSupported;
+            jobject["shipmeshcollider"] = ShipMeshCollider;
+            jobject["thunderboltpassthrough"] = ThunderboltPassthrough;
+            jobject["damagenumbers"] = DamageNumbers;
+            jobject["audiotauntsupport"] = AudioTauntsSupported;
             return jobject;
         }
 
@@ -1292,6 +1323,10 @@ END_ENTRY
                 NetworkMatch.m_match_time_limit_seconds = MatchTimeLimit;
             AssistScoring = root["assistscoring"].GetBool(true);
             JoystickRotationFixSupported = root["joystickrotationfixsupported"].GetBool(false);
+            ShipMeshCollider = root["shipmeshcollider"].GetInt(0);
+            ThunderboltPassthrough = root["thunderboltpassthrough"].GetBool(false);
+            DamageNumbers = root["damagenumbers"].GetBool(false);
+            AudioTauntsSupported = root["audiotauntsupport"].GetBool(false);
         }
 
         public static string GetModeString(MatchMode mode)
@@ -1580,8 +1615,11 @@ END_ENTRY
             MPModPrivateData.CtfCarrierBoostEnabled = Menus.mms_ctf_boost;
             MPModPrivateData.AlwaysCloaked = Menus.mms_always_cloaked;
             MPModPrivateData.AllowSmash = Menus.mms_allow_smash;
+            MPModPrivateData.DamageNumbers = Menus.mms_damage_numbers;
             MPModPrivateData.MatchTimeLimit = Menus.mms_match_time_limit == 0 ? int.MaxValue : Menus.mms_match_time_limit;
             MPModPrivateData.AssistScoring = Menus.mms_assist_scoring;
+            MPModPrivateData.ShipMeshCollider = Menus.mms_collision_mesh;
+            MPModPrivateData.ThunderboltPassthrough = MPThunderboltPassthrough.isAllowed;
             if (Menus.mms_mp_projdata_fn == "STOCK") {
                 MPModPrivateData.CustomProjdata = string.Empty;
             } else {
@@ -1590,7 +1628,7 @@ END_ENTRY
                     MPModPrivateData.CustomProjdata = System.IO.File.ReadAllText(Menus.mms_mp_projdata_fn);
                     
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     Debug.Log("Unable to read custom projdata file: " + Menus.mms_mp_projdata_fn);
                     MPModPrivateData.CustomProjdata = String.Empty;

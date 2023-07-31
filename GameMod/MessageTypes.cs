@@ -21,6 +21,7 @@ namespace GameMod
         public const short MsgCTFNotify = 125;
         public const short MsgLapCompleted = 126;
         public const short MsgSetFullMatchState = 127;
+        public const short MsgCTFJoinUpdate = 128;
 
         public const short MsgCreeperSync = 130;
         public const short MsgExplode = 131;
@@ -38,6 +39,17 @@ namespace GameMod
         public const short MsgDeathReview = 143;
 
         public const short MsgSetTurnRampMode = 145;
+        public const short MsgChangeTeam = 146;
+        public const short MsgCustomLoadouts = 147;
+        public const short MsgSetCustomLoadout = 148;
+
+        public const short MsgSendDamage = 149;
+
+        public const short MsgShareAudioTauntIdentifiers = 150;
+        public const short MsgRequestAudioTaunt = 151;
+        public const short MsgPlayAudioTaunt = 152;
+        public const short MsgAudioTauntPacket = 153;
+
         // Do not use 400, it is in use by Mod-Projdata.dll.
     }
 }

@@ -67,6 +67,7 @@ namespace GameMod {
             if (ready)
             {
                 player.c_player_ship.RestoreLights();
+                MPOpponentCockpits.SetOpponentCockpitVisibility(player,false);
             }
             else
             {
@@ -240,6 +241,47 @@ namespace GameMod {
     [HarmonyPatch(typeof(Server), "OnPlayerJoinLobbyMessage")]
     class JIPJoinLobby
     {
+        private static IEnumerator WaitForMPTweaks(int connectionId, int maxSeconds, int informAfter=-1)
+        {
+            int cnt = 0;
+            while (!MPTweaks.ClientHasMod(connectionId) && cnt < maxSeconds * 10)  {
+                cnt++;
+                yield return new WaitForSecondsRealtime(0.1f);
+                if (!NetworkMatch.m_players.ContainsKey(connectionId)) // disconnected?
+                    yield break;
+                if (cnt == informAfter * 10) {
+                    // it's already unlikely to be a modded client.
+                    LobbyChatMessage lmsg = new LobbyChatMessage(connectionId, "Server", MpTeam.TEAM0, "This server uses OLMod", false);
+                    NetworkServer.SendToClient(connectionId, 75, lmsg);
+                }
+            }
+        }
+
+        private static IEnumerator InformClientAboutOlmod(int connectionId, bool customLevel, int delaySeconds)
+        {
+            if (!MPTweaks.ClientHasMod(connectionId)) {
+                yield return GameManager.m_gm.StartCoroutine(WaitForMPTweaks(connectionId,3,1));
+            }
+            if (!NetworkMatch.m_players.ContainsKey(connectionId)) // disconnected?
+                yield break;
+            if (!MPTweaks.ClientHasMod(connectionId)) {
+                // client does not have olmod
+                LobbyChatMessage lmsg = null;
+                if (customLevel) {
+                    Debug.LogFormat("client {0} doesn't seem to have olmod, but we use a custom level, warning it", connectionId);
+                    lmsg = new LobbyChatMessage(connectionId, "Server", MpTeam.TEAM0, "Joining this match might be impossible without OLMod!", false);
+                    NetworkServer.SendToClient(connectionId, 75, lmsg);
+                } else {
+                    lmsg = new LobbyChatMessage(connectionId, "Server", MpTeam.TEAM0, "Please install OLMod for enhanced multiplayer experience!", false);
+                    NetworkServer.SendToClient(connectionId, 75, lmsg);
+                }
+                lmsg = new LobbyChatMessage(connectionId, "Server", MpTeam.TEAM0, "See olmod.overloadmaps.com for instructions...", false);
+                NetworkServer.SendToClient(connectionId, 75, lmsg);
+                if (delaySeconds > 0) {
+                    yield return new WaitForSecondsRealtime((float)(delaySeconds*10));
+                }
+            }
+        }
         private static IEnumerator SendSceneLoad(int connectionId)
         {
             // wait until we've received the loadout
@@ -249,8 +291,16 @@ namespace GameMod {
                     yield break;
                 yield return null;
             }
+            string level = MPJoinInProgress.NetworkMatchLevelName();
+            bool customLevel = (level != null)? level.Contains(':') : false;
+            if (customLevel && !MPTweaks.ClientHasMod(connectionId)) {
+                // client seems not to have olmod, warn it
+                yield return GameManager.m_gm.StartCoroutine(InformClientAboutOlmod(connectionId, customLevel, 8));
+                if (!NetworkMatch.m_players.ContainsKey(connectionId)) // disconnected?
+                    yield break;
+            }
 
-            StringMessage levelNameMsg = new StringMessage(MPJoinInProgress.NetworkMatchLevelName());
+            StringMessage levelNameMsg = new StringMessage(level);
             NetworkServer.SendToClient(connectionId, CustomMsgType.SceneLoad, levelNameMsg);
             Debug.Log("JIP: sending scene load " + levelNameMsg.value);
 
@@ -268,6 +318,10 @@ namespace GameMod {
             if (match_state != MatchState.LOBBY && match_state != MatchState.LOBBY_LOAD_COUNTDOWN)
             {
                 GameManager.m_gm.StartCoroutine(SendSceneLoad(msg.conn.connectionId));
+            } else {
+                string level = MPJoinInProgress.NetworkMatchLevelName();
+                bool customLevel = (level != null)? level.Contains(':') : false;
+                GameManager.m_gm.StartCoroutine(InformClientAboutOlmod(msg.conn.connectionId, customLevel, 0));
             }
         }
     }
@@ -379,6 +433,14 @@ namespace GameMod {
         private static IEnumerator MatchStart(int connectionId)
         {
             var newPlayer = Server.FindPlayerByConnectionId(connectionId);
+            MPBanEntry newPlayerEntry = new MPBanEntry(newPlayer);
+
+            // prevent banned players from JIP into our match
+            // there is already a delayed Disconnect going on, just
+            // prevent this player from entering the JIP code
+            if (MPBanPlayers.IsBanned(newPlayerEntry)) {
+                yield break;
+            }
 
             float pregameWait = 3f;
 
@@ -453,6 +515,7 @@ namespace GameMod {
                 });
             }
             ServerStatLog.Connected(newPlayer.m_mp_name);
+            MPBanPlayers.ApplyAllBans(); // make sure the newly connected player gets proper treatment if he is BANNED
         }
 
         private static void Postfix(NetworkMessage msg)
@@ -482,6 +545,34 @@ namespace GameMod {
         {
             var pings = _ServerPing_m_pings_Field.GetValue(null) as Dictionary<int, PingForConnection>;
             pings.Remove(msg.conn.connectionId);
+
+            var dcPlayers = Overload.NetworkManager.m_PlayersForScoreboard.Where(x => !Overload.NetworkManager.m_Players.Contains(x));
+            var dcmsg = new DisconnectedPlayerMatchStateMessage()
+            {
+                m_player_states = new DisconnectedPlayerMatchState[dcPlayers.Count()]
+            };
+            int j = 0;
+            foreach (var player in dcPlayers)
+            {
+                dcmsg.m_player_states[j++] = new DisconnectedPlayerMatchState()
+                {
+                    m_net_id = NetworkInstanceId.Invalid,
+                    m_kills = player.m_kills,
+                    m_deaths = player.m_deaths,
+                    m_assists = player.m_assists,
+                    m_mp_name = player.m_mp_name,
+                    m_mp_team = player.m_mp_team
+                };
+            }
+
+            foreach (NetworkConnection cID in NetworkServer.connections)
+            {
+                if (cID != null && MPTweaks.ClientHasTweak(cID.connectionId, "jip"))
+                {
+                    //Debug.Log("CCF Sending disconnect msg to " + cID.connectionId);
+                    NetworkServer.SendToClient(cID.connectionId, MessageTypes.MsgSetDisconnectedMatchState, dcmsg);
+                }
+            }
         }
     }
 
@@ -565,6 +656,7 @@ namespace GameMod {
             uie.DrawMenuToolTip(position + Vector2.up * 40f);
         }
 
+        [HarmonyPriority(Priority.Normal - 7)] // set global order of transpilers for this function
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             var jipMatchSetup_DrawMpMatchCreateOpen_Method = AccessTools.Method(typeof(JIPMatchSetup), "DrawMpMatchCreateOpen");
@@ -778,6 +870,9 @@ namespace GameMod {
                     p.m_mp_team = pl_state.m_mp_team;
                     p.gameObject.SetActive(false);
                     Overload.NetworkManager.m_PlayersForScoreboard.Add(p);
+
+                    // remove the original pilots and any straggler disconnected pilots by that name
+                    Overload.NetworkManager.m_PlayersForScoreboard.Where(x => x != p && x.m_mp_name == pl_state.m_mp_name).ToList().ForEach(x => Overload.NetworkManager.m_PlayersForScoreboard.Remove(x));
                     continue;
                 }
                 var player = gameObject.GetComponent<Player>();

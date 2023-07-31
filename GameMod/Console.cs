@@ -1,12 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
-using GameMod.Core;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
-using UnityEngine.XR;
-using Valve.VR;
 
 namespace GameMod {
     static class Console
@@ -21,6 +18,80 @@ namespace GameMod {
             _GameManager_InitializeMissionList_Method.Invoke(GameManager.m_gm, null);
             uConsole.Log("Missions reloaded (" + GameManager.GetAvailableMissions().Length + " sp, " +
                 GameManager.ChallengeMission.NumLevels + " cm, " + GameManager.MultiplayerMission.NumLevels + " mp)");
+        }
+
+        static void MutePlayer()
+        {
+            string player_name = uConsole.GetString();
+
+            if (string.IsNullOrEmpty(player_name))
+            {
+                Debug.Log("You didn't add the name of the player you want to mute!\nSyntax: mute <player_name>");
+                return;
+            }
+
+            if(!GameplayManager.IsMultiplayerActive)
+            {
+                Debug.Log("You need to be in the same game as the person that you want to mute!");
+                return;
+            }
+
+            player_name = player_name.ToUpper();
+            foreach (PlayerLobbyData pld in NetworkMatch.m_players.Values)
+            {
+                if (pld.m_name.ToUpper().Equals(player_name))
+                {
+                    if (ExtendedConfig.Section_AudiotauntMutedPlayers.ids.Contains(pld.m_player_id))
+                    {
+                        Debug.Log("This player is already muted! If you want to unmute that player use the unmute command.");
+                        return;
+                    }
+                    else
+                    {
+                        ExtendedConfig.Section_AudiotauntMutedPlayers.ids.Add(pld.m_player_id);
+                        Debug.Log("Muted "+pld.m_name);
+                        return;
+                    }
+                        
+                }
+            }
+        }
+
+        static void UnmutePlayer()
+        {
+            string player_name = uConsole.GetString();
+
+            if (string.IsNullOrEmpty(player_name))
+            {
+                Debug.Log("You didn't add the name of the player you want to unmute!\nSyntax: unmute <player_name>");
+                return;
+            }
+
+            if (!GameplayManager.IsMultiplayerActive)
+            {
+                Debug.Log("You need to be in the same game as the person that you want to unmute!");
+                return;
+            }
+
+            player_name = player_name.ToUpper();
+            foreach (PlayerLobbyData pld in NetworkMatch.m_players.Values)
+            {
+                if (pld.m_name.ToUpper().Equals(player_name))
+                {
+                    if (!ExtendedConfig.Section_AudiotauntMutedPlayers.ids.Contains(pld.m_player_id))
+                    {
+                        Debug.Log("This player is not muted! If you want to mute that player use the mute command.");
+                        return;
+                    }
+                    else
+                    {
+                        ExtendedConfig.Section_AudiotauntMutedPlayers.ids.Remove(pld.m_player_id);
+                        Debug.Log("Unmuted " + pld.m_name);
+                        return;
+                    }
+
+                }
+            }
         }
 
         static void CmdXP()
@@ -140,33 +211,38 @@ namespace GameMod {
             uConsole.Log("Segments dumped to debug log.");
         }
 
-        // Not working.  See VRScale.cs.
-        //static void CmdVRScale() {
-        //    if (!GameplayManager.VRActive) {
-        //        uConsole.Log("You must be in VR to use this command.");
-        //        return;
-        //    }
+        static void CmdVRScale() {
+            if (!GameplayManager.VRActive) {
+                uConsole.Log("You must be in VR to use this command.");
+                return;
+            }
 
-        //    string s = uConsole.GetString();
+            if (GameplayManager.m_gameplay_state != GameplayState.MENUS) {
+                uConsole.Log("You must set this in the menus first, this has no effect while playing.");
+                return;
+            }
 
-        //    if (float.TryParse(s, out float scale)) {
-        //        scale = Mathf.Clamp(scale, 0.1f, 10f);
+            string s = uConsole.GetString();
 
-        //        VRScale.VR_Scale = scale;
-        //    } else {
-        //        uConsole.Log("Invalid scale, must be a number between 0.1 and 10.");
-        //    }
-        //}
+            if (float.TryParse(s, out float scale)) {
+                scale = Mathf.Clamp(scale, 0.1f, 10f);
+
+                VRScale.VR_Scale = scale;
+            } else {
+                uConsole.Log("Invalid scale, must be a number between 0.1 and 10.");
+            }
+        }
 
         public static void RegisterCommands()
         {
+            uConsole.RegisterCommand("mute", "Mute a specific player", new uConsole.DebugCommand(MutePlayer));
+            uConsole.RegisterCommand("unmute", "Unmute a specific player", new uConsole.DebugCommand(UnmutePlayer));
             uConsole.RegisterCommand("dump_segments", "Dump segment data", new uConsole.DebugCommand(CmdDumpSegments));
             uConsole.RegisterCommand("mipmap_bias", "Set Mipmap bias (-16 ... 15.99)", new uConsole.DebugCommand(CmdMipmapBias));
             uConsole.RegisterCommand("reload_missions", "Reload missions", new uConsole.DebugCommand(CmdReloadMissions));
             uConsole.RegisterCommand("toggle_debugging", "Toggle the display of debugging info", new uConsole.DebugCommand(CmdToggleDebugging));
             uConsole.RegisterCommand("ui_color", "Set UI color #aabbcc", new uConsole.DebugCommand(CmdUIColor));
-            // Not working.  See VRScale.cs.
-            // uConsole.RegisterCommand("vr_scale", "Set VR scale (0.1 to 10)", new uConsole.DebugCommand(CmdVRScale));
+            uConsole.RegisterCommand("vr_scale", "Set VR scale (0.1 to 10)", new uConsole.DebugCommand(CmdVRScale));
             uConsole.RegisterCommand("xp", "Set XP", new uConsole.DebugCommand(CmdXP));
         }
     }
@@ -242,9 +318,10 @@ namespace GameMod {
         private static void HandleConsoleToggle()
         {
             if (MenuManager.m_menu_sub_state == MenuSubState.ACTIVE &&
-                (UIManager.PushedSelect(100) || UIManager.PushedDir()) && 
                 MenuManager.m_menu_micro_state == 2 &&
-                UIManager.m_menu_selection == 9)
+                UIManager.m_menu_selection == 9 &&
+                (UIManager.PushedSelect(100) || UIManager.PushedDir())
+                )
             {
                 Console.KeyEnabled = !Console.KeyEnabled;
                 MenuManager.PlayCycleSound(1f);

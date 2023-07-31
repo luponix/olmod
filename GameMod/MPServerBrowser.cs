@@ -108,7 +108,7 @@ namespace GameMod
                         ip = result.server.ip,
                         port = result.server.port,
                         name = result.server.name,
-                        version = result.server.version.Replace("olmod ", ""),
+                        version = result.server.version?.Replace("olmod ", ""),
                         serverNotes = result.server.serverNotes,
                         online = result.server.online,
                         gameStarted = result.game == null ? (DateTime?)null : result.game.gameStarted,
@@ -214,6 +214,9 @@ namespace GameMod
 
         public static void UpdateList()
         {
+            if (!menuActive) 
+                return;
+
             MenuManager.m_list_items_total_count = Items.Count();
             MenuManager.m_list_items_max_per_page = Math.Min(MenuManager.m_list_items_total_count, 12);
             while (MenuManager.m_list_items_first > MenuManager.m_list_items_total_count) {
@@ -979,6 +982,7 @@ namespace GameMod
             position.y += 62f;
         }
 
+        [HarmonyPriority(Priority.Normal - 3)] // set global order of transpilers for this function
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             var mpServerBrowser_UIElement_DrawMpMatchSetup_DrawMatchNotes_Method = AccessTools.Method(typeof(MPServerBrowser_UIElement_DrawMpMatchSetup), "DrawMatchNotes");

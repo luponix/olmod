@@ -2,7 +2,6 @@
 using Newtonsoft.Json.Linq;
 using Overload;
 using System.Collections;
-using System.Timers;
 using UnityEngine;
 
 namespace GameMod
@@ -44,7 +43,7 @@ namespace GameMod
     [HarmonyPatch(typeof(Server), "SendPlayersInLobbyToAllClients")]
     class ServerLobbyStatus
     {
-        public static void Postfix()
+        public static void SendToTracker()
         {
             MatchState state = NetworkMatch.GetMatchState();
             if (state != MatchState.LOBBY && state != MatchState.LOBBY_LOADING_SCENE && state != MatchState.LOBBY_LOAD_COUNTDOWN)
@@ -55,6 +54,11 @@ namespace GameMod
             obj["type"] = "LobbyStatus";
 
             ServerStatLog.TrackerPostStats(obj);
+        }
+
+        public static void Postfix()
+        {
+            SendToTracker();
         }
     }
 }

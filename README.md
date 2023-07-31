@@ -1,4 +1,4 @@
-## olmod 0.5.2 - Overload mod
+## olmod 0.5.9 - Overload mod
 
 **Community mods for Overload**
 
@@ -31,9 +31,7 @@ This is an unaffiliated, unsupported tool. Use at your own risk.
 
 - Puts a MP player in observer mode if it uses a pilot name starting with OBSERVER. The observer mode only works when the server and the observer client run olmod.
 
-- Reads projdata.txt / robotdata.txt with custom projectile (weapon) and robot settings. You can extract the stock data from the game with the included tool `olgetdata`. The txt files must be in the same directory as olmod.exe. You can run olgetdata on linux with `mono olgetdata.exe`. They can either go in the olmod directory, or map makers can add them to their map .zip files.
-
-- Adds `frametime` non-cheat code
+- Reads `<level name>-projdata.txt` / `<level name>-robotdata.txt` for levels, `<mission name>-projdata.txt` / `<level name>-robotdata.txt` for missions, and `projdata.txt` / `robotdata.txt` in the olmod directory for testing.  These files can have custom projectile (weapon) and robot settings. You can extract the stock data from the game with the included tool `olgetdata`. The txt files must be in the same directory as olmod.exe. You can run olgetdata on linux with `mono olgetdata.exe`. They can either go in the olmod directory, or map makers can add them to their map .zip files.
 
 - Adds a rearview option for all game modes, with an option to allow it in a multiplayer game
 
@@ -48,6 +46,8 @@ This is an unaffiliated, unsupported tool. Use at your own risk.
 - Allows pasting in the MP password field
 
 - Allows joining in progress matches when enabled for the match
+
+- Allows switching teams for team games with join in progress enabled, by Tobias
 
 - Adds option to enable console with ` key
 
@@ -129,7 +129,7 @@ This is an unaffiliated, unsupported tool. Use at your own risk.
 
 - Smashmouth Overload!
 
-- Updated weapon balance for multiplayer, by zero & roncli.
+- Updated weapon balance for multiplayer, by zero, roncli, & Tobias.
 
 - Nerf to reduced shader cloaks down to 30% opacity, by Tobias.
 
@@ -163,15 +163,47 @@ This is an unaffiliated, unsupported tool. Use at your own risk.
 
 - Option to reset audio engine, by Tobias.
 
-#### How to build
+- Option to move your missions to a directory of your choosing using the `-missionpath` parameter, by roncli.
 
-##### Windows
+- Option to have bigger and more colorful enemy names in anarchy, by luponix.
 
-- Open solution in Visual Studio 2017 or 2019
+- Multiplayer chat commands, by derhass.
 
-- In the GameMod project, find the file Directory.Build.targets and replace the OverloadDir variable with the path to Overload 1.1 on your machine.
+- Corpse desync fix, by Tobias.
 
-- Run
+- Option to disable profanity filter, by luponix.
+
+- Options for framerate and velocity on the HUD, by Tobias.
+
+- Ability to join games by LAN hostname, by derhass.
+
+- Objects teleported by warpers are now oriented as expected, by kevin.
+
+- 4 customizable multiplayer loadouts, with a reflex sidearm, by Tobias.
+
+- Multiplayer option for team health bars, by roncli.
+
+- Match option for thunderbolt ship penetration, by luponix.
+
+- Match option for floating damage numbers, by roncli.
+
+- Audio occlusion and stereo homing alerts, by Fireball.
+
+- vr_scale console command to set the VR camera size, by roncli.
+
+- New matcen HP cap calculation for level designers, by Kevin.
+
+- Boss 2B available for use in single player campaigns, by Kevin.
+
+- Audio taunts, by luponix.  See https://github.com/overload-development-community/olmod/wiki/Audio-taunts for details.
+
+- Packet loss monitor, by Fireball.
+
+- Colored creepers in team games, by Fireball.
+
+- Options to use a different mesh collider in multiplayer, by Fireball.
+
+- Frame limiting, by luponix.
 
 ##### Linux
 

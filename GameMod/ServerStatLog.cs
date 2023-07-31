@@ -48,10 +48,19 @@ namespace GameMod {
             public MpTeam? ScorerTeam;
         }
 
+        private struct TeamChange
+        {
+            public float Time;
+            public string PlayerName;
+            public MpTeam? PreviousTeam;
+            public MpTeam? CurrentTeam;
+        }
+
         private static Dictionary<PlayerPlayerWeaponDamage, float> DamageTable = new Dictionary<PlayerPlayerWeaponDamage, float>();
         private static List<Kill> Kills = new List<Kill>();
         private static List<Goal> Goals = new List<Goal>();
         private static List<FlagStat> FlagStats = new List<FlagStat>();
+        private static List<TeamChange> TeamChanges = new List<TeamChange>();
         public static bool GameStarted = false;
         private static string Attacker, Defender, Assisted;
         private static MpTeam AttackerTeam = (MpTeam)(-1), DefenderTeam = (MpTeam)(-1), AssistedTeam = (MpTeam)(-1);
@@ -63,6 +72,7 @@ namespace GameMod {
             Kills = new List<Kill>();
             Goals = new List<Goal>();
             FlagStats = new List<FlagStat>();
+            TeamChanges = new List<TeamChange>();
             GameStarted = false;
         }
 
@@ -76,6 +86,23 @@ namespace GameMod {
                     defender = d.Key.Defender.m_mp_name,
                     weapon = d.Key.Weapon.ToString(),
                     damage = d.Value
+                }, new JsonSerializer()
+                {
+                    NullValueHandling = NullValueHandling.Ignore
+                })
+            );
+        }
+
+        public static JArray GetTeamChanges()
+        {
+            return new JArray(
+                from tc in TeamChanges
+                select JObject.FromObject(new
+                {
+                    time = tc.Time,
+                    playerName = tc.PlayerName,
+                    previousTeam = TeamName(tc.PreviousTeam),
+                    currentTeam = TeamName(tc.CurrentTeam)
                 }, new JsonSerializer()
                 {
                     NullValueHandling = NullValueHandling.Ignore
@@ -160,7 +187,8 @@ namespace GameMod {
                 damage = GetDamageTable(),
                 kills = GetKills(),
                 goals = GetGoals(),
-                flagStats = GetFlagStats()
+                flagStats = GetFlagStats(),
+                teamChanges = GetTeamChanges()
             }, new JsonSerializer()
             {
                 NullValueHandling = NullValueHandling.Ignore
@@ -196,6 +224,7 @@ namespace GameMod {
 
         public static void TrackerPostStats(JObject body)
         {
+            body.Add("port", Server.GetListenPort());
             TrackerPost("/api/stats", body);
         }
 
@@ -280,7 +309,7 @@ namespace GameMod {
 
         private static string TeamName(MpTeam? team)
         {
-            return team == null || team == MpTeam.ANARCHY || team == (MpTeam)(-1) ? null : MPTeams.TeamName((MpTeam)team);
+            return team == null || team == MpTeam.ANARCHY || team == (MpTeam)(-1) ? null : MPTeams.TeamNameNotLocalized((MpTeam)team);
         }
 
         public static void AddGoal()
@@ -343,7 +372,78 @@ namespace GameMod {
             TrackerPostStats(obj);
         }
 
-        public static void AddKill(DamageInfo di)
+        public static void AddTeamChange(Player player, MpTeam newTeam)
+        {
+            if (NetworkMatch.m_postgame)
+                return;
+
+            TeamChanges.Add(new TeamChange
+            {
+                Time = NetworkMatch.m_match_elapsed_seconds,
+                PlayerName = player.m_mp_name,
+                PreviousTeam = player.m_mp_team,
+                CurrentTeam = newTeam
+            });
+
+            var obj = JObject.FromObject(new
+            {
+                name = "Stats",
+                type = "TeamChange",
+                time = NetworkMatch.m_match_elapsed_seconds,
+                playerName = player.m_mp_name,
+                previousTeam = TeamName(player.m_mp_team),
+                currentTeam = TeamName(newTeam)
+            }, new JsonSerializer()
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            });
+
+            TrackerPostStats(obj);
+        }
+
+        private static ProjPrefab GetProjPrefab(int damageType)
+        {
+            switch (damageType) {
+                case 0:
+                    return ProjPrefab.proj_impulse;
+                case 1:
+                    return ProjPrefab.proj_vortex;
+                case 2:
+                    return ProjPrefab.proj_reflex;
+                case 3:
+                    return ProjPrefab.proj_shotgun;
+                case 4:
+                    return ProjPrefab.proj_driller;
+                case 5:
+                    return ProjPrefab.proj_flak_cannon;
+                case 6:
+                    return ProjPrefab.proj_thunderbolt;
+                case 7:
+                    return ProjPrefab.proj_beam;
+                case 8:
+                    return ProjPrefab.missile_falcon;
+                case 9:
+                    return ProjPrefab.missile_pod;
+                case 10:
+                    return ProjPrefab.missile_hunter;
+                case 11:
+                    return ProjPrefab.missile_creeper;
+                case 12:
+                    return ProjPrefab.missile_smart;
+                case 13:
+                    return ProjPrefab.missile_devastator;
+                case 14:
+                    return ProjPrefab.missile_timebomb;
+                case 15:
+                    return ProjPrefab.missile_vortex;
+                case 16:
+                    return ProjPrefab.proj_melee;
+                default:
+                    return ProjPrefab.none;
+            }
+        }
+
+        public static void AddKill(DamageInfo di, PlayerDamageRecord pdr, bool flag)
         {
             if (NetworkMatch.m_postgame)
                 return;
@@ -357,7 +457,7 @@ namespace GameMod {
                 AttackerTeam = AttackerTeam,
                 DefenderTeam = DefenderTeam,
                 AssistedTeam = AssistedTeam,
-                Weapon = di.weapon
+                Weapon = flag && pdr.client_id > -1 ? GetProjPrefab(pdr.dmg_type) : di.weapon
             });
 
             var obj = JObject.FromObject(new
@@ -371,7 +471,7 @@ namespace GameMod {
                 defenderTeam = Defender == null ? null : TeamName(DefenderTeam),
                 assisted = Assisted,
                 assistedTeam = Assisted == null ? null : TeamName(AssistedTeam),
-                weapon = di.weapon.ToString()
+                weapon = flag && pdr.client_id > -1 ? GetProjPrefab(pdr.dmg_type).ToString() : di.weapon.ToString()
             }, new JsonSerializer()
             {
                 NullValueHandling = NullValueHandling.Ignore
@@ -554,7 +654,8 @@ namespace GameMod {
                 hasPassword = MPModPrivateData.HasPassword,
                 matchNotes = MPModPrivateData.MatchNotes,
                 classicSpawnsEnabled = MPClassic.matchEnabled,
-                ctfCarrierBoostEnabled = CTF.CarrierBoostEnabled
+                ctfCarrierBoostEnabled = CTF.CarrierBoostEnabled,
+                suddenDeath = MPSuddenDeath.SuddenDeathMenuEnabled
             });
         }
 
@@ -608,6 +709,14 @@ namespace GameMod {
             var otherPlayer = di.owner?.GetComponent<Player>();
 
             float hitpoints = __instance.c_player.m_hitpoints;
+
+            // Increase hitpoints by ratio of damage reduction so that we report the correct value.
+            float reduction = Player.ARMOR_DAMAGE[__instance.c_player.m_upgrade_level[0]];
+            if (di.type == DamageType.EXPLOSIVE && __instance.c_player.m_unlock_blast_damage) {
+                reduction *= 0.8f;
+            }
+            hitpoints /= reduction;
+
             ProjPrefab weapon = di.weapon;
 
             float damage = di.damage;
@@ -632,6 +741,8 @@ namespace GameMod {
                 if (code.opcode == OpCodes.Ret && setCount > 0)
                 {
                     yield return new CodeInstruction(OpCodes.Ldarg_1); // damageInfo
+                    yield return new CodeInstruction(OpCodes.Ldloc_S, 4); // pdr
+                    yield return new CodeInstruction(OpCodes.Ldloc_S, 5); // flag
                     yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(ServerStatLog), "AddKill"));
                 }
                 yield return code;

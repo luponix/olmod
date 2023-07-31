@@ -1,3 +1,140 @@
+v0.5.9 - 2023-04-10
+
+- Audio taunts have been added to multiplayer!  It can be turned off when setting up a game.  See https://github.com/overload-development-community/olmod/wiki/Audio-taunts for details. (Thanks, luponix!)
+- Packet loss is now visible in multiplayer games. (Thanks, Fireball!)
+- Creepers are now color coded in team games.  Your own creepers will also pulse to indicate that they are yours, and will do damage to you when they time out. (Thanks, Fireball!)
+- In weapon autoselect, you can now exclude weapons from previous/next cycling. (Thanks, Fireball!)
+- There is now extremely simple filtering on the map list for multiplayer maps.  On the map selection screen, start typing the name of the map, and the list will be filtered.  (Thanks, derhass!)
+- There is an option when creating a new game to use low poly mesh colliders. (Thanks, Fireball!)
+- Graphics options now include a frame limiter.  Set to 0 for unlimited.  Only works when vsync is off. (Thanks, luponix!)
+- Many fixes have been made in Capture the Flag when Join in Progess is enabled. (Thanks, Fireball!)
+- Reinitializing audio no longer resets volumes to 100%.
+- Options for the reflex cannon and reflex cannon spawns are removed in games where the reflex sidearm is enabled. (Thanks, Fireball!)
+- Boost is now properly updated when energy is gained as normal.
+- Ammo is once again given when you force custom loadouts that are ammo only.
+- The tracker should report the correct weapon on unassisted suicides (suicides that actually count as a suicide).
+- The join timeout has been reduced from 60 seconds to 5 seconds. (Thanks, derhass!)
+- A transpiling fix has been made for Linux builds. (Thanks, derhass!)
+- The left arrow for the axis of controllers now works. (Thanks, Tobias!)
+
+v0.5.8 - 2022-10-30
+
+- Restore functionality of Armor Toughness, Move Speed, and Energy Efficiency mods that were broken as of v0.5.6.
+- New multiplayer option under "General" for loadout hotkeys.  (Thanks, Fireball!)
+- New multiplayer option under "Team" for damage numbers.  Yes, we know it doesn't belong there, it'll move to a better spot when we do a menu overhaul, we just wanted to get something in quick for this version.
+- Additional sound occlusion optimizations, especially in energy centers.  (Thanks, Fireball!)
+- Improved performance around lag compensation's "Limit Ships Diving Into Walls" option.  (Thanks, derhass!)
+- Improved performance around client physics resimulations that were done every frame.  (Thanks, derhass!)
+- Removed creepers and time bombs from the homing fix, should help smooth them out in game play.
+
+v0.5.7 - 2022-10-24
+
+- Thunderbolt Penetration and Damage Numbers settings are now read from presets.  Public games have damage numbers on by default!
+- New public team game option.  (Thanks, Tobias!)
+- Extra logging for auto downloader.  (Thanks, Sirius!)
+- Loadouts are now synchronized with other players on spawn.  (Thanks, Fireball!)
+
+v0.5.6 - 2022-10-14
+
+- There are now 4 loadouts available, all of them are customizable, and all 4 are available in the game at all times.  You can use the hot keys to select the 4 sets of primary weapons (by default, keys are 1, 2, 3, and 4) to select the loadout to use.  (Thanks, Tobias!)
+- The reflex is given for free for all loadouts.  Note that this is an experimental feature, and may change in the future depending on feedback.  (Thanks, Tobias!)
+- New multiplayer option for team health bars.
+- New match option for thunderbolt ship penetration.  (Thanks, luponix!)
+- New match option for floating damage numbers.  Currently damage numbers are before tank mods are applied.  (Note, we will also add this as a multiplayer option in the future, similar to rear view.)
+- New audio options for audio occlusion.  This means sounds that have to go through a wall to reach you can be made to sound muffled.  (Thanks, Fireball!)
+- Homing alerts are now in stereo.  (Thanks, Fireball!)
+- New vr_scale console command.  Use it when outside of a game to change the vr_scale of the world.  Think of it as adjusting the size of the camera, 10 makes the camera really big and things seem tiny, 0.1 makes it really small and things seem huge.
+- New matcen HP cap calculation.  Does not affect existing campaigns, only maps that take advantage of a parameter from the editor. (Thanks, kevin!)
+- Multiplayer chat command updates: (Thanks, derhass!)
+  - Admin commands.
+    - /EXTEND <seconds> - Extend the match time by the specified amount of seconds.
+  - Commands anyone can do.
+    - /SWITCHTEAM - Switches you to the next team.
+- Fix for missing levels from .zip files when downloading maps. (Thanks, Sirius!)
+- Fix for reporting incorrect damage to the tracker when the target is using tank mods and the damage would have killed them without the tank mods but did not actually kill them.  Does not change the actual damage done in game.
+- Fix for in-game FPS measure. (Thanks, derhass!)
+- Boss 2B is now useable in single player campaigns. (Thanks, kevin!)
+- Ships no longer disappear during the cutscene exit. (Thanks, kevin!)
+- Opponent cockpits are no longer rendered. (Thanks, derhass!)
+- Load screen for single player is back.
+- Gamelift pings are now disabled.  You'll still see them in the log as all 0 or -1.
+- Allow Rear View Camera menu navigation is now fixed. (Thanks, Tobias!)
+- Harmony updated to v2.2.2.
+
+v0.5.5 - 2022-08-23
+
+- Multiplayer chat commands.  For a detailed explanation, see https://github.com/overload-development-community/olmod/blob/master/ServerCommands.md (Thanks, derhass!)
+  - Admin commands are commands that the match creator and trusted admins ALWAYS has access to.
+    - /AUTH <password> - Authorize yourself as an admin on this server.
+    - /GIVEPERM <player> - Give a player permissions for these commands.
+    - /REVOKEPERM <player> - Remove a player's permissions for these commands.
+    - /KICK <player> - Removes a player from a game.
+    - /BAN <player> - Bans a player.  Does not also /KICK, you must use /KICKBAN for that.
+    - /KICKBAN <player> - Removes a player from a game, and also bans that player.
+    - /ANNOY <player> - Force a player into observer mode.  Also applies /BLOCKCHAT.
+    - /BLOCKCHAT <player> - Stops a player from sending or receiving chat messages.
+    - /UNBAN <player> - Unbans a player from the server.
+    - /UNANNOY <player> - Prevents a player from being annoyed in future games.
+    - /UNBLOCKCHAT <player> - Allows a player to send or receive chat messages.
+    - /END - Forces a match in progress to end.
+    - /START - Forces a match in the lobby to start, even if everyone hasn't readied up.
+  - Commands anyone can do.
+    - /STATUS - Shows who the creator is, whether you are authorized, and how many bans, annoys, chat blocks, authorized players, and trusted players there are currently on the server.
+    - /SAY <message> - Sends your message to unblocked players.
+    - /TEST <player> - Tests player name selection.
+  - Command line arguments related to multiplayer chat commands:
+    - -chatCommandPassword <password> - Sets the password users must use to /AUTH.
+    - -disableChatCommands - Never allow ANY chat commands on this server.
+    - -trustedPlayerIds <comma-separated list of player IDs> - A list of players who, when joining a game, are automatically authorized to use admin chat commands.  You can find your own player ID in your player log by searching for the text `Setting my player id`.
+
+- Client-side homing fix is now applied to homing projectiles other than just hunters and missile pods.  This should make creeper and time bomb sync slightly more smoother.  Oh, and watch out for nova blobs!
+- Sniper packets will no longer burst from pilots with bad connections or malintent.
+- Corpses now have proper hit detection.  Previously, a ship's hit box for weapons detection would desync with the ship's visible model upon death, and the hit box would not move after dying even though the physical model.  Now that desync no longer happens, which resolves two bugs: 1) Shots will no longer go through corpses 2) Shots won't fizzle out at where a ship died even if its corpse is no longer there. (Thanks, Tobias!)
+- Option to disable the ****ing profanity filter. (Thanks, luponix!)
+- Added a warning message for clients not using olmod when joining a game in progress that uses a custom map. (Thanks, derhass!)
+- Added options to view ship velocity and frame rate on the HUD. (Thanks, Tobias!)
+- You can now join by hostname on LAN, ie: server is not required to have dots in it anymore. (Thanks, derhass!)
+- Armor, energy, and ammo no longer despawn after 5 minutes in race mode. (Thanks, Tobias!)
+- Non-CM spawn items in multiplayer are now considered spew.  Translation: Those shield orbs in Ascent's basement will actually work as they're supposed to, and go away for everyone after picked up. (Thanks, Tobias!)
+- Objects teleported by warpers are now oriented as expected. (Thanks, kevin!)
+- CM scores in olmod are now saved to local leaderboards. (Thanks, luponix!)
+- Improvements to the individual player colors in anarchy. (Thanks, luponix!)
+- Fixed black screen on joining an unreachable server. (Thanks, derhass!)
+- Fixed bugs related to joystick curves resetting. (Thanks, luponix!)
+- Fixed CTF flags appearing in single player when loading saved games. (Thanks, Arne!)
+
+v0.5.4 - 2022-01-09
+
+- The Thunderbolt has been rebalanced:
+  - Self overcharge damage +300% (4 per second instead of 1 per second).  Note only servers using this version or later will have this nerf.
+  - Self overcharge now has a warning noise when damage begins.
+  - Thunderbolt projectiles are now closer together by 28.5% (0.4 units, or 1/10 of a standard cube).  Note only clients using this version or later will have this buff.
+- You can now switch teams in team games that are join in progress.  Use the escape menu to change teams.
+- Respawn invulnerability no longer decays with ship speed.  The only way to lose invulnerability on spawn is by firing, or letting the full timer run out.
+- In anarchy, you can increase the size of the names and give each player a separate color.  You can find this in Options -> Multiplayer Options -> Individual Player Colors.
+- You can now use the `-missionpath` parameter to specify where to find missions.  It defaults to `-missionpath c:\ProgramData\Revival\Overload` on Windows.
+- Scoreboard colors have been fixed for CTF and Monsterball.
+- When creating a multiplayer match, if a preset specifies a team count, it will be honored.
+- For tracker compatibility, team names are always sent as English to the tracker, regardles of the server's chosen language.
+- Per-mission and per-level projdata and robotdata files are now possible.
+  - First a level will look for `<level name>-projdata.txt` and `<level name>-robotdata.txt`.
+  - If not found, it will look for `<mission name>-projdata.txt` and `<mission name>-robotdata.txt`.
+  - If not found, it will look for `projdata.txt` and `robotdata.txt` in your olmod directory.
+  - If none of these are found, it will use the stock versions of the files.
+- Fixed an audio issue that would cause ambient sounds not to be played after the first time the level was loaded.
+- Fixed a bug with the server browser showing up empty when old version of olmod connect to it.
+- Fixed a bug that prevented olmod from starting on Linux with glib 2.34 or newer.
+- Fixed a bug that prevented olmod from starting on Windows with modern CPUs due to an OpenSSL issue.
+- Fixed a bug that sometimes caused olmod to crash while loading a level.
+- Upgrade to Harmony 2.2.
+
+v0.5.3 - 2021-10-08
+
+- Lag Compensation now has a "dive-in limiter" that lets you control how far ships can dive into walls when being lag compensated. (Thanks, derhass!)
+- For team anarchy, the teammate bonus given to spawn points is no longer given if an enemy is within 32 units.
+- Server browser now shows the olmod version the server is running.
+- Fix for CTF/Monsterball scoreboards. (Thanks, Tobias!)
+
 v0.5.2 - 2021-09-30
 
 - Update to balance settings for multiplayer games only: (Thanks to zero for coordinating, and all the pilots who tested this!)

@@ -44,9 +44,11 @@ mcs \
     -r:"${OLPATH}"/Overload_Data/Managed/UnityEngine.PhysicsModule.dll \
     -r:"${OLPATH}"/Overload_Data/Managed/UnityEngine.UnityWebRequestModule.dll \
     -r:"${OLPATH}"/Overload_Data/Managed/UnityEngine.UnityWebRequestWWWModule.dll \
+    -r:"${OLPATH}"/Overload_Data/Managed/UnityEngine.UNETModule.dll \
     -r:../GameMod/0Harmony.dll \
     -target:library \
     -sdk:2 \
+    -resource:../GameMod/Resources/meshes,GameMod.Resources.meshes \
     -out:GameMod.dll \
     ../GameMod/*.cs \
     ../GameMod/*/*.cs

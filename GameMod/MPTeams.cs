@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace GameMod
 {
@@ -23,11 +24,11 @@ namespace GameMod
         public static readonly MpTeam MPTEAM_NUM = MpTeam.NUM_TEAMS + 6;
         private static readonly int[] teamIndexList = { 0, 1, -1, 2, 3, 4, 5, 6, 7 };
         private static readonly int[] teamMessageColorIndexList = { 2, 3, 5, 6, 7, 8, 9, 10 };
-        
+
         // This processes when team != TEAM0
         public static int TeamMessageColor(MpTeam team)
         {
-            return teamMessageColorIndexList[(int)team > 1 ? (int)team-1 : (int)team];
+            return teamMessageColorIndexList[(int)team > 1 ? (int)team - 1 : (int)team];
         }
 
         public static MpTeam GetMpTeamFromMessageColor(int messageColorIndex)
@@ -42,7 +43,8 @@ namespace GameMod
 
         public static IEnumerable<MpTeam> Teams
         {
-            get {
+            get
+            {
                 return AllTeams.Take(NetworkMatchTeamCount);
             }
         }
@@ -65,10 +67,13 @@ namespace GameMod
             }
         }
 
-        public static MpTeam[] TeamsByScore {
-            get {
-                var teams = ActiveTeams.ToArray();
-                Array.Sort<MpTeam>(teams, new Comparison<MpTeam>((i1, i2) => {
+        public static MpTeam[] TeamsByScore
+        {
+            get
+            {
+                var teams = Teams.ToArray();
+                Array.Sort<MpTeam>(teams, new Comparison<MpTeam>((i1, i2) =>
+                {
                     var n = NetworkMatch.m_team_scores[(int)i2].CompareTo(NetworkMatch.m_team_scores[(int)i1]);
                     return n == 0 ? i1.CompareTo(i2) : n;
                 }));
@@ -84,19 +89,64 @@ namespace GameMod
             return team == MPTEAM_NUM || AllTeams.IndexOf(x => x == team) >= NetworkMatchTeamCount ? MpTeam.TEAM0 : team;
         }
 
+        public static bool IsMyTeam(MpTeam team)
+        {
+            if (MenuManager.m_menu_state == MenuState.MP_PRE_MATCH_MENU && NetworkMatch.m_players.ContainsKey((int)GameManager.m_local_player.netId.Value))
+                return team == NetworkMatch.m_players[(int)GameManager.m_local_player.netId.Value].m_team;
+
+            return team == GameManager.m_local_player.m_mp_team;
+        }
+
         public static string TeamName(MpTeam team)
         {
             var c = MenuManager.mpc_decal_color;
             var cIdx = colorIdx[TeamNum(team)];
             if (MPTeams.NetworkMatchTeamCount < (int)MpTeam.NUM_TEAMS && !Menus.mms_team_color_default)
             {
-                bool my_team = team == GameManager.m_local_player.m_mp_team;
-                cIdx = my_team ? Menus.mms_team_color_self : Menus.mms_team_color_enemy;
+                cIdx = IsMyTeam(team) ? Menus.mms_team_color_self : Menus.mms_team_color_enemy;
             }
             MenuManager.mpc_decal_color = cIdx;
             var ret = MenuManager.GetMpDecalColor();
             MenuManager.mpc_decal_color = c;
             return ret;
+        }
+
+        public static string TeamNameNotLocalized(MpTeam team)
+        {
+            var c = MenuManager.mpc_decal_color;
+            var cIdx = colorIdx[TeamNum(team)];
+            if (MPTeams.NetworkMatchTeamCount < (int)MpTeam.NUM_TEAMS && !Menus.mms_team_color_default)
+            {
+                cIdx = IsMyTeam(team) ? Menus.mms_team_color_self : Menus.mms_team_color_enemy;
+            }
+
+            switch (cIdx)
+            {
+                case 0:
+                    return "ORANGE";
+                case 1:
+                    return "YELLOW";
+                case 2:
+                    return "GREEN";
+                case 3:
+                    return "AQUA";
+                case 4:
+                    return "BLUE";
+                case 5:
+                    return "PURPLE";
+                case 6:
+                    return "PINK";
+                case 7:
+                    return "RED";
+                case 8:
+                    return "WHITE";
+                case 9:
+                    return "BLACK";
+                case 10:
+                    return "GRAY";
+                default:
+                    return "UNKNOWN";
+            };
         }
 
         public static string ColorName(int index)
@@ -111,14 +161,9 @@ namespace GameMod
         public static int TeamColorIdx(MpTeam team)
         {
             if (MPTeams.NetworkMatchTeamCount < (int)MpTeam.NUM_TEAMS && !Menus.mms_team_color_default)
-            {
-                bool my_team = team == GameManager.m_local_player.m_mp_team;
-                return my_team ? Menus.mms_team_color_self : Menus.mms_team_color_enemy;
-            }
-            else
-            {
-                return colorIdx[TeamNum(team)];
-            }
+                return IsMyTeam(team) ? Menus.mms_team_color_self : Menus.mms_team_color_enemy;
+
+            return colorIdx[TeamNum(team)];
         }
 
         public static Color TeamColor(MpTeam team, int mod)
@@ -143,9 +188,9 @@ namespace GameMod
             if (MPTeams.NetworkMatchTeamCount < (int)MpTeam.NUM_TEAMS && !Menus.mms_team_color_default)
             {
                 c = c2 = UIManager.m_col_ui0;
-                teamName = $"{Loc.LS("TEAM")} {(int)team+1}";
+                teamName = $"{Loc.LS("TEAM")} {(int)team + 1}";
             }
-            
+
             UIManager.DrawQuadBarHorizontal(pos, 13f, 13f, w * 2f, c, 7);
             uie.DrawStringSmall(teamName, pos, 0.6f, StringOffset.CENTER, c2, 1f, -1f);
         }
@@ -158,7 +203,8 @@ namespace GameMod
             int max_row_count = NetworkMatch.GetMaxPlayersForMatch() + MPTeams.NetworkMatchTeamCount;
             int cur_row_count = NetworkMatch.m_players.Count() + MPTeams.NetworkMatchTeamCount;
             bool split = max_row_count > 10;
-            if (split) {
+            if (split)
+            {
                 pos.x -= 300f;
                 pos.y += 50f + 24f;
             }
@@ -247,7 +293,8 @@ namespace GameMod
             Color c = UIManager.m_col_ui5;
             string s = Loc.LS("MATCH OVER!");
             var teams = TeamsByScore;
-            if (teams.Length >= 2 && NetworkMatch.m_team_scores[(int)teams[0]] != NetworkMatch.m_team_scores[(int)teams[1]]) {
+            if (teams.Length >= 2 && NetworkMatch.m_team_scores[(int)teams[0]] != NetworkMatch.m_team_scores[(int)teams[1]])
+            {
                 c = TeamColor(teams[0], 4);
                 s = TeamName(teams[0]) + " WINS!";
             }
@@ -288,14 +335,18 @@ namespace GameMod
             return max_score;
         }
 
-        public static void SetPlayerGlow(PlayerShip ship, MpTeam team) {
-            if (GameplayManager.IsMultiplayerActive && !GameplayManager.IsDedicatedServer() && NetworkMatch.IsTeamMode(NetworkMatch.GetMode())) {
+        public static void SetPlayerGlow(PlayerShip ship, MpTeam team)
+        {
+            if (GameplayManager.IsMultiplayerActive && !GameplayManager.IsDedicatedServer() && NetworkMatch.IsTeamMode(NetworkMatch.GetMode()))
+            {
                 var teamcolor = UIManager.ChooseMpColor(team);
-                foreach (var mat in ship.m_materials) {
+                foreach (var mat in ship.m_materials)
+                {
                     // Main damage color
                     if (mat.shader != null)
                     {
-                        if ((Color)mat.GetVector("_color_burn") == teamcolor) {
+                        if ((Color)mat.GetVector("_color_burn") == teamcolor)
+                        {
                             return;
                         }
                         mat.SetVector("_color_burn", teamcolor);
@@ -317,6 +368,50 @@ namespace GameMod
                 s = MPTeams.TeamName(teams[0]) + " WINS!";
             }
         }
+
+        public class ChangeTeamMessage : MessageBase
+        {
+            public NetworkInstanceId netId;
+            public MpTeam newTeam;
+            public override void Serialize(NetworkWriter writer)
+            {
+                writer.Write(netId);
+                writer.WritePackedUInt32((uint)newTeam);
+            }
+            public override void Deserialize(NetworkReader reader)
+            {
+                netId = reader.ReadNetworkId();
+                newTeam = (MpTeam)reader.ReadPackedUInt32();
+            }
+        }
+
+        public static void UpdateClientColors()
+        {
+            if (GameplayManager.IsMultiplayerActive)
+            {
+                // Update ship colors
+                foreach (var ps in UnityEngine.Object.FindObjectsOfType<PlayerShip>())
+                {
+                    ps.UpdateShipColors(ps.c_player.m_mp_team, -1, -1, -1);
+                    ps.UpdateRimColor(true);
+                }
+
+                // Update CTF flag/carrier colors
+                if (CTF.IsActive)
+                {
+                    for (int i = 0; i < CTF.FlagObjs.Count; i++)
+                    {
+                        CTF.UpdateFlagColor(CTF.FlagObjs[i], i);
+                    }
+                    foreach (var player in Overload.NetworkManager.m_Players)
+                    {
+                        CTF.UpdateShipEffects(player);
+                    }
+                }
+            }
+            UIManager.InitMpNames();
+        }
+
     }
 
     [HarmonyPatch(typeof(UIElement), "MaybeDrawPlayerList")]
@@ -332,7 +427,7 @@ namespace GameMod
             return false;
         }
     }
-    
+
     [HarmonyPatch(typeof(UIElement), "DrawMpScoreboardRaw")]
     static class MPTeamsScore
     {
@@ -407,7 +502,7 @@ namespace GameMod
             MpTeam myTeam = GameManager.m_local_player.m_mp_team;
             foreach (var team in MPTeams.TeamsByScore)
             {
-                if (!NetworkManager.m_PlayersForScoreboard.Any(x => x.m_mp_team == team))
+                if (!Overload.NetworkManager.m_PlayersForScoreboard.Any(x => x.m_mp_team == team))
                     continue;
 
                 pos.y += 28f;
@@ -489,7 +584,7 @@ namespace GameMod
                 NetworkMatch.m_team_scores[i] = 0;
         }
     }
-    
+
     // team balancing for new player
     [HarmonyPatch(typeof(NetworkMatch), "NetSystemGetTeamForPlayer")]
     static class MPTeamsForPlayer
@@ -620,7 +715,7 @@ namespace GameMod
 
             int state = 0; // 0 = before switch, 1 = after switch
             int oneSixtyCount = 0;
-            for (var codes = instructions.GetEnumerator(); codes.MoveNext(); )
+            for (var codes = instructions.GetEnumerator(); codes.MoveNext();)
             {
                 var code = codes.Current;
                 // add call before switch m_menu_micro_state
@@ -655,7 +750,7 @@ namespace GameMod
                     }
                 }
                 yield return code;
-            }                
+            }
         }
     }
 
@@ -899,13 +994,16 @@ namespace GameMod
     [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
     class MPTeamsMenuDraw
     {
+        [HarmonyPriority(Priority.Normal - 8)] // set global order of transpilers for this function
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> cs)
         {
             var vector2_y_Field = AccessTools.Field(typeof(Vector2), "y");
 
             int lastAdv = 0;
-            foreach (var c in cs) {
-                if (lastAdv == 0 && c.opcode == OpCodes.Ldstr && (string)c.operand == "ADVANCED SETTINGS") {
+            foreach (var c in cs)
+            {
+                if (lastAdv == 0 && c.opcode == OpCodes.Ldstr && (string)c.operand == "ADVANCED SETTINGS")
+                {
                     yield return new CodeInstruction(OpCodes.Ldloca_S, 0);
                     yield return new CodeInstruction(OpCodes.Dup);
                     yield return new CodeInstruction(OpCodes.Ldfld, vector2_y_Field);
@@ -913,9 +1011,13 @@ namespace GameMod
                     yield return new CodeInstruction(OpCodes.Add);
                     yield return new CodeInstruction(OpCodes.Stfld, vector2_y_Field);
                     lastAdv = 1;
-                } else if ((lastAdv == 1 || lastAdv == 2) && c.opcode == OpCodes.Call) {
+                }
+                else if ((lastAdv == 1 || lastAdv == 2) && c.opcode == OpCodes.Call)
+                {
                     lastAdv++;
-                } else if (lastAdv == 3) {
+                }
+                else if (lastAdv == 3)
+                {
                     if (c.opcode != OpCodes.Ldloca_S)
                         continue;
                     lastAdv = 4;
@@ -1038,7 +1140,8 @@ namespace GameMod
         }
 
         // Damage glow in team color
-        static void Postfix(PlayerShip __instance) {
+        static void Postfix(PlayerShip __instance)
+        {
             MPTeams.SetPlayerGlow(__instance, __instance.c_player.m_mp_team);
         }
 
@@ -1249,4 +1352,267 @@ namespace GameMod
         }
     }
 
+    [HarmonyPatch(typeof(Server), "RegisterHandlers")]
+    class MPTeams_Server_RegisterHandlers
+    {
+        public static void DoChangeTeam(MPTeams.ChangeTeamMessage msg)
+        {
+            var targetPlayer = Overload.NetworkManager.m_Players.FirstOrDefault(x => x.netId == msg.netId);
+
+            ServerStatLog.AddTeamChange(targetPlayer, msg.newTeam);
+            targetPlayer.Networkm_mp_team = msg.newTeam;
+
+            // Also need to set the Lobby data as it gets used for things like tracker stats
+            var targetLobbyData = NetworkMatch.m_players.FirstOrDefault(x => x.Value.m_name == targetPlayer.m_mp_name).Value;
+            targetLobbyData.m_team = msg.newTeam;
+
+            // CTF behavior, need to account for flag carrier switching
+            if (CTF.IsActiveServer)
+            {
+                if (CTF.PlayerHasFlag.ContainsKey(targetPlayer.netId) && CTF.PlayerHasFlag.TryGetValue(targetPlayer.netId, out int flag))
+                {
+                    CTF.SendCTFLose(-1, targetPlayer.netId, flag, FlagState.HOME, true);
+
+                    if (!CTF.CarrierBoostEnabled)
+                    {
+                        targetPlayer.c_player_ship.m_boost_overheat_timer = 0;
+                        targetPlayer.c_player_ship.m_boost_heat = 0;
+                    }
+
+                    CTF.NotifyAll(CTFEvent.RETURN, $"{MPTeams.TeamName(targetPlayer.m_mp_team)} FLAG RETURNED AFTER {targetPlayer.m_mp_name} CHANGED TEAMS",
+                        targetPlayer, flag);
+                }
+            }
+
+            foreach (var player in Overload.NetworkManager.m_Players.Where(x => x.connectionToClient.connectionId > 0))
+            {
+                // Send message to clients with 'changeteam' support to give them HUD message
+                if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "changeteam"))
+                    NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgChangeTeam, msg);
+            }
+        }
+
+        private static void OnChangeTeam(NetworkMessage rawMsg)
+        {
+            var msg = rawMsg.ReadMessage<MPTeams.ChangeTeamMessage>();
+            DoChangeTeam(msg);
+        }
+
+        static void Postfix()
+        {
+            if (GameplayManager.IsDedicatedServer())
+            {
+                NetworkServer.RegisterHandler(MessageTypes.MsgChangeTeam, OnChangeTeam);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(Client), "RegisterHandlers")]
+    public class MPTeams_Client_RegisterHandlers
+    {
+        private static void OnChangeTeam(NetworkMessage rawMsg)
+        {
+            var msg = rawMsg.ReadMessage<MPTeams.ChangeTeamMessage>();
+            var player = Overload.NetworkManager.m_Players.FirstOrDefault(x => x.netId == msg.netId);
+
+            if (player != null && msg.newTeam != player.m_mp_team)
+            {
+                player.m_mp_team = msg.newTeam;
+                MPTeams.UpdateClientColors();
+
+                GameplayManager.AddHUDMessage($"{player.m_mp_name} changed teams", -1, true);
+                SFXCueManager.PlayRawSoundEffect2D(SoundEffect.hud_notify_message1);
+            }
+        }
+
+        static void Postfix()
+        {
+            if (Client.GetClient() == null)
+                return;
+
+            Client.GetClient().RegisterHandler(MessageTypes.MsgChangeTeam, OnChangeTeam);
+        }
+    }
+
+    // Team-colored creepers in team games
+    [HarmonyPatch(typeof(Projectile), "Fire")]
+    class MPTeams_Projectile_Fire
+    {
+        // stock Colors for restoring the correct particle colors in Anarchy
+        // since Unity actively attempts to outsmart me by reusing previous
+        // ParticleSystems and getting leftover TA colors despite my efforts.
+
+        public static float s_intensity = 0.6f;
+        public static float s_EdgePower = 1.44f;
+        public static float s_EdgeStrength = 0.26f;
+        public static Color s_glow = new Color(1f, 0.706f, 0.265f, 0.234f);
+        public static Color s_trail = new Color(1f, 0.419f, 0.074f, 0.853f);
+        public static Color s_ring = new Color(1f, 0.173f, 0.039f, 0.392f);
+
+        static void Postfix(Projectile __instance)
+        {
+            if (__instance.m_type == ProjPrefab.missile_creeper && !GameplayManager.IsDedicatedServer())
+            {
+                Light light = __instance.c_go.GetComponent<Light>();
+                light.intensity = s_intensity;
+
+                if (GameplayManager.IsMultiplayerActive && NetworkMatch.IsTeamMode(NetworkMatch.GetMode()) && Menus.mms_creeper_colors)
+                {
+                    var teamcolor = UIManager.ChooseMpColor(__instance.m_mp_team);
+
+                    light.color = teamcolor;
+
+                    foreach (var rend in __instance.c_go.GetComponentsInChildren<Renderer>(includeInactive: true))
+                    {
+                        if (rend.name == "_glow" || rend.name == "extra_glow")
+                        {
+                            //Debug.Log("CCF found rend " + rend.name);
+                            foreach (var mat in rend.materials)
+                            {
+                                //Debug.Log("CCF found mat " + mat.name);
+                                if (mat.name == "_glow_superbright1_yellow (Instance)")
+                                {
+                                    mat.color = teamcolor;
+                                    mat.SetColor("_EmissionColor", teamcolor);
+                                }
+                                else if (mat.name == "enemy_creeper1 (Instance)")
+                                {
+                                    mat.color = teamcolor;
+                                    mat.SetColor("_EmissionColor", teamcolor);
+                                    mat.SetFloat("_EdgePower", s_EdgePower);
+                                    mat.SetFloat("_EdgeStrength", s_EdgeStrength);
+                                }
+                            }
+                        }
+                    }
+                    foreach (var x in __instance.c_go.GetComponentsInChildren<ParticleSystem>())
+                    {
+                        var m = x.main;
+                        m.startColor = teamcolor;
+                        if (x.name == "_glow")
+                        {
+                            var col = x.colorOverLifetime;
+                            var c = col.color;
+                            c.color = Color.clear;
+                            c.mode = ParticleSystemGradientMode.Gradient;
+                            col.color = c;
+                        }
+                    }
+                }
+                else
+                {
+                    foreach (var rend in __instance.m_robot_only_extra_mesh.GetComponentsInChildren<Renderer>(includeInactive: true).Where(x => x.name == "extra_glow"))
+                    {
+                        foreach (var mat in rend.materials.Where(x => x.name == "enemy_creeper1 (Instance)"))
+                        {
+
+                            if (mat.name == "enemy_creeper1 (Instance)")
+                            {
+                                mat.SetFloat("_EdgePower", s_EdgePower);
+                                mat.SetFloat("_EdgeStrength", s_EdgeStrength);
+                            }
+                        }
+                    }
+
+                    foreach (var x in __instance.c_go.GetComponentsInChildren<ParticleSystem>(includeInactive: true))
+                    {
+                        var m = x.main;
+                        switch (x.name)
+                        {
+                            case "_glow":
+                                m.startColor = s_glow;
+                                var col = x.colorOverLifetime;
+                                var c = col.color;
+                                c.color = Color.clear;
+                                c.mode = ParticleSystemGradientMode.Gradient;
+                                col.color = c;
+                                break;
+                            case "partilce_ring": // No, I didn't misspell that. Revival did.
+                                m.startColor = s_ring;
+                                break;
+                            case "trail_creeper(Clone)":
+                                m.startColor = s_trail;
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // if team-coloured creepers are on and friendly fire isn't, causes the player's creepers to blink periodically
+    [HarmonyPatch(typeof(Projectile), "FixedUpdateDynamic")]
+    static class MPTeams_Projectile_FixedUpdateDynamic
+    {
+        const float offTime = 0.75f;
+        const float cycleTime = 1f;
+
+        static void Postfix(Projectile __instance)
+        {
+            if (GameplayManager.IsMultiplayerActive && Menus.mms_creeper_colors && MenuManager.mms_friendly_fire != 1 && __instance.m_type == ProjPrefab.missile_creeper && __instance.m_owner_player.isLocalPlayer)
+            {
+                var time = Time.time % cycleTime;
+
+                // 0f ... 1f value
+                var pulse = Mathf.Clamp(Math.Abs(time - offTime / 2) / (offTime / 2), 0, 1);
+
+                // Enemy creeper light
+                __instance.m_robot_only_extra_mesh.SetActive(pulse < 1f);
+
+                if (pulse < 1f)
+                {
+                    foreach (var rend in __instance.m_robot_only_extra_mesh.GetComponentsInChildren<Renderer>(includeInactive: true))
+                    {
+                        if (rend.name == "extra_glow")
+                        {
+                            foreach (var mat in rend.materials)
+                            {
+                                
+                                if (mat.name == "enemy_creeper1 (Instance)")
+                                {
+                                    mat.SetFloat("_EdgePower", 5f - 4f * (1f - pulse));
+                                    mat.SetFloat("_EdgeStrength", 3f * (1f - pulse));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Team color creeper light
+                var light = __instance.c_go.GetComponent<Light>();
+                var color = light.color;
+                color.a = pulse;
+
+                light.intensity = 0.25f + pulse * 0.75f;
+
+                foreach (var ps in __instance.c_go.GetComponentsInChildren<ParticleSystem>().Where(x => x.name == "_glow"))
+                {
+                    var col = ps.colorOverLifetime; // this one is different on purpose - first time sets the mode the "color", then just updates from there
+                    col.color = color;
+                }
+            }
+        }
+    }
+
+    // resets the projectile list between rounds
+    [HarmonyPatch(typeof(GameplayManager), "StartLevel")]
+    class MPTeams_GameplayManager_StartLevel
+    {
+        static void Postfix()
+        {
+            for (int i = 1; i < 29; i++) // Whyyyyyyyyy
+            {
+                //Debug.Log("CCC nuking proj list");
+                /*foreach (ProjElement p in ProjectileManager.proj_list[i])
+                {
+                    Debug.Log("CCC destroying projectile");
+                    UnityEngine.Object.Destroy(p.c_proj);
+                    UnityEngine.Object.Destroy(p.c_go);
+                    //p.Destroy();
+                }*/
+                ProjectileManager.proj_list[i].Clear();
+            }
+            UpdateDynamicManager.m_proj_count = 0;
+        }
+    }
 }

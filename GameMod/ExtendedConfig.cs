@@ -16,20 +16,30 @@ namespace GameMod
     /// </summary>
     class ExtendedConfig
     {
-        
+
         private const string file_extension = ".extendedconfig";
         private static List<string> unknown_sections;
 
         // Legacy autoselect file.
         public static string textFile = Path.Combine(Application.persistentDataPath, "AutoSelect-Config.txt");
 
-        // On Game Loading or when selecting a different PILOT read or generate PILOT.extendedconfig
+        // On Game Loading or when selecting a different PILOT read or generating PILOT.extendedconfig
         [HarmonyPatch(typeof(PilotManager), "Select", new Type[] { typeof(string) })]
         internal class ExtendedConfig_PilotManager_Select
         {
             public static void Prefix(string name)
             {
-                if( Network.isServer )
+                LoadPilotExtendedConfig(name);
+            }
+
+            public static void Postfix()
+            {
+                Section_JoystickCurve.MatchMControllerOrder();
+            }
+
+            public static void LoadPilotExtendedConfig(string name)
+            {
+                if (Network.isServer)
                 {
                     Debug.Log("ExtendedConfig_PilotManager_Select called on the server");
                     return;
@@ -49,11 +59,14 @@ namespace GameMod
                     }
                 }
 
-                if (!loaded) {
+                if (!loaded)
+                {
                     // Attempt to use autoselect from pre 0.4.1.
-                    if (File.Exists(textFile)) {
+                    if (File.Exists(textFile))
+                    {
                         Debug.Log("Extended config does not exist for pilot, attempting to load pre-0.4.1 autoselect.");
-                        using (StreamReader sr = File.OpenText(textFile)) {
+                        using (StreamReader sr = File.OpenText(textFile))
+                        {
                             MPAutoSelection.PrimaryPriorityArray[0] = sr.ReadLine();
                             MPAutoSelection.PrimaryPriorityArray[1] = sr.ReadLine();
                             MPAutoSelection.PrimaryPriorityArray[2] = sr.ReadLine();
@@ -102,10 +115,14 @@ namespace GameMod
             }
         }
 
+
         // reads all lines and passes them to their respective functions to process them 
         // unknown sections get stored in ExtendedConfig.unknown_lines to reattach them to the end when saving
         private static void ReadConfigData(string filepath)
         {
+            List<string> completed = new List<string>();
+
+            uConsole.Log("ReadConfigData");
             using (StreamReader sr = new StreamReader(filepath))
             {
                 unknown_sections = new List<string>();
@@ -133,6 +150,7 @@ namespace GameMod
                         if (!current_section_id.Equals("unknown"))
                         {
                             PassSectionToFunction(current_section, current_section_id);
+                            completed.Add(current_section_id);
                             current_section_id = "unknown";
                             current_section.Clear();
                         }
@@ -154,6 +172,17 @@ namespace GameMod
                     }
                 }
             }
+
+            foreach (string s in known_sections)
+            {
+                // a section is missing from the config file, create it
+                if (!completed.Contains(s))
+                {
+                    List<string> l = new List<string>();
+                    PassSectionToFunction(l, s);
+                    Debug.Log("Creating missing section \"" + s + "\" in pilot's .extendedconfig");
+                }
+            }
         }
 
 
@@ -162,6 +191,7 @@ namespace GameMod
         {
             public static void Postfix()
             {
+                //uConsole.Log("ExtendedConfig_Controls_SaveControlData");
                 if (Network.isServer)
                 {
                     Debug.Log("ExtendedConfig_Controls_SaveControlData called on the server");
@@ -176,6 +206,7 @@ namespace GameMod
         {
             public static void Postfix()
             {
+                //uConsole.Log("ExtendedConfig_PilotManager_SavePreferences");
                 if (Network.isServer)
                 {
                     Debug.Log("ExtendedConfig_Controls_SavePreferences called on the server");
@@ -190,12 +221,13 @@ namespace GameMod
         {
             public static void Prefix()
             {
+                uConsole.Log("ExtendedConfig_PilotManager_Create");
                 if (Network.isServer)
                 {
                     Debug.Log("ExtendedConfig_PilotManager_Create called on the server");
                     return;
                 }
-                if ( string.IsNullOrEmpty(PilotManager.ActivePilot) )
+                if (string.IsNullOrEmpty(PilotManager.ActivePilot))
                 {
                     SetDefaultConfig();
                 }
@@ -240,12 +272,27 @@ namespace GameMod
         {
             static void Prefix()
             {
+                //Debug.Log("ExtendedConfig_Controls_OnControllerConnected");
                 if (!Network.isServer)
                 {
-                    PilotManager.Select(PilotManager.ActivePilot);
+                    ExtendedConfig_PilotManager_Select.LoadPilotExtendedConfig(PilotManager.PilotName);
+                    //PilotManager.Select(PilotManager.ActivePilot);
                 }
             }
         }
+        /*
+        [HarmonyPatch(typeof(Controls), "OnControllerDisconnected")]
+        internal class ExtendedConfig_Controls_OnControllerDisconnected
+        {
+            static void Prefix()
+            {
+                //Debug.Log("ExtendedConfig_Controls_OnControllerDisconnected");
+                if (!Network.isServer)
+                {
+                    
+                }
+            }
+        }*/
 
 
         /////////////////////////////////////////////////////////////////////////////////////////
@@ -255,7 +302,11 @@ namespace GameMod
         private static List<string> known_sections = new List<string> {
             "[SECTION: AUTOSELECT]",
             "[SECTION: JOYSTICKCURVE]",
-
+            "[SECTION: WEAPONCYCLING]",
+            "[SECTION: AUDIOTAUNT_KEYBINDS]",
+            "[SECTION: AUDIOTAUNT_MUTED_PLAYERS]",
+            "[SECTION: AUDIOTAUNT_SELECTED_TAUNTS]",
+            //...
         };
 
 
@@ -264,12 +315,39 @@ namespace GameMod
             if (section_name.Equals(known_sections[0]))
             {
                 Section_AutoSelect.Load(section);
+                return;
             }
             if (section_name.Equals(known_sections[1]))
             {
                 Section_JoystickCurve.Load(section);
+                return;
             }
-
+            if (section_name.Equals(known_sections[2]))
+            {
+                Section_WeaponCycling.Load(section);
+                return;
+            }
+            if (section_name.Equals(known_sections[3]))
+            {
+                Section_AudiotauntKeybinds.Load(section);
+                return;
+            }
+            if (section_name.Equals(known_sections[3]))
+            {
+                Section_AudiotauntKeybinds.Load(section);
+                return;
+            }
+            if (section_name.Equals(known_sections[4]))
+            {
+                Section_AudiotauntMutedPlayers.Load(section);
+                return;
+            }
+            if (section_name.Equals(known_sections[5]))
+            {
+                Section_AudiotauntSelectedTaunts.Load(section);
+                return;
+            }
+            //...
 
         }
 
@@ -293,6 +371,23 @@ namespace GameMod
                     Section_JoystickCurve.Save(w);
                     w.WriteLine("[/END]");
 
+                    w.WriteLine("[SECTION: WEAPONCYCLING]");
+                    Section_WeaponCycling.Save(w);
+                    w.WriteLine("[/END]");
+
+                    w.WriteLine("[SECTION: AUDIOTAUNT_KEYBINDS]");
+                    Section_AudiotauntKeybinds.Save(w);
+                    w.WriteLine("[/END]");
+
+                    w.WriteLine("[SECTION: AUDIOTAUNT_MUTED_PLAYERS]");
+                    Section_AudiotauntMutedPlayers.Save(w);
+                    w.WriteLine("[/END]");
+
+                    w.WriteLine("[SECTION: AUDIOTAUNT_SELECTED_TAUNTS]");
+                    Section_AudiotauntSelectedTaunts.Save(w);
+                    w.WriteLine("[/END]");
+
+                    //...
 
                     if (unknown_sections != null)
                     {
@@ -313,13 +408,14 @@ namespace GameMod
         {
             Section_AutoSelect.Set();
             Section_JoystickCurve.SetDefault();
-
+            Section_WeaponCycling.Set();
+            Section_AudiotauntKeybinds.SetDefaultKeybinds();
         }
 
         public static void ApplyConfigData()
         {
             Section_AutoSelect.ApplySettings();
-
+            Section_WeaponCycling.ApplySettings();
         }
 
 
@@ -472,7 +568,6 @@ namespace GameMod
 
         }
 
-
         internal class Section_JoystickCurve
         {
             public static List<Controller> controllers = new List<Controller>();
@@ -480,6 +575,7 @@ namespace GameMod
             public class Controller
             {
                 public string name = "";
+                public int id = -1;
                 public List<Axis> axes = new List<Axis>();
 
                 public class Axis
@@ -489,13 +585,87 @@ namespace GameMod
 
                     public Vector2[] CloneCurvePoints()
                     {
-                        return new Vector2[] { 
-                            new Vector2(curve_points[0].x,curve_points[0].y), 
-                            new Vector2(curve_points[1].x,curve_points[1].y), 
-                            new Vector2(curve_points[2].x,curve_points[2].y), 
+                        return new Vector2[] {
+                            new Vector2(curve_points[0].x,curve_points[0].y),
+                            new Vector2(curve_points[1].x,curve_points[1].y),
+                            new Vector2(curve_points[2].x,curve_points[2].y),
                             new Vector2(curve_points[3].x,curve_points[3].y)
                         };
 
+                    }
+                }
+            }
+
+            // returns the index of a controller in Overload.Controls.m_controllers
+            static int FindControllerIndex(string controller_name)
+            {
+                int index = -1;
+                for (int i = 0; i < Overload.Controls.m_controllers.Count; i++)
+                {
+                    if (RemoveWhitespace(Overload.Controls.m_controllers[i].name).Equals(controller_name))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+                return index;
+            }
+
+            public static void MatchMControllerOrder()
+            {
+                if(controllers != null && Controls.m_controllers != null)
+                {
+                    
+                    if (controllers.Count > Controls.m_controllers.Count)
+                    {
+                        Debug.Log("\nThe device count doesnt match!");
+                        List<Controller> to_remove = new List<Controller>();
+                        foreach(Controller device in controllers)
+                        {
+                            if(Controls.m_controllers.FindIndex((Overload.Controller c) => c.name == device.name && c.joystickID == device.id) == -1)
+                            {
+                                to_remove.Add(device);
+                            }
+                        }
+
+                        foreach(Controller device in to_remove)
+                        {
+                            Debug.Log(" Removed: " + device.name + ":" + device.id);
+                            controllers.Remove(device);
+                        }
+                    }
+
+
+                    for (int i = 0; i < Controls.m_controllers.Count; i++)
+                    {
+                        if((i < Controls.m_controllers.Count && i < controllers.Count)
+                            &&(!controllers[i].name.Equals(Controls.m_controllers[i].name))
+                            )
+                        {
+                            //Debug.Log("Found a mismatch in the "+i+"th device: "+ controllers[i].name+" : "+ Controls.m_controllers[i].name);
+                            // check if there is an exact match
+                            int index = controllers.FindIndex((Controller c) => c.name == Controls.m_controllers[i].name && Controls.m_controllers[i].joystickID == c.id);
+                            if(index != -1)
+                            {
+                                //Debug.Log(" Found an exact match");
+                                Controller tmp = controllers[i];
+                                controllers[i] = controllers[controllers.Count - 1];
+                                controllers[controllers.Count - 1] = tmp;
+                            }
+                        }
+                    }
+
+
+                    Debug.Log("\nSection_Joystickcurve.controllers Order");
+                    for (int i = 0; i < controllers.Count; i++)
+                    {
+                        Debug.Log("     "+controllers[i].name+":"+controllers[i].id);
+                    }
+
+                    Debug.Log("\nControls.m_controllers Order");
+                    for (int i = 0; i < Controls.m_controllers.Count; i++)
+                    {
+                        Debug.Log("     " + Controls.m_controllers[i].name + ":" + Controls.m_controllers[i].joystickID);
                     }
                 }
             }
@@ -504,51 +674,176 @@ namespace GameMod
             {
                 for (int i = 0; i < section.Count; i++)
                 {
-                    if (!string.IsNullOrEmpty(section[i]))
+                    if (!string.IsNullOrEmpty(section[i]) && section[i].Length > 3)
                     {
-                        section[i] = RemoveWhitespace(section[i]);
+                        section[i] = section[i].Substring(3);
+                    }
+                }
+
+                List<Controller> copy_of_controllers = new List<Controller>();
+                foreach (Controller c in controllers)
+                {
+                    copy_of_controllers.Add(new Controller
+                    {
+                        name = c.name,
+                        id = c.id,
+                        axes = new List<Controller.Axis>()
+                    });
+
+                    foreach (Controller.Axis axis in c.axes)
+                    {
+                        copy_of_controllers[copy_of_controllers.Count - 1].axes.Add(new Controller.Axis()
+                        {
+                            curve_points = axis.curve_points,
+                            curve_lookup = axis.curve_lookup
+                        });
                     }
                 }
 
                 try
                 {
+                    // Mirror Overload.Controls.m_controllers devices with default configurations
                     SetDefault();
                     int index = -1;
+
+                    // read in the amount of controllers that are saved in this curve section
                     int.TryParse(section[++index], out int val);
                     int numControllers = val;
+
+
+                    List<Controller> inactive_devices = new List<Controller>();
+                    List<Controller> all_devices = new List<Controller>();
+                    Dictionary<string, int> controller_types = new Dictionary<string, int>();
+
+                    // read in the data of the devices and insert the populated devices at their right position
+                    // (controllers needs to be parallel to Overload.Controls.m_controllers)
                     for (int i = 0; i < numControllers; i++)
                     {
-                        string controllerName = section[++index];
+                        Controller device = new Controller();
+                        string[] device_informations = section[++index].Split(';');
+                        string controllerName = device_informations[0];
+                        device.name = controllerName;
+                        device.id = -1;
+                        if (device_informations.Length == 2)
+                        {
+                            int.TryParse(device_informations[1], out device.id);
+                        }
+
+
+                        // read in the number of axes for this device
                         int.TryParse(section[++index], out int val2);
                         int numAxes = val2;
-                        if( i >= controllers.Count )
-                        {
-                            Controller c = new Controller();
-                            c.name = controllerName;
-                            for (int g = 0; g < numAxes; g++) c.axes.Add(new Controller.Axis());
-                            controllers.Add(c);
-                        }
+
+                        for (int g = 0; g < numAxes; g++) device.axes.Add(new Controller.Axis());
+
+                        // populate device with default or saved curve points
                         for (int j = 0; j < numAxes; j++)
                         {
+                            if (j >= device.axes.Count)
+                            {
+                                device.axes.Add(new Controller.Axis());
+                            }
                             float value = 0f;
-                            controllers[i].axes[j].curve_points = DefaultCurvePoints();
-                            controllers[i].axes[j].curve_points[0].y = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0f;
-                            controllers[i].axes[j].curve_points[1].x = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0.25f;
-                            controllers[i].axes[j].curve_points[1].y = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0.25f;
-                            controllers[i].axes[j].curve_points[2].x = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0.75f;
-                            controllers[i].axes[j].curve_points[2].y = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0.75f;
-                            controllers[i].axes[j].curve_points[3].y = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 1f;
+                            device.axes[j].curve_points = DefaultCurvePoints();
+                            device.axes[j].curve_points[0].y = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0f;
+                            device.axes[j].curve_points[1].x = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0.25f;
+                            device.axes[j].curve_points[1].y = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0.25f;
+                            device.axes[j].curve_points[2].x = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0.75f;
+                            device.axes[j].curve_points[2].y = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 0.75f;
+                            device.axes[j].curve_points[3].y = float.TryParse(section[++index], out value) && value >= 0f && value <= 1f ? value : 1f;
 
-                            controllers[i].axes[j].curve_lookup = ExtendedConfig.Section_JoystickCurve.GenerateCurveLookupTable(controllers[i].axes[j].curve_points);
+                            // generate the lookup table
+                            device.axes[j].curve_lookup = ExtendedConfig.Section_JoystickCurve.GenerateCurveLookupTable(device.axes[j].curve_points);
+                        }
+                        all_devices.Add(device);
+                    }
+
+
+                    // match the devices
+                    foreach (var device in all_devices)
+                    {
+                        // populate the dictionary of the different controller types
+                        if (!controller_types.ContainsKey(device.name))
+                            controller_types.Add(device.name, 0);
+
+
+                        if (device.id != -1)
+                        {
+
+                            int index2 = Controls.m_controllers.FindIndex((Overload.Controller c) => c.name == device.name && c.joystickID == device.id);
+                            Debug.Log("[1C] Matching devices: (" + device.name + ":" + device.id + ") to " + (index2 == -1 ? "UNCONNECTED" : index2.ToString()));
+                            if (index2 == -1)
+                                inactive_devices.Add(device);
+                            else
+                                controllers[index2] = device;
+                        }
+                        else
+                        {
+                            int index2 = Controls.m_controllers.FindIndex((Overload.Controller c) => c.name == device.name);
+                            // ensure that there is sth that this device can be matched to
+                            if (index2 != -1 && index2 < Controls.m_controllers.Count)
+                            {
+                                // device has no id and there are no other devices with ids either 
+                                if (all_devices.Find((Controller c) => c.name == Controls.m_controllers[index2].name && c.id == Controls.m_controllers[index2].joystickID) == null)
+                                {
+                                    int[] matching_device_indexes = FindControllerIndexes(device.name, device.id, false);
+                                    if (matching_device_indexes.Length > 0 && matching_device_indexes.Length > controller_types[device.name])
+                                    {
+                                        device.id = Controls.m_controllers[matching_device_indexes[controller_types[device.name]]].joystickID;
+                                        controllers[matching_device_indexes[controller_types[device.name]]] = device;
+                                        Debug.Log("[2C] Matching devices: (" + device.name + ":" + device.id + ") to " + (index2 == -1 ? "UNCONNECTED" : matching_device_indexes[controller_types[device.name]].ToString()));
+                                    }
+                                    controller_types[device.name]++;
+                                }
+                            }
+                            else
+                                inactive_devices.Add(device);
+
                         }
                     }
+
+                    foreach (Controller c in inactive_devices)
+                    {
+                        Debug.Log("  readded inactive controller: " + c.name);
+                        controllers.Add(c);
+                    }
+
                 }
                 catch (Exception ex)
                 {
-                    Debug.Log("Error in ExtendedConfig.Section_JoystickCurve.Load:  " + ex + ", Setting Default Values.");
-                    SetDefault();
+                    Debug.Log("Error in ExtendedConfig.Section_JoystickCurve.Load:  " + ex + ", Setting Former Values.");
+                    controllers = copy_of_controllers;
 
                 }
+            }
+
+            static int[] FindControllerIndexes(string controller_name, int device_id, bool requires_matching_device_id = true)
+            {
+                int[] indexes = new int[FindAmountOfControllerIndexes(controller_name, device_id, requires_matching_device_id)];
+                int occurence = 0;
+                for (int i = 0; i < Overload.Controls.m_controllers.Count; i++)
+                {
+                    if (Overload.Controls.m_controllers[i].name.Equals(controller_name) && (Overload.Controls.m_controllers[i].joystickID == device_id | !requires_matching_device_id))
+                    {
+                        indexes[occurence] = i;
+                        occurence++;
+                    }
+                }
+                return indexes;
+            }
+
+
+            static int FindAmountOfControllerIndexes(string controller_name, int device_id, bool requires_matching_device_id = true)
+            {
+                int amount = 0;
+                for (int i = 0; i < Overload.Controls.m_controllers.Count; i++)
+                {
+                    if (Overload.Controls.m_controllers[i].name.Equals(controller_name) && (Overload.Controls.m_controllers[i].joystickID == device_id | !requires_matching_device_id))
+                    {
+                        amount++;
+                    }
+                }
+                return amount;
             }
 
             public static void Save(StreamWriter w)
@@ -558,7 +853,7 @@ namespace GameMod
                     w.WriteLine(controllers.Count);
                     for (int i = 0; i < controllers.Count; i++)
                     {
-                        w.WriteLine("   " + controllers[i].name);
+                        w.WriteLine("   " + controllers[i].name + ";" + controllers[i].id);
                         w.WriteLine("   " + controllers[i].axes.Count);
                         for (int j = 0; j < controllers[i].axes.Count; j++)
                         {
@@ -586,6 +881,7 @@ namespace GameMod
                     controllers.Add(new Controller
                     {
                         name = Controls.m_controllers[i].name,
+                        id = Controls.m_controllers[i].joystickID,
                         axes = new List<Controller.Axis>()
                     });
                     for (int j = 0; j < Controls.m_controllers[i].m_axis_count; j++)
@@ -642,8 +938,185 @@ namespace GameMod
             }
         }
 
+        internal class Section_WeaponCycling
+        {
+            public static Dictionary<string, string> settings;
 
-        
+            public static void Load(List<string> section)
+            {
+                MPWeaponCycling.UpdateWeaponOrder();
+
+                settings = new Dictionary<string, string>();
+                string l;
+                foreach (string line in section)
+                {
+                    l = RemoveWhitespace(line);
+                    string[] res = l.Split(':');
+                    if (res.Length == 2)
+                    {
+                        settings.Add(res[0], res[1]);
+                    }
+                    else
+                    {
+                        Debug.Log("Error in ExtendedConfig.ProcessWeaponCyclingSection: unexpected line split: " + line + ", Setting Default Values.");
+                        Set();
+                        return;
+                    }
+                }
+                ApplySettings();
+            }
+
+            public static void Save(StreamWriter w)
+            {
+                if (settings != null)
+                {
+                    foreach (var setting in settings)
+                    {
+                        if (setting.Key != null && setting.Value != null)
+                        {
+                            w.WriteLine("   " + setting.Key + ": " + setting.Value);
+                        }
+                    }
+                }
+            }
+
+            // sets the values of the AutoSelect dictionary
+            //  mirror = false   sets the default values
+            //  mirror = true    sets the current MPWeaponCycling values
+            public static void Set(bool mirror = false)
+            {
+
+
+                settings = new Dictionary<string, string>();
+                settings.Add("p_cycle_0", mirror ? MPWeaponCycling.CPrimaries[0].ToString() : "true");
+                settings.Add("p_cycle_1", mirror ? MPWeaponCycling.CPrimaries[1].ToString() : "true");
+                settings.Add("p_cycle_2", mirror ? MPWeaponCycling.CPrimaries[2].ToString() : "true");
+                settings.Add("p_cycle_3", mirror ? MPWeaponCycling.CPrimaries[3].ToString() : "true");
+                settings.Add("p_cycle_4", mirror ? MPWeaponCycling.CPrimaries[4].ToString() : "true");
+                settings.Add("p_cycle_5", mirror ? MPWeaponCycling.CPrimaries[5].ToString() : "true");
+                settings.Add("p_cycle_6", mirror ? MPWeaponCycling.CPrimaries[6].ToString() : "true");
+                settings.Add("p_cycle_7", mirror ? MPWeaponCycling.CPrimaries[7].ToString() : "true");
+                settings.Add("s_cycle_0", mirror ? MPWeaponCycling.CSecondaries[0].ToString() : "true");
+                settings.Add("s_cycle_1", mirror ? MPWeaponCycling.CSecondaries[1].ToString() : "true");
+                settings.Add("s_cycle_2", mirror ? MPWeaponCycling.CSecondaries[2].ToString() : "true");
+                settings.Add("s_cycle_3", mirror ? MPWeaponCycling.CSecondaries[3].ToString() : "true");
+                settings.Add("s_cycle_4", mirror ? MPWeaponCycling.CSecondaries[4].ToString() : "true");
+                settings.Add("s_cycle_5", mirror ? MPWeaponCycling.CSecondaries[5].ToString() : "true");
+                settings.Add("s_cycle_6", mirror ? MPWeaponCycling.CSecondaries[6].ToString() : "true");
+                settings.Add("s_cycle_7", mirror ? MPWeaponCycling.CSecondaries[7].ToString() : "true");
+            }
+
+            public static void ApplySettings()
+            {
+                try
+                {
+                    MPWeaponCycling.CPrimaries[0] = Convert.ToBoolean(settings["p_cycle_0"]);
+                    MPWeaponCycling.CPrimaries[1] = Convert.ToBoolean(settings["p_cycle_1"]);
+                    MPWeaponCycling.CPrimaries[2] = Convert.ToBoolean(settings["p_cycle_2"]);
+                    MPWeaponCycling.CPrimaries[3] = Convert.ToBoolean(settings["p_cycle_3"]);
+                    MPWeaponCycling.CPrimaries[4] = Convert.ToBoolean(settings["p_cycle_4"]);
+                    MPWeaponCycling.CPrimaries[5] = Convert.ToBoolean(settings["p_cycle_5"]);
+                    MPWeaponCycling.CPrimaries[6] = Convert.ToBoolean(settings["p_cycle_6"]);
+                    MPWeaponCycling.CPrimaries[7] = Convert.ToBoolean(settings["p_cycle_7"]);
+                    MPWeaponCycling.CSecondaries[0] = Convert.ToBoolean(settings["s_cycle_0"]);
+                    MPWeaponCycling.CSecondaries[1] = Convert.ToBoolean(settings["s_cycle_1"]);
+                    MPWeaponCycling.CSecondaries[2] = Convert.ToBoolean(settings["s_cycle_2"]);
+                    MPWeaponCycling.CSecondaries[3] = Convert.ToBoolean(settings["s_cycle_3"]);
+                    MPWeaponCycling.CSecondaries[4] = Convert.ToBoolean(settings["s_cycle_4"]);
+                    MPWeaponCycling.CSecondaries[5] = Convert.ToBoolean(settings["s_cycle_5"]);
+                    MPWeaponCycling.CSecondaries[6] = Convert.ToBoolean(settings["s_cycle_6"]);
+                    MPWeaponCycling.CSecondaries[7] = Convert.ToBoolean(settings["s_cycle_7"]);
+                }
+                catch (Exception ex)
+                {
+                    Debug.Log("Error while parsing WeaponCycling settings. missing entry " + ex + "\nSetting Default values");
+                    Set();
+                    ApplySettings();
+                }
+            }
+
+        }
+
+        internal class Section_AudiotauntKeybinds
+        {
+            public static void Load(List<string> section)
+            {
+                string l;
+                for (int i = 0; i < section.Count; i++)
+                {
+                    if (i < MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT)
+                    {
+                        l = RemoveWhitespace(section[i]);
+                        int.TryParse(l, out int val);
+
+                        if (val >= -1)
+                        {
+                            MPAudioTaunts.AClient.keybinds[i] = val;
+                        }
+                    }
+
+                }
+            }
+
+            public static void Save(StreamWriter w)
+            {
+                for (int i = 0; i < MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT; i++)
+                {
+                    w.WriteLine("   " + MPAudioTaunts.AClient.keybinds[i]);
+                }
+            }
+
+            // -1 = no keycode set
+            public static void SetDefaultKeybinds()
+            {
+                for (int i = 0; i < MPAudioTaunts.AClient.keybinds.Length; i++)
+                {
+                    MPAudioTaunts.AClient.keybinds[i] = -1;
+                }
+            }
+        }
+
+        internal class Section_AudiotauntSelectedTaunts
+        {
+            public static void Load(List<string> section){  
+                string hashes = "", l = "";
+                for (int i = 0; i < section.Count; i++){
+                    if (i != 0)
+                        hashes += "/";
+                    if (i < MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT){
+                        l = RemoveWhitespace(section[i]);
+                        hashes += l;
+                    }
+                }
+                MPAudioTaunts.AClient.loaded_local_taunts = hashes;
+                MPAudioTaunts.AClient.LoadLocalAudioTauntsFromPilotPrefs();
+            }
+
+            public static void Save(StreamWriter w){
+                for (int i = 0; i < MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT; i++)
+                    if (MPAudioTaunts.AClient.local_taunts.Length > i && MPAudioTaunts.AClient.local_taunts[i] != null)
+                        w.WriteLine("   " + MPAudioTaunts.AClient.local_taunts[i].hash);
+            }
+        }
+
+        internal class Section_AudiotauntMutedPlayers
+        {
+            public static HashSet<string> ids = new HashSet<string>();
+
+            public static void Load(List<string> section)
+            {
+                for (int i = 0; i < section.Count; i++)
+                   ids.Add(RemoveWhitespace(section[i]));
+            }
+
+            public static void Save(StreamWriter w)
+            {
+                foreach(string id in ids)
+                    w.WriteLine("   " + id);
+            }
+
+        }
+
     }
 }
 

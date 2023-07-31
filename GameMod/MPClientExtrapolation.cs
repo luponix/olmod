@@ -484,6 +484,7 @@ namespace GameMod {
             player.c_player_ship.c_transform.localPosition = Vector3.LerpUnclamped(A.m_pos, B.m_pos, t);
             player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(A.m_rot, B.m_rot, t);
             player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
+            player.c_player_ship.c_mesh_collider_trans.localRotation = player.c_player_ship.c_transform.localRotation;
         }
 
         public static void extrapolatePlayer(Player player, NewPlayerSnapshot snapshot, float t){
@@ -510,14 +511,15 @@ namespace GameMod {
                     const int layerMask = (1<<(int)UnityObjectLayers.LEVEL) | (1<<(int)UnityObjectLayers.LAVA);
                     RaycastHit hitInfo;
                     Vector3 direction = (1.0f/dist) * deltaPos;
+                    dist += radius; // we're doing a basic RayCast, so the distance to check must be increased by the ship's radius`
 
-                    if (Physics.SphereCast(basePos, radius, direction, out hitInfo, dist, layerMask, QueryTriggerInteraction.Ignore)) {
+                    if (Physics.Raycast(basePos, direction, out hitInfo, dist, layerMask, QueryTriggerInteraction.Ignore)) {
                         // how far the ship's enclosing shpere dives into the collider
                         float diveIn = dist - hitInfo.distance;
                         if (diveIn > maxDive) {
                             // limit the ship position
                             diveIn = maxDive;
-                            newPos = basePos + (hitInfo.distance + diveIn) * direction;
+                            newPos = basePos + (hitInfo.distance - radius + diveIn) * direction;
                         }
                     }
                 }
@@ -525,6 +527,7 @@ namespace GameMod {
             player.c_player_ship.c_transform.localPosition = newPos;
             player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(snapshot.m_rot, snapshot.m_rot*Quaternion.Euler(snapshot.m_vrot), t);
             player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
+            player.c_player_ship.c_mesh_collider_trans.localRotation = player.c_player_ship.c_transform.localRotation;
         }
 
         // Called per frame, moves ships along their interpolation/extrapolation motions
