@@ -233,6 +233,11 @@ namespace GameMod {
             }
         }
 
+        static void CmdRandomTarget()
+        {
+            MPBot.Behaviour.target = new Vector3(Random.value * 300, Random.value * 300, Random.value * 300);
+        }
+
         public static void RegisterCommands()
         {
             uConsole.RegisterCommand("mute", "Mute a specific player", new uConsole.DebugCommand(MutePlayer));
@@ -244,6 +249,7 @@ namespace GameMod {
             uConsole.RegisterCommand("ui_color", "Set UI color #aabbcc", new uConsole.DebugCommand(CmdUIColor));
             uConsole.RegisterCommand("vr_scale", "Set VR scale (0.1 to 10)", new uConsole.DebugCommand(CmdVRScale));
             uConsole.RegisterCommand("xp", "Set XP", new uConsole.DebugCommand(CmdXP));
+            uConsole.RegisterCommand("settarget", "Sets a random target", new uConsole.DebugCommand(CmdRandomTarget));
         }
     }
 
