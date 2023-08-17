@@ -435,7 +435,7 @@ namespace GameMod
         {
             var mode = NetworkMatch.GetMode();
             var fitSingle = MPTeams.NetworkMatchTeamCount == 2 && NetworkMatch.m_players.Count <= 8;
-            if (MPModPrivateData.MatchMode == ExtMatchMode.RACE)
+            if (MPModPrivateData.MatchMode == ExtMatchMode.RACE || MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP)
                 return true;
             if (mode == MatchMode.ANARCHY || ((mode == MatchMode.TEAM_ANARCHY || mode == MatchMode.MONSTERBALL) && fitSingle))
                 return true;
@@ -488,7 +488,7 @@ namespace GameMod
                 return false;
             }
 
-            if (NetworkMatch.GetMode() == MatchMode.ANARCHY || MPTeams.NetworkMatchTeamCount == 2)
+            if (NetworkMatch.GetMode() == MatchMode.ANARCHY || MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP || MPTeams.NetworkMatchTeamCount == 2)
                 return true;
 
             int match_time_remaining = NetworkMatch.m_match_time_remaining;

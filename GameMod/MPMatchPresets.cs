@@ -151,6 +151,47 @@ namespace GameMod
                 thunderboltPassthrough = false
             });
 
+            presets.Add(new MPMatchPreset
+            {
+                title = "INSTAREAP",
+                matchMode = MatchMode.ANARCHY,
+                maxPlayers = 16,
+                friendlyFire = 0,
+                timeLimit = 15 * 60,
+                scoreLimit = 0,
+                respawnTime = 0,
+                respawnInvuln = 0,
+                showNames = MatchShowEnemyNames.NORMAL,
+                turnSpeedLimit = 2,
+                forceLoadout = 0,
+                forcePrimary1 = WeaponType.DRILLER,
+                forcePrimary2 = WeaponType.NUM,
+                forceSecondary1 = MissileType.NUM,
+                forceSecondary2 = MissileType.NUM,
+                forceModifier1 = 4,
+                forceModifier2 = 4,
+                powerupSpawn = 2,
+                powerupInitial = 2,
+                powerupBigSpawn = 1,
+                powerupFilter = new bool[] { false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false },
+                jipEnabled = true,
+                suddenDeathOvertime = false,
+                lapLimit = 0,
+                sniperPackets = true,
+                noCompression = true,
+                allowRearView = true,
+                scaleRespawnTime = false,
+                ctfCarrierBoostEnabled = false,
+                classicSpawnsEnabled = false,
+                alwaysCloaked = false,
+                allowSmash = false,
+                assistScoring = true,
+                teamCount = 2,
+                shipMeshCollider = 0,
+                damageNumbers = false,
+                thunderboltPassthrough = false
+            });
+
             GameManager.m_gm.StartCoroutine(GetMatchPresets());
         }        
 
