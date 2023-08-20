@@ -755,11 +755,7 @@ namespace GameMod
                         if (!NetworkMatch.m_head_to_head)
                         {
                             if (score)
-                                uie.DrawDigitsVariable(pos + Vector2.right * (col2 - 100f), player.m_kills * (MPModPrivateData.AssistScoring ? 3 : 1) + (MPModPrivateData.AssistScoring ? player.m_assists : 0), 0.65f, StringOffset.CENTER, c2, m_alpha * num);
-                            if (MPModPrivateData.AssistScoring)
-                            {
-                                uie.DrawDigitsVariable(pos + Vector2.right * col3, player.m_assists, 0.65f, StringOffset.CENTER, c, m_alpha * num);
-                            }
+                                uie.DrawDigitsVariable(pos + Vector2.right * (col2 - 100f), player.m_kills , 0.65f, StringOffset.CENTER, c2, m_alpha * num);
                         }
                         uie.DrawDigitsVariable(pos + Vector2.right * col2, player.m_kills, 0.65f, StringOffset.CENTER, c, m_alpha * num);
                         uie.DrawDigitsVariable(pos + Vector2.right * col4, player.m_deaths, 0.65f, StringOffset.CENTER, c, m_alpha * num);
@@ -768,6 +764,55 @@ namespace GameMod
                         pos.y += 25f;
                     }
                 }
+            }
+
+
+
+            public static bool DrawHUDScoreInfo(UIElement uie, Vector2 pos, Vector2 temp_pos)
+            {
+                pos.x -= 4f;
+                pos.y -= 5f;
+                temp_pos.y = pos.y;
+                temp_pos.x = pos.x - 100f;
+                uie.DrawStringSmall(NetworkMatch.GetModeString(MatchMode.NUM), temp_pos, 0.4f, StringOffset.LEFT, UIManager.m_col_ub0, 1f, 130f);
+                temp_pos.x = pos.x + 95f;
+                int match_time_remaining = NetworkMatch.m_match_time_remaining;
+                int num3 = (int)NetworkMatch.m_match_elapsed_seconds;
+                uie.DrawDigitsTime(temp_pos, (float)match_time_remaining, 0.45f, (num3 <= 10 || match_time_remaining >= 10) ? UIManager.m_col_ui2 : UIManager.m_col_em5, uie.m_alpha, false);
+                temp_pos.x = pos.x - 100f;
+                temp_pos.y = temp_pos.y - 20f;
+                uie.DrawPing(temp_pos);
+                pos.y += 24f;
+
+                pos.y -= 12f;
+                pos.x += 6f;
+                UIManager.DrawQuadUI(pos, 100f, 1.2f, UIManager.m_col_ub1, uie.m_alpha, 21);
+                pos.y += 10f;
+                temp_pos.x = pos.x;
+                temp_pos.x = temp_pos.x + 90f;
+
+                pos.y -= 6f;
+                UIManager.DrawQuadUI(pos, 100f, 1.2f, UIManager.m_col_ub1, uie.m_alpha, 21);
+                pos.x -= 6f;
+                pos.y -= 6f;
+
+                pos.y += 22f;
+                pos.x += 100f;
+                uie.DrawRecentKillsMP(pos);
+                if (GameManager.m_player_ship.m_wheel_select_state == WheelSelectState.QUICK_CHAT)
+                {
+                    pos.y = UIManager.UI_TOP + 128f;
+                    pos.x = -448f;
+                    uie.DrawQuickChatWheel(pos);
+                }
+                else
+                {
+                    pos.y = UIManager.UI_TOP + 60f;
+                    pos.x = UIManager.UI_LEFT + 5f;
+                    uie.DrawQuickChatMP(pos);
+                }
+
+                return false;
             }
         }
 
@@ -877,6 +922,8 @@ namespace GameMod
                     return true;
                 case ExtMatchMode.RACE:
                     return MPScoreboards.Race.DrawHUDScoreInfo(__instance, pos, ___temp_pos);
+                case ExtMatchMode.INSTAREAP:
+                    return MPScoreboards.Instareap.DrawHUDScoreInfo(__instance, pos, ___temp_pos);
                 default:
                     return true;
             }

@@ -1529,6 +1529,7 @@ namespace GameMod {
                     GameManager.m_audio.MusicVolume = MenuManager.opt_volume_music;
                     GameManager.m_audio.VoiceVolume = MenuManager.opt_volume_voice;
                     GameManager.m_audio.AmbientVolume = MenuManager.opt_volume_ambient;
+                    MatchModeInstareap.MatchModeInstareap_GameManager_Awake.LoadSoundEffects();
                     MenuManager.PlaySelectSound(1f);
                     break;
             }

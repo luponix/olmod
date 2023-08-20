@@ -154,7 +154,7 @@ namespace GameMod
             presets.Add(new MPMatchPreset
             {
                 title = "INSTAREAP",
-                matchMode = MatchMode.ANARCHY,
+                matchMode = ExtMatchMode.INSTAREAP,
                 maxPlayers = 16,
                 friendlyFire = 0,
                 timeLimit = 15 * 60,
@@ -163,7 +163,7 @@ namespace GameMod
                 respawnInvuln = 0,
                 showNames = MatchShowEnemyNames.NORMAL,
                 turnSpeedLimit = 2,
-                forceLoadout = 0,
+                forceLoadout = 1,
                 forcePrimary1 = WeaponType.DRILLER,
                 forcePrimary2 = WeaponType.NUM,
                 forceSecondary1 = MissileType.NUM,
