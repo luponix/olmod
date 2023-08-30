@@ -180,7 +180,9 @@ namespace GameMod
 
                 if (cc_type == CCInput.FIRE_WEAPON & GameplayManager.m_gameplay_state == GameplayState.PLAYING)
                 {
-                    if (GameplayManager.m_game_type == GameType.MULTIPLAYER && NetworkMatch.GetMatchState() == MatchState.PLAYING && massdriver_refire_time <= 0)
+                    if (GameplayManager.m_game_type == GameType.MULTIPLAYER 
+                        && NetworkMatch.GetMatchState() == MatchState.PLAYING && massdriver_refire_time <= 0
+                        && (!GameManager.m_local_player.c_player_ship.m_dead | !GameManager.m_local_player.c_player_ship.m_dying))
                     {
                         if(IsFiringInputPressed(KeyPressed(cc_type), Controls.JoyButtonPressed(cc_type)) )
                         {
@@ -220,7 +222,7 @@ namespace GameMod
                 if(time > MD_TIME_TILL_ZOOM_KICKS_IN)
                 {
                     float time_since_zoom_started = time - MD_TIME_TILL_ZOOM_KICKS_IN;
-                    GameManager.m_viewer.c_camera.fieldOfView = DEFAULT_FOV[MenuManager.opt_fov] * Mathf.Max(0.55f, 1f - (0.45f * time_since_zoom_started));
+                    GameManager.m_viewer.c_camera.fieldOfView = DEFAULT_FOV[MenuManager.opt_fov] * Mathf.Max(0.35f, 1f - (0.65f * time_since_zoom_started));
                     if (!has_the_zoom_sound_effect_been_played)
                     {
                         MassdriverProjectile.PlayClipAtPoint(md_zoom_audio, GameManager.m_local_player.c_player_ship.transform.position, 1f, false);
@@ -326,11 +328,11 @@ namespace GameMod
         public static void InitialiseMeshes()
         {
             // create beam mesh
-            MassdriverProjectile.mesh_beam = GenerateBeamMesh();
+            MassdriverProjectile.mesh_beam = MassdriverProjectile.GenerateBeamMesh();
             // create halo mesh
-            MassdriverProjectile.mesh_halo = GenerateHaloMesh();
+            MassdriverProjectile.mesh_halo = MassdriverProjectile.GenerateHaloMesh();
             // create torus mesh
-            MassdriverProjectile.mesh_torus = GenerateTorusMesh();
+            MassdriverProjectile.mesh_torus = MassdriverProjectile.GenerateTorusMesh();
         }
 
    
@@ -341,11 +343,8 @@ namespace GameMod
             public bool active;
             float start_time;
             float relative_time;
-            int tori_per_8m = 6;
+            int tori_per_8m = 9;
             int number_of_tori;
-            Material mat_beam;
-            Material mat_halo;
-            Material mat_torus;
             Matrix4x4 translation_matrix_beam;
             Matrix4x4 translation_matrix_halo;
             Matrix4x4[] translation_matrix_torus;
@@ -357,7 +356,9 @@ namespace GameMod
             Vector3 scaling_vector_beam;
             Vector3 scaling_vector_halo;
             Vector3[] scaling_vectors_torus;
-
+            Material mat_beam;
+            Material mat_halo;
+            Material mat_torus;
             public static Mesh mesh_beam;
             public static Mesh mesh_halo;
             public static Mesh mesh_torus;
@@ -393,18 +394,18 @@ namespace GameMod
 
                 mat_torus.SetColor("_Color", new Color(1f, 1f, 1f, 1f));
                 mat_halo.SetColor("_Color", new Color(0.6f, 0.6f, 0.6f, 0.8f));
-                mat_beam.SetColor("_Color", Color.white);//new Color(0.5f, 0f, 0.5f, 1.2f));
+                mat_beam.SetColor("_Color", new Color(0.3f, 0f, 0.3f, 1.2f));//new Color(0.5f, 0f, 0.5f, 1.2f));
 
                 for (int i = 0; i < 4; i++)
                 {
-                    GameManager.m_light_manager.CreateLightFlash(start_position + 0.1f * position_delta + (i * 0.2f * position_delta), Color.white, 6f, 6f, 1.1f, false);
+                    GameManager.m_light_manager.CreateLightFlash(start_position + 0.1f * position_delta + (i * 0.2f * position_delta), Color.white * 0.8f, 3f, 10f, 0.9f, false);
                 }
-                GameManager.m_light_manager.CreateLightFlash(end_position, Color.white, 10f, 6f, 1f, false);
+                GameManager.m_light_manager.CreateLightFlash(end_position, Color.white * 0.8f, 3f, 10f, 0.9f, false);
 
 
                 ExplosionManager.CreateSimpleExplosion(end_position);
                 PlayClipAtPoint(md_fire_audio, start_position, 1f, shot_by_non_local_player);
-                GameManager.m_local_player.PlayCameraShake(CameraShakeType.FIRE_DEVASTATOR, 1.5f, 1.3f);
+                if(!shot_by_non_local_player) GameManager.m_local_player.PlayCameraShake(CameraShakeType.FIRE_DEVASTATOR, 1.5f, 1.3f);
                 Draw();
             }
 
@@ -468,11 +469,10 @@ namespace GameMod
                 // update the time
                 relative_time = Time.time - start_time;
 
-                Color beam_color = Color.white;
-                beam_color.a = 1.2f - relative_time;
+
                 mat_torus.SetColor("_Color", new Color(1f, 1f, 1f, 1f - relative_time));
                 mat_halo.SetColor("_Color", new Color(0.6f, 0.6f, 0.6f, 0.8f - relative_time));
-                mat_beam.SetColor("_Color", beam_color);//new Color(0.3f, 0f, 0.3f, 1.2f - relative_time));
+                mat_beam.SetColor("_Color", new Color(0.3f, 0f, 0.3f, 1.2f - relative_time));//new Color(0.3f, 0f, 0.3f, 1.2f - relative_time));
 
                 Draw();
                 // Disable the entity if the shot shouldnt be rendered anymore
@@ -483,30 +483,40 @@ namespace GameMod
 
             private void Draw()
             {
+                float percentage_time_left = Mathf.Clamp((1f - relative_time) / 1f, 0f, 1f);
+
                 // Draw Beam
-                scaling_vector_beam.x = 0.3f;
-                scaling_vector_beam.y = 0.3f;
-                scaling_vector_beam.z = position_delta.magnitude;
-                translation_matrix_beam.SetTRS(start_position + (0.5f * position_delta), rotation, scaling_vector_beam);
-                Graphics.DrawMesh(mesh_beam, translation_matrix_beam, mat_beam, 0, GameManager.m_viewer.c_camera);
+                if (relative_time < 1.4)
+                {
+                    scaling_vector_beam.x = 0.15f;
+                    scaling_vector_beam.y = 0.15f;
+                    scaling_vector_beam.z = position_delta.magnitude;
+                    translation_matrix_beam.SetTRS(start_position + (0.5f * position_delta), rotation, scaling_vector_beam);
+                    Graphics.DrawMesh(mesh_beam, translation_matrix_beam, mat_beam, 0, GameManager.m_viewer.c_camera);
+                }
 
                 // Draw Halo
-                scaling_vector_halo.x = 1f;
-                scaling_vector_halo.y = 1f;
-                scaling_vector_halo.z = position_delta.magnitude;
-                translation_matrix_halo.SetTRS(start_position + (0.5f * position_delta), rotation, scaling_vector_halo);
-                Graphics.DrawMesh(mesh_halo, translation_matrix_halo, mat_halo, 0, GameManager.m_viewer.c_camera);
-
-                if (relative_time < 1.1f)
+                if (relative_time < 1.2)
                 {
-                    // Draw Tori
+                    scaling_vector_halo.x = 0.2f + percentage_time_left * 0.5f;
+                    scaling_vector_halo.y = 0.2f + percentage_time_left * 0.5f;
+                    scaling_vector_halo.z = position_delta.magnitude;
+                    translation_matrix_halo.SetTRS(start_position + (0.5f * position_delta), rotation, scaling_vector_halo);
+                    Graphics.DrawMesh(mesh_halo, translation_matrix_halo, mat_halo, 0, GameManager.m_viewer.c_camera);
+                }
+
+                // Draw Tori
+                if (relative_time < 0.9f)
+                {
                     for (int i = 0; i < number_of_tori; i++)
                     {
-                        float percentage_time_left = (1.5f - relative_time) / 1.5f;
+                        if (i == 0)
+                            continue;
+
                         float scalar = Mathf.Sin((6.28319f / 8f * (i % 8)) + (relative_time / 0.32f) * 6.28319f);
-                        scaling_vectors_torus[i].x = 0.25f + (percentage_time_left * 0.25f) + scalar * (0.07f + (0.13f * percentage_time_left));
-                        scaling_vectors_torus[i].y = 0.25f + (percentage_time_left * 0.25f) + scalar * (0.07f + (0.13f * percentage_time_left));
-                        scaling_vectors_torus[i].z = 0.2f +  (percentage_time_left * 0.25f) + scalar * 0.05f;
+                        scaling_vectors_torus[i].x = 0.15f + (percentage_time_left * 0.3f) + scalar * (0.03f + (0.12f * percentage_time_left));
+                        scaling_vectors_torus[i].y = 0.15f + (percentage_time_left * 0.3f) + scalar * (0.03f + (0.12f * percentage_time_left));
+                        scaling_vectors_torus[i].z = 0.1f +  (percentage_time_left * 0.3f) + scalar * 0.05f;
                         translation_matrix_torus[i].SetTRS(start_position + ((i * (1f / number_of_tori)) * position_delta), rotation, scaling_vectors_torus[i]);
                         Graphics.DrawMesh(mesh_torus, translation_matrix_torus[i], mat_torus, 0, GameManager.m_viewer.c_camera);
                     }
@@ -529,16 +539,20 @@ namespace GameMod
 
                 return material;
             }
-
             private Material GenerateBeamMaterial()
             {
-                Material material = new Material(Shader.Find("Standard"));//"Transparent/Diffuse"));
-                material.EnableKeyword("_EMISSION"); // Enable emission on the material shader
-                material.SetColor("_EmissionColor", new Color(0.3f, 0f, 0.3f, 1.2f));
-
+                Material material = new Material(Shader.Find("Standard"));
+                material.color = new Color(0.3f, 0f, 0.3f, 1.2f);
+                material.SetFloat("_Mode", 3);
+                material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
+                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                material.SetInt("_ZWrite", 0);
+                material.DisableKeyword("_ALPHATEST_ON");
+                material.DisableKeyword("_ALPHABLEND_ON");
+                material.EnableKeyword("_ALPHAPREMULTIPLY_ON");
+                material.renderQueue = 3001;
                 return material;
             }
-
             private Material GenerateHaloMaterial()
             {
                 Material material = new Material(Shader.Find("Standard"));
@@ -553,133 +567,14 @@ namespace GameMod
                 material.renderQueue = 3001;
                 return material;
             }
-        }
 
-
-
-
-
-
-
-
-
-
-        [HarmonyPatch(typeof(GameManager), "Awake")]
-        public class MatchModeInstareap_GameManager_Awake
-        {
-            public static string SoundEffectDirectory = "";
-
-            static void Postfix()
+            public static Mesh GenerateTorusMesh()
             {
-                LoadSoundEffects();
-            }
-
-
-            public static void LoadSoundEffects()
-            {
-                if (String.IsNullOrEmpty(SoundEffectDirectory))
+                var mesh = new Mesh
                 {
-                    SoundEffectDirectory = Path.Combine(Application.persistentDataPath, "SoundEffects");
-                    if (!Directory.Exists(SoundEffectDirectory))
-                    {
-                        Debug.Log("Did not find a directory for soundeffects, creating one at: " + SoundEffectDirectory);
-                        Directory.CreateDirectory(SoundEffectDirectory);
-                    }
-
-
-                    string MDFirePath = Path.Combine(SoundEffectDirectory, "MDfireB.wav");
-                    if (!File.Exists(MDFirePath))
-                    {
-                        File.WriteAllBytes(MDFirePath, GetMDFireAudioAsBytes());
-                    }
-                    md_fire_audio = LoadAsAudioClip("MDfireB.wav", SoundEffectDirectory);
-
-                    string MDZoomPath = Path.Combine(SoundEffectDirectory, "MDzoomtestB.wav");
-                    if (!File.Exists(MDZoomPath))
-                    {
-                        File.WriteAllBytes(MDZoomPath, GetMDZoomAudioAsBytes());
-                    }
-                    md_zoom_audio = LoadAsAudioClip("MDzoomtestB.wav", SoundEffectDirectory);
-
-                    string MDindicatorPath = Path.Combine(SoundEffectDirectory, "MDindicator.wav");
-                    if (!File.Exists(MDindicatorPath))
-                    {
-                        File.WriteAllBytes(MDindicatorPath, GetMDindicatorAudioAsBytes());
-                    }
-                    md_indicator_audio = LoadAsAudioClip("MDindicator.wav", SoundEffectDirectory);
-
-                }
-            }
-
-
-            private static AudioClip LoadAsAudioClip(string filename, string directory_path)
-            {
-                //Debug.Log("  Attempting to load file as audio clip: " + filename);
-                string path = Path.Combine(directory_path, filename);
-                if (path != null)
-                {
-                    WWW www = new WWW("file:///" + path);
-                    while (!www.isDone) { }
-                    if (string.IsNullOrEmpty(www.error))
-                    {
-                        return www.GetAudioClip(true, false);
-                    }
-                    else Debug.Log("Error in 'LoadAsAudioClip': " + www.error + " : " + filename + " : " + directory_path);
-                }
-                return null;
-            }
-
-        }
-
-
-        // Enable screenshake
-        [HarmonyPatch(typeof(PlayerShip), "Update")]
-        class MatchModeInstareap_PlayerShip_Update
-        {
-            private static int option_screenshake;
-
-            static void Prefix()
-            {
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
-                    return;
-
-                option_screenshake = MenuManager.opt_hud_shake;
-                MenuManager.opt_hud_shake = 2;
-            }
-
-            static void Postfix()
-            {
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
-                    return;
-
-                MenuManager.opt_hud_shake = option_screenshake;
-            }
-        }
-
-
-        // Label the equipped weapon as a massdriver
-        [HarmonyPatch(typeof(Player), "UpdateCurrentWeaponName")]
-        class MatchModeInstareap_PlayerShip_UpdateCurrentWeaponName
-        {
-
-            static void Postfix(Player __instance)
-            {
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
-                    return;
-
-                __instance.CurrentWeaponName = "MASSDRIVER";
-            }
-        }
-
-
-
-        public static Mesh GenerateTorusMesh()
-        {
-            var mesh = new Mesh
-            {
-                name = "Massdriver Projectile Torus Mesh"
-            };
-            mesh.vertices = new Vector3[] {
+                    name = "Massdriver Projectile Torus Mesh"
+                };
+                mesh.vertices = new Vector3[] {
                    new Vector3(-0.073384f,-1.249905f,-0.001664f),
                    new Vector3(0.064259f,-1.227861f,0.123023f),
                    new Vector3(0.074549f,-1.137394f,0.215399f),
@@ -849,11 +744,11 @@ namespace GameMod
                    new Vector3(-0.208680f,-0.758159f,-0.123429f),
                 };
 
-            mesh.triangles = new int[] {
+                mesh.triangles = new int[] {
                     11,1,0,12,3,158,14,6,5,7,15,8,9,16,10,16,11,10,11,18,1,18,2,1,19,12,2,13,20,4,21,7,6,22,21,14,25,16,9,27,24,17,28,12,19,29,22,20,22,30,21,30,23,21,23,33,15,34,24,27,28,35,12,35,31,12,36,30,22,37,26,25,38,27,26,34,39,24,39,28,24,40,35,28,31,42,29,42,36,29,43,39,34,44,40,39,40,45,35,45,41,35,36,47,30,47,32,30,32,49,33,49,37,33,50,34,38,51,45,40,41,52,42,52,46,42,53,50,37,54,44,43,55,51,44,53,56,50,50,54,43,57,52,41,58,48,47,59,55,54,60,46,52,61,58,46,55,65,51,65,45,51,66,57,45,67,62,58,68,63,49,69,64,59,63,71,56,71,59,56,73,67,61,74,71,63,75,64,69,66,76,57,76,70,57,67,78,62,78,68,62,75,79,64,79,72,64,78,80,68,80,74,68,81,79,75,82,73,70,74,84,71,84,75,71,81,85,79,85,72,79,86,66,72,66,87,76,87,82,76,88,80,78,80,89,74,89,84,74,90,85,81,91,87,66,89,93,84,84,90,81,94,92,83,95,86,85,96,82,87,88,97,80,89,98,93,96,100,82,100,94,82,98,99,90,86,102,91,102,96,91,92,104,88,104,97,88,106,95,99,100,108,94,108,103,94,105,109,98,109,99,98,110,101,95,102,111,96,111,107,96,112,110,106,104,114,97,114,105,97,115,106,109,110,116,101,116,102,101,118,113,103,119,115,105,112,120,110,120,116,110,111,121,107,121,108,107,122,118,108,123,120,112,124,117,116,119,126,115,126,123,115,127,120,123,125,129,121,129,122,121,130,113,118,113,132,114,132,119,114,129,134,122,134,130,122,135,126,119,138,127,126,139,125,117,140,129,125,129,142,134,142,137,134,143,128,136,144,133,128,132,146,135,135,147,138,147,136,138,149,145,131,139,151,140,140,152,141,152,142,141,153,137,142,154,149,137,146,155,147,155,150,147,150,157,144,157,148,144,148,158,139,158,151,139,159,158,148,160,153,152,154,161,149,161,145,149,146,163,155,163,156,155,164,157,156,165,154,153,166,161,154,8,162,145,3,160,151,164,1,157,157,2,159,160,5,165,5,166,165,10,164,163,4,5,160,5,6,166,6,7,166,10,11,0,2,12,158,12,13,3,3,13,4,4,14,5,8,15,9,11,17,18,18,19,2,4,20,14,14,21,6,16,17,11,20,22,14,21,23,7,7,23,15,17,24,18,18,24,19,15,25,9,25,26,16,16,26,17,24,28,19,13,29,20,26,27,17,12,31,13,13,31,29,30,32,23,23,32,33,15,33,25,29,36,22,33,37,25,37,38,26,38,34,27,39,40,28,35,41,31,31,41,42,43,44,39,42,46,36,36,46,47,47,48,32,32,48,49,37,50,38,50,43,34,44,51,40,49,53,37,54,55,44,50,56,54,45,57,41,46,58,47,57,60,52,60,61,46,58,62,48,48,62,49,49,63,53,53,63,56,56,59,54,59,64,55,55,64,65,65,66,45,61,67,58,62,68,49,57,70,60,60,70,61,71,69,59,64,72,65,65,72,66,70,73,61,68,74,63,73,77,67,67,77,78,71,75,69,76,82,70,82,83,73,73,83,77,84,81,75,85,86,72,77,88,78,86,91,66,83,92,77,77,92,88,84,93,90,82,94,83,90,95,85,91,96,87,80,97,89,93,98,90,90,99,95,95,101,86,86,101,102,94,103,92,92,103,104,97,105,89,89,105,98,96,107,100,100,107,108,109,106,99,106,110,95,103,113,104,104,113,114,105,115,109,115,112,106,116,117,102,102,117,111,108,118,103,114,119,105,121,122,108,120,124,116,115,123,112,117,125,111,111,125,121,127,128,120,120,128,124,122,130,118,130,131,113,113,131,132,126,127,123,128,133,124,124,133,117,132,135,119,127,136,128,134,137,130,130,137,131,135,138,126,138,136,127,133,139,117,139,140,125,140,141,129,129,141,142,143,144,128,131,145,132,132,145,146,135,146,147,147,143,136,144,148,133,133,148,139,137,149,131,143,150,144,147,150,143,140,151,152,152,153,142,153,154,137,150,156,157,155,156,150,157,159,148,151,160,152,145,162,146,146,162,163,160,165,153,165,166,154,161,8,145,163,164,156,158,3,151,164,0,1,157,1,2,159,2,158,166,7,161,161,7,8,162,10,163,10,0,164,3,4,160,8,9,162,162,9,10,
                 };
 
-            mesh.uv = new Vector2[] {
+                mesh.uv = new Vector2[] {
                    new Vector2(0.592000f, 0.750000f),
                    new Vector2(0.490669f, 0.500000f),
                    new Vector2(0.585329f, 0.666667f),
@@ -1023,17 +918,17 @@ namespace GameMod
                    new Vector2(0.450913f, 0.333333f),
                 };
 
-            mesh.RecalculateNormals();
-            mesh.RecalculateTangents();
-            return mesh;
-        }
-        public static Mesh GenerateBeamMesh()
-        {
-            var mesh = new Mesh
+                mesh.RecalculateNormals();
+                mesh.RecalculateTangents();
+                return mesh;
+            }
+            public static Mesh GenerateBeamMesh()
             {
-                name = "Massdriver Projectile Beam Mesh"
-            };
-            mesh.vertices = new Vector3[] {
+                var mesh = new Mesh
+                {
+                    name = "Massdriver Projectile Beam Mesh"
+                };
+                mesh.vertices = new Vector3[] {
                    new Vector3(0.200000f,-0.000000f,-0.500000f),
                    new Vector3(0.200000f,-0.000000f,0.500000f),
                    new Vector3(0.196157f,-0.039018f,-0.500000f),
@@ -1100,11 +995,11 @@ namespace GameMod
                    new Vector3(0.196157f,0.039018f,0.500000f),
                 };
 
-            mesh.triangles = new int[] {
+                mesh.triangles = new int[] {
                     1,2,0,3,4,2,5,6,4,7,8,6,9,10,8,11,12,10,13,14,12,15,16,14,17,18,16,19,20,18,21,22,20,23,24,22,25,26,24,27,28,26,29,30,28,31,32,30,33,34,32,35,36,34,37,38,36,39,40,38,41,42,40,43,44,42,45,46,44,47,48,46,49,50,48,51,52,50,53,54,52,55,56,54,57,58,56,59,60,58,37,21,5,61,62,60,63,0,62,30,46,62,1,3,2,3,5,4,5,7,6,7,9,8,9,11,10,11,13,12,13,15,14,15,17,16,17,19,18,19,21,20,21,23,22,23,25,24,25,27,26,27,29,28,29,31,30,31,33,32,33,35,34,35,37,36,37,39,38,39,41,40,41,43,42,43,45,44,45,47,46,47,49,48,49,51,50,51,53,52,53,55,54,55,57,56,57,59,58,59,61,60,5,3,1,1,63,61,61,59,57,57,55,53,53,51,49,49,47,45,45,43,41,41,39,37,37,35,33,33,31,29,29,27,25,25,23,21,21,19,17,17,15,13,13,11,9,9,7,5,5,1,61,61,57,53,53,49,45,45,41,37,37,33,29,29,25,21,21,17,13,13,9,5,5,61,53,53,45,37,37,29,21,21,13,5,5,53,37,61,63,62,63,1,0,62,0,2,2,4,6,6,8,10,10,12,14,14,16,18,18,20,22,22,24,26,26,28,30,30,32,34,34,36,38,38,40,42,42,44,46,46,48,50,50,52,54,54,56,58,58,60,62,62,2,6,6,10,14,14,18,22,22,26,30,30,34,38,38,42,46,46,50,54,54,58,62,62,6,14,14,22,30,30,38,46,46,54,62,62,14,30,
                 };
 
-            mesh.uv = new Vector2[] {
+                mesh.uv = new Vector2[] {
                    new Vector2(0.968750f, 1.000000f),
                    new Vector2(0.968750f, 0.500000f),
                    new Vector2(1.000000f, 0.500000f),
@@ -1171,17 +1066,17 @@ namespace GameMod
                    new Vector2(0.000000f, 0.500000f),
                 };
 
-            mesh.RecalculateNormals();
-            mesh.RecalculateTangents();
-            return mesh;
-        }
-        public static Mesh GenerateHaloMesh()
-        {
-            var mesh = new Mesh
+                mesh.RecalculateNormals();
+                mesh.RecalculateTangents();
+                return mesh;
+            }
+            public static Mesh GenerateHaloMesh()
             {
-                name = "Massdriver Projectile Halo Mesh"
-            };
-            mesh.vertices = new Vector3[] {
+                var mesh = new Mesh
+                {
+                    name = "Massdriver Projectile Halo Mesh"
+                };
+                mesh.vertices = new Vector3[] {
                    new Vector3(0.200000f,-0.000000f,-0.500000f),
                    new Vector3(0.200000f,-0.000000f,0.500000f),
                    new Vector3(0.196157f,-0.039018f,-0.500000f),
@@ -1248,11 +1143,11 @@ namespace GameMod
                    new Vector3(0.196157f,0.039018f,0.500000f),
                 };
 
-            mesh.triangles = new int[] {
+                mesh.triangles = new int[] {
                     1,2,0,3,4,2,5,6,4,7,8,6,9,10,8,11,12,10,13,14,12,15,16,14,17,18,16,19,20,18,21,22,20,23,24,22,25,26,24,27,28,26,29,30,28,31,32,30,33,34,32,35,36,34,37,38,36,39,40,38,41,42,40,43,44,42,45,46,44,47,48,46,49,50,48,51,52,50,53,54,52,55,56,54,57,58,56,59,60,58,37,21,5,61,62,60,63,0,62,30,46,62,1,3,2,3,5,4,5,7,6,7,9,8,9,11,10,11,13,12,13,15,14,15,17,16,17,19,18,19,21,20,21,23,22,23,25,24,25,27,26,27,29,28,29,31,30,31,33,32,33,35,34,35,37,36,37,39,38,39,41,40,41,43,42,43,45,44,45,47,46,47,49,48,49,51,50,51,53,52,53,55,54,55,57,56,57,59,58,59,61,60,5,3,1,1,63,61,61,59,57,57,55,53,53,51,49,49,47,45,45,43,41,41,39,37,37,35,33,33,31,29,29,27,25,25,23,21,21,19,17,17,15,13,13,11,9,9,7,5,5,1,61,61,57,53,53,49,45,45,41,37,37,33,29,29,25,21,21,17,13,13,9,5,5,61,53,53,45,37,37,29,21,21,13,5,5,53,37,61,63,62,63,1,0,62,0,2,2,4,6,6,8,10,10,12,14,14,16,18,18,20,22,22,24,26,26,28,30,30,32,34,34,36,38,38,40,42,42,44,46,46,48,50,50,52,54,54,56,58,58,60,62,62,2,6,6,10,14,14,18,22,22,26,30,30,34,38,38,42,46,46,50,54,54,58,62,62,6,14,14,22,30,30,38,46,46,54,62,62,14,30,
                 };
 
-            mesh.uv = new Vector2[] {
+                mesh.uv = new Vector2[] {
                    new Vector2(0.968750f, 1.000000f),
                    new Vector2(0.968750f, 0.500000f),
                    new Vector2(1.000000f, 0.500000f),
@@ -1320,10 +1215,142 @@ namespace GameMod
                 };
 
 
-            mesh.RecalculateNormals();
-            mesh.RecalculateTangents();
-            return mesh;
+                mesh.RecalculateNormals();
+                mesh.RecalculateTangents();
+                return mesh;
+            }
+
         }
+
+
+
+
+
+
+
+        [HarmonyPatch(typeof(MenuManager), "ApplySpeakerMode")]
+        internal class MatchModeInstareap_MenuManager_ApplySpeakerMode
+        {
+            private static AudioSpeakerMode speaker_mode;
+
+            static void Prefix()
+            {
+                speaker_mode = AudioSettings.speakerMode;
+            }
+
+            static void Postfix()
+            {
+                if (speaker_mode != AudioSettings.speakerMode)
+                    MatchModeInstareap_GameManager_Awake.LoadSoundEffects();
+            }
+        }
+
+        [HarmonyPatch(typeof(GameManager), "Awake")]
+        public class MatchModeInstareap_GameManager_Awake
+        {
+            public static string SoundEffectDirectory = "";
+
+            static void Postfix()
+            {
+                LoadSoundEffects();
+            }
+
+
+            public static void LoadSoundEffects()
+            {
+                if (String.IsNullOrEmpty(SoundEffectDirectory))
+                {
+                    SoundEffectDirectory = Path.Combine(Application.persistentDataPath, "SoundEffects");
+                    if (!Directory.Exists(SoundEffectDirectory))
+                    {
+                        Debug.Log("Did not find a directory for soundeffects, creating one at: " + SoundEffectDirectory);
+                        Directory.CreateDirectory(SoundEffectDirectory);
+                    }
+
+
+                    string MDFirePath = Path.Combine(SoundEffectDirectory, "MDfireB.wav");
+                    if (!File.Exists(MDFirePath))
+                    {
+                        File.WriteAllBytes(MDFirePath, GetMDFireAudioAsBytes());
+                    }
+                    md_fire_audio = LoadAsAudioClip("MDfireB.wav", SoundEffectDirectory);
+
+                    string MDZoomPath = Path.Combine(SoundEffectDirectory, "MDzoomtestB.wav");
+                    if (!File.Exists(MDZoomPath))
+                    {
+                        File.WriteAllBytes(MDZoomPath, GetMDZoomAudioAsBytes());
+                    }
+                    md_zoom_audio = LoadAsAudioClip("MDzoomtestB.wav", SoundEffectDirectory);
+
+                    string MDindicatorPath = Path.Combine(SoundEffectDirectory, "MDindicator.wav");
+                    if (!File.Exists(MDindicatorPath))
+                    {
+                        File.WriteAllBytes(MDindicatorPath, GetMDindicatorAudioAsBytes());
+                    }
+                    md_indicator_audio = LoadAsAudioClip("MDindicator.wav", SoundEffectDirectory);
+
+                }
+            }
+
+
+            private static AudioClip LoadAsAudioClip(string filename, string directory_path)
+            {
+                //Debug.Log("  Attempting to load file as audio clip: " + filename);
+                string path = Path.Combine(directory_path, filename);
+                if (path != null)
+                {
+                    WWW www = new WWW("file:///" + path);
+                    while (!www.isDone) { }
+                    if (string.IsNullOrEmpty(www.error))
+                    {
+                        return www.GetAudioClip(true, false);
+                    }
+                    else Debug.Log("Error in 'LoadAsAudioClip': " + www.error + " : " + filename + " : " + directory_path);
+                }
+                return null;
+            }
+
+        }
+
+        // Enable screenshake
+        [HarmonyPatch(typeof(PlayerShip), "Update")]
+        class MatchModeInstareap_PlayerShip_Update
+        {
+            private static int option_screenshake;
+
+            static void Prefix()
+            {
+                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
+                    return;
+
+                option_screenshake = MenuManager.opt_hud_shake;
+                MenuManager.opt_hud_shake = 2;
+            }
+
+            static void Postfix()
+            {
+                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
+                    return;
+
+                MenuManager.opt_hud_shake = option_screenshake;
+            }
+        }
+
+        // Label the equipped weapon as a massdriver
+        [HarmonyPatch(typeof(Player), "UpdateCurrentWeaponName")]
+        class MatchModeInstareap_PlayerShip_UpdateCurrentWeaponName
+        {
+
+            static void Postfix(Player __instance)
+            {
+                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
+                    return;
+
+                __instance.CurrentWeaponName = "MASSDRIVER";
+            }
+        }
+
+
 
         public static byte[] GetMDindicatorAudioAsBytes()
         {
@@ -1778,7 +1805,6 @@ byte[] mdindicator_bytes = {82,73,70,70,142,87,0,0,87,65,86,69,102,109,116,32,16
 46,48,84,68,82,67,0,0,0,11,0,0,0,49,57,57,56,45,48,56,45,50,52,};
             return mdindicator_bytes;
         }
-
         public static byte[] GetMDZoomAudioAsBytes()
         {
 byte[] mdzoom_bytes = {82,73,70,70,22,100,0,0,87,65,86,69,102,109,116,32,16,0,0,0,1,0,1,0,34,86,0,0,68,172,0,0,2,0,16,0,100,97,116,97,92,99,0,0,136,0,190,0,224,
@@ -2296,8 +2322,6 @@ byte[] mdzoom_bytes = {82,73,70,70,22,100,0,0,87,65,86,69,102,109,116,32,16,0,0,
 32,70,111,114,103,101,32,52,46,48,84,68,82,67,0,0,0,11,0,0,0,49,57,57,56,45,48,56,45,50,52,};
 			return mdzoom_bytes;
 		}
-
-
         public static byte[] GetMDFireAudioAsBytes()
             {
 				byte[] mdfire_bytes = {
