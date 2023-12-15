@@ -783,7 +783,7 @@ namespace GameMod {
 
                         position.x -= 175f;
                         position.y += 50f;
-                        for (int i = 0; i < 6; i++)
+                        for (int i = 0; i < MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT; i++)
                         {
                             // Draws the Item slider for selecting an audio taunt
                             __instance.SelectAndDrawStringOptionItem("", position, 16 + i, MPAudioTaunts.AClient.local_taunts[i].name, string.Empty, 0.49f, false);
@@ -817,7 +817,9 @@ namespace GameMod {
                             if (highlighted)
                                 MenuManager.option_dir = false;
                             __instance.TestMouseInRect(position, 80f, 22f, 2010 + i, true);
-                            string bound_input_name = Controls.m_input_joy[0, 61 + i].GetName();
+                            string bound_input_name = "";
+                            if(Controls.m_input_joy != null && Controls.m_input_joy.GetLength(0) >= 2 && Controls.m_input_joy.GetLength(1) >= (61+i))
+                                bound_input_name = Controls.m_input_joy[0, 61 + i].GetName();
                             if (string.IsNullOrEmpty(bound_input_name))
                                 bound_input_name = "BIND KEY";
                             __instance.DrawControlItem(bound_input_name, position, highlighted, 130f, false);
