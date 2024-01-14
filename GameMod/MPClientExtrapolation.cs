@@ -74,6 +74,19 @@ namespace GameMod {
 
         }
 
+        // How far ahead to advance a ships rotation, in seconds.
+        public static float GetShipRotationExtrapolationTime()
+        {
+            if (MPObserver.Enabled || Menus.mms_lag_compensation == 0 || Menus.mms_lag_compensation == 2)
+            {
+                return 0f;
+            }
+            float time_ms = Math.Min(GameManager.m_local_player.m_avg_ping_ms,
+                                      Menus.mms_ship_rotation_lag_compensation_max);
+            return time_ms / 1000f;
+
+        }
+
         public static void InitForMatch() {
             bodies_to_resolve.Clear();
             //players_to_resolve.Clear();
@@ -487,7 +500,7 @@ namespace GameMod {
             player.c_player_ship.c_mesh_collider_trans.localRotation = player.c_player_ship.c_transform.localRotation;
         }
 
-        public static void extrapolatePlayer(Player player, NewPlayerSnapshot snapshot, float t){
+        public static void extrapolatePlayer(Player player, NewPlayerSnapshot snapshot, float t, float tr){
             if (HandlePlayerRespawn(player,snapshot)) {
                 return;
             }
@@ -525,7 +538,7 @@ namespace GameMod {
                 }
             }
             player.c_player_ship.c_transform.localPosition = newPos;
-            player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(snapshot.m_rot, snapshot.m_rot*Quaternion.Euler(snapshot.m_vrot), t);
+            player.c_player_ship.c_transform.rotation = Quaternion.SlerpUnclamped(snapshot.m_rot, snapshot.m_rot*Quaternion.Euler(snapshot.m_vrot), tr);
             player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
             player.c_player_ship.c_mesh_collider_trans.localRotation = player.c_player_ship.c_transform.localRotation;
         }
@@ -538,6 +551,7 @@ namespace GameMod {
             NewPlayerSnapshotToClientMessage msgB = null; // interpolation: end, extrapolation start
             float interpolate_factor = 0.0f;              // interpolation: factor in [0,1]
             float delta_t = 0.0f;
+            float delta_tr = 0.0f;
             int interpolate_ticks = 0;
             bool do_interpolation = false;
 
@@ -560,9 +574,11 @@ namespace GameMod {
                 //       we need to adjust just the ping and the mms_ship_max_interpolate_frames offset...
                 //       Also note that the server still sends the unscaled velocities.
                 delta_t = now + Time.timeScale * MPClientExtrapolation.GetShipExtrapolationTime() - m_last_update_time;
+                delta_tr = now + Time.timeScale * MPClientExtrapolation.GetShipRotationExtrapolationTime() - m_last_update_time; 
                 // if we want interpolation, add this as a _negative_ offset
                 // we use delta_t=0  as the base for from which we extrapolate into the future
                 delta_t -= (Menus.mms_lag_compensation_ship_added_lag / 1000f) * Time.timeScale;
+                delta_tr -= (Menus.mms_lag_compensation_ship_added_lag / 1000f) * Time.timeScale;
                 // it might sound absurd, but after this point, the Time.fixedDeltaTime is correct
                 // and MUST NOT be scaled by timeScale. The data packets do contain 16.67ms of
                 // movement each, we already have taken the time dilation into account above...
@@ -653,7 +669,7 @@ namespace GameMod {
                     } else {
                         NewPlayerSnapshot snapshot = GetPlayerSnapshot(msgB, player);
                         if(snapshot != null){
-                            extrapolatePlayer(player, snapshot, delta_t);
+                            extrapolatePlayer(player, snapshot, delta_t, delta_tr);
                         }
                     }
                 }

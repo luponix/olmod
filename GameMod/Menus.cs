@@ -234,6 +234,7 @@ namespace GameMod {
             mms_ship_lag_compensation_max = 100;
             mms_weapon_lag_compensation_scale = 100;
             mms_ship_lag_compensation_scale = 100;
+            mms_ship_rotation_lag_compensation_max = 250;
             mms_lag_compensation_ship_added_lag = 0;
             mms_lag_compensation_advanced = false;
             mms_lag_compensation_strength = 2;
@@ -245,6 +246,7 @@ namespace GameMod {
         public static int mms_ship_lag_compensation_max = 100;
         public static int mms_weapon_lag_compensation_scale = 100;
         public static int mms_ship_lag_compensation_scale = 100;
+        public static int mms_ship_rotation_lag_compensation_max = 250;
         public static int mms_lag_compensation_ship_added_lag = 0;
         public static bool mms_lag_compensation_advanced = false;
         public static int mms_lag_compensation = 3;
@@ -768,6 +770,8 @@ namespace GameMod {
                         SelectAndDrawSliderItem(__instance, Loc.LS("SHIP LAG ADDED"), position, 10, Menus.mms_lag_compensation_ship_added_lag, 50, "ADDS A SET AMOUNT OF LAG TO THE END OF THE SHIP LAG COMPENSATION CALCULATIONS. USEFUL WHEN SHIP LAG COMPENSATION IS TURNED OFF." + Environment.NewLine + "A HIGHER SETTING WILL BETTER SHOW SHIP POSITIONS WITHOUT GUESSING, BUT REQUIRE YOU TO LEAD SHIPS MORE");
                         position.y += 62f;
                         SelectAndDrawSliderItem(__instance, Loc.LS("LIMIT SHIPS DIVING INTO WALLS"), position, 11, Menus.mms_lag_compensation_collision_limit, 100, "LIMIT HOW FAR SHIPS MIGHT DIVE INTO WALLS (BUT SHIPS MIGHT APPEAR STUCK AT THE WALLS FOR SHORT MOMENTS INSTEAD)." + Environment.NewLine + "0 FOR UNLIMITED (NO CALCULATION OVERHEAD), OTHERWISE PERCENTAGE OF SHIP DIAMETER WHICH MUST REMAIN VISIBLE (100 = NO DIVE-IN AT ALL).");
+                        position.y += 62f;
+                        SelectAndDrawSliderItem(__instance, Loc.LS("MAX PING TO COMPENSATE FOR SHIP ROTATION"), position, 12, Menus.mms_ship_rotation_lag_compensation_max, 250, "LIMIT SHIP ROTATION EXTRAPOLATION TO ONLY COMPENSATE UP TO A CERTAIN PING", Menus.mms_lag_compensation == 0 || Menus.mms_lag_compensation == 2);
                     }
                     break;
                 case 3:
@@ -1169,6 +1173,9 @@ namespace GameMod {
                                         break;
                                     case 11:
                                         Menus.mms_lag_compensation_collision_limit = (int)(UIElement.SliderPos * 100f + 0.5f);
+                                        break;
+                                    case 12:
+                                        Menus.mms_ship_rotation_lag_compensation_max = (int)(UIElement.SliderPos * 250f);
                                         break;
                                 }
                                 break;
