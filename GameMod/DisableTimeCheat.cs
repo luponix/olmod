@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 namespace GameMod
-{
+{/*
     [HarmonyPatch(typeof(GameManager), "FixCurrentDateFormat")]
     class DisableTimeCheat
     {
@@ -56,5 +56,5 @@ namespace GameMod
                 }
             }
         }
-    }
+    }*/
 }
