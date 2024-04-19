@@ -159,8 +159,8 @@ namespace GameMod
                             asc[i] = new AudioSourceContainer();
                         }
 
-                        ImportAudioTaunts(LocalAudioTauntDirectory, new List<string>(), true);
-                        ImportAudioTaunts(ExternalAudioTauntDirectory, new List<string>(), true);
+                        ImportAudioTaunts(LocalAudioTauntDirectory, new List<string>(), false, true);
+                        ImportAudioTaunts(ExternalAudioTauntDirectory, new List<string>(), true, true);
                         for (int i = 0; i < 6; i++){
                             local_taunts[i] = new AudioTaunt{
                                 hash = "EMPTY",
