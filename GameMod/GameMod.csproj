@@ -220,6 +220,7 @@
     <Compile Include="PresetData.cs" />
     <Compile Include="RearView.cs" />
     <Compile Include="Debugging.cs" />
+    <Compile Include="ReduceLogging.cs" />
     <Compile Include="ServerCleanup.cs" />
     <Compile Include="ServerPing.cs" />
     <Compile Include="ServerPort.cs" />
