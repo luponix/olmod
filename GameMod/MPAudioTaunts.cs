@@ -123,21 +123,34 @@ namespace GameMod
             public static float spectrum_update_cooldown = 0f;
             public static bool display_audio_spectrum = true;
 
+
             [HarmonyPatch(typeof(GameManager), "Awake")]
             class MPAudioTaunts_GameManager_Awake
             {
                 static void Postfix(){
                     if (String.IsNullOrEmpty(LocalAudioTauntDirectory)){
-                        LocalAudioTauntDirectory = Path.Combine(Application.persistentDataPath, "AudioTaunts");
-                        if (!Directory.Exists(LocalAudioTauntDirectory)){
-                            Debug.Log("Did not find a directory for local audiotaunts, creating one at: " + LocalAudioTauntDirectory);
-                            Directory.CreateDirectory(LocalAudioTauntDirectory);
-                        }
+                        try
+                        {
+                            LocalAudioTauntDirectory = Path.Combine(Application.persistentDataPath, "AudioTaunts");
+                            if (!Directory.Exists(LocalAudioTauntDirectory))
+                            {
+                                Debug.Log("Did not find a directory for local audiotaunts, creating one at: " + LocalAudioTauntDirectory);
+                                Directory.CreateDirectory(LocalAudioTauntDirectory);
+                            }
 
-                        ExternalAudioTauntDirectory = Path.Combine(LocalAudioTauntDirectory, "external");
-                        if (!Directory.Exists(ExternalAudioTauntDirectory)){
-                            Debug.Log("Did not find a directory for external audiotaunts, creating one at: " + ExternalAudioTauntDirectory);
-                            Directory.CreateDirectory(ExternalAudioTauntDirectory);
+                            ExternalAudioTauntDirectory = Path.Combine(LocalAudioTauntDirectory, "external");
+                            if (!Directory.Exists(ExternalAudioTauntDirectory))
+                            {
+                                Debug.Log("Did not find a directory for external audiotaunts, creating one at: " + ExternalAudioTauntDirectory);
+                                Directory.CreateDirectory(ExternalAudioTauntDirectory);
+                            }
+                        }
+                        catch(Exception e)
+                        {
+                            Debug.Log("Running into an exception when potentially creating the AudioTaunt folders!\n" +
+                                "Exception -///////////////////////////////////////////////////////////////\n"+
+                                e + "\n" + 
+                                "          -///////////////////////////////////////////////////////////////");
                         }
                     }
 
