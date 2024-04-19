@@ -412,6 +412,7 @@ namespace GameMod
 
         public static void SetDefaultConfig()
         {
+            Debug.Log("ExtendedConfig.SetDefaultConfig got called!");
             Section_AutoSelect.Set();
             Section_JoystickCurve.SetDefault();
             Section_WeaponCycling.Set();
@@ -690,18 +691,18 @@ namespace GameMod
                     // best fit base line = equal name, equal axis count
                     // best fit = matching or non '-1' id > contains data > exists
                     for ( int i = 0; i < Controls.m_controllers.Count; i++){
-                        Debug.Log(i);
+                        //Debug.Log(i);
                         // establish base line and collect candidates
                         List<Controller> candidates = new List<Controller>();
                         foreach( Controller c in parsed_devices){
                             if (c.name.Equals(Controls.m_controllers[i].name) & c.axes.Count == Controls.m_controllers[i].m_axis_count)
                             {
-                                Debug.Log(" Added a candidate");
+                                //Debug.Log(" Added a candidate");
                                 candidates.Add(c);
                             }
                             else
                             {
-                                Debug.Log(" "+ c.name+" : "+ Controls.m_controllers[i].name+", "+ c.axes.Count+" : "+ Controls.m_controllers[i].m_axis_count);
+                                //Debug.Log(" "+ c.name+" : "+ Controls.m_controllers[i].name+", "+ c.axes.Count+" : "+ Controls.m_controllers[i].m_axis_count);
                             }
                                 
                         }
