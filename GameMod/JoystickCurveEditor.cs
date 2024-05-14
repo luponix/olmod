@@ -18,7 +18,7 @@ namespace GameMod
     /// </summary>
     class JoystickCurveEditor
     {
-        /*
+        
          internal class DebugOutput
          {
              public static InputAdjustment[] axes = new InputAdjustment[100];
@@ -30,6 +30,16 @@ namespace GameMod
                  public float last_original_input;
                  public float last_adjusted_input;
              }
+
+            public static int return_percentage(float input)
+            {
+                if (input >= 1f)
+                    return 100;
+                else if (input <= 0)
+                    return 0;
+                else
+                    return (int)(input * 100);
+            }
 
              [HarmonyPatch(typeof(UIElement), "DrawHUD")]
              class JoystickCurveEditor_DebugOutput_UIElement_DrawHUD
@@ -44,9 +54,9 @@ namespace GameMod
                          {
                              __instance.DrawStringSmall(Controls.m_controllers[axes[i].controller_num].name + ":" + axes[i].control_num, pos, 0.32f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
                              pos.x += 260f;
-                             __instance.DrawStringSmall(axes[i].last_original_input.ToString("n3"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
+                             __instance.DrawStringSmall(return_percentage(axes[i].last_original_input).ToString() + '%', pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
                              pos.x += 65f;
-                             __instance.DrawStringSmall(axes[i].last_adjusted_input.ToString("n3"), pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
+                             __instance.DrawStringSmall(return_percentage(axes[i].last_adjusted_input).ToString() + '%', pos, 0.45f, StringOffset.LEFT, UIManager.m_col_ui1, 1f, -1f);
                              pos.y += 18f;
                              pos.x -= 260f;
                              pos.x -= 65f;
@@ -61,7 +71,7 @@ namespace GameMod
                  }
              }
          }
-         */
+         
 
 
 
@@ -913,7 +923,7 @@ namespace GameMod
                 __result = result * (neg ? -1f : 1f);
 
                 //DEBUG
-                /*
+                
                 if (control_num < 100 && control_num > -1)
                 {
                     int axis_index_to_save_to = controller_num * 16 + control_num;
@@ -928,7 +938,7 @@ namespace GameMod
                         };
                     }
                 }
-                */
+                
                 return false;
 
             }

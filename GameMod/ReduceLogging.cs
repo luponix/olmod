@@ -1,22 +1,15 @@
 ﻿using HarmonyLib;
-using Ionic.Zip;
 using Overload;
-using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
-using System.Text;
-using UnityEngine.Networking;
 using System.Runtime.CompilerServices;
-using UnityEngine;
 
 namespace GameMod
 {
     internal class ReduceLogging
     {
-        // Replaces occurences of Debug.Log and Debug.LogFormat with empty dummy functions to avoid thousands of lines for loading of levels
+        // Replaces occurences of Debug.Log and Debug.LogFormat with empty dummy functions to avoid thousands of logged lines when loading the levels
         [HarmonyPatch(typeof(GameManager), "ScanForLevels")]
         class ReduceLogging_GameManager_ScanForLevels
         {
