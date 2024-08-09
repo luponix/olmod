@@ -18,7 +18,7 @@ namespace GameMod
     /// </summary>
     class JoystickCurveEditor
     {
-        
+        /*
          internal class DebugOutput
          {
              public static InputAdjustment[] axes = new InputAdjustment[100];
@@ -71,7 +71,7 @@ namespace GameMod
                  }
              }
          }
-         
+         */
 
 
 
@@ -923,7 +923,7 @@ namespace GameMod
                 __result = result * (neg ? -1f : 1f);
 
                 //DEBUG
-                
+                /*
                 if (control_num < 100 && control_num > -1)
                 {
                     int axis_index_to_save_to = controller_num * 16 + control_num;
@@ -937,7 +937,7 @@ namespace GameMod
                             last_adjusted_input = result
                         };
                     }
-                }
+                }*/
                 
                 return false;
 
