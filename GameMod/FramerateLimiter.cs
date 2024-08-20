@@ -9,7 +9,7 @@ namespace GameMod
     class FramerateLimiter
     {
         public static int target_framerate = 0;
-        public const int maximum_framerate = 360;
+        public const int maximum_framerate = 600;
 
         // Insert the framelimiter menu option
         [HarmonyPatch(typeof(UIElement), "DrawGraphicsMenu")]
@@ -18,7 +18,7 @@ namespace GameMod
             public static void DrawFrameLimiterSlider(UIElement uie, ref Vector2 position)
             {
                 position.y += 62f;
-                Menus_UIElement_DrawMpOptions.SelectAndDrawSliderItem(uie, "FRAMERATE LIMIT", position, 282, target_framerate, 360, "SETS THE MAXIMUM FRAMERATE. THIS WILL BE OVERRIDDEN WHEN VSYNC IS ACTIVE");
+                Menus_UIElement_DrawMpOptions.SelectAndDrawSliderItem(uie, "FRAMERATE LIMIT", position, 282, target_framerate, maximum_framerate, "SETS THE MAXIMUM FRAMERATE. THIS WILL BE OVERRIDDEN WHEN VSYNC IS ACTIVE");
 
             }
 
