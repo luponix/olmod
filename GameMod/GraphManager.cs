@@ -35,7 +35,7 @@ namespace GameMod
     {
         public static bool show_graphs_input = false;
 
-        public static Dictionary<string, Graph> graphs;
+        public static Dictionary<string, Graph> graphs = new Dictionary<string, Graph>();
 
         private static void CreateGraphs()
         {
@@ -44,8 +44,21 @@ namespace GameMod
             // Yaw 
 
             // Roll
+            if(!graphs.ContainsKey("Framerate"))
+            {
+                uConsole.Log("111111");
 
+                graphs.Add("Framerate", new Graph(new Vector2(-200, -200), 250, 100, "Framerate"));
+                uConsole.Log("222222");
+                graphs["Framerate"].AddDataPointToDecayStructure("Framerate", 0);
+                uConsole.Log("33333333");
+
+                graphs["Framerate"].draw_relations.Add(new Graph.DrawRelation(42069, "", "Framerate"));
+                uConsole.Log("4444444");
+
+            }
             // Framerate
+
         }
 
         [HarmonyPatch(typeof(GameplayManager), "LoadLevel")]
@@ -69,36 +82,23 @@ namespace GameMod
             }
         }
 
-
+        static int counter = 0;
         [HarmonyPatch(typeof(UIElement), "DrawHUD")]
         internal class GraphManager_GameManager_Starttss
         {
             private static void Postfix(UIElement __instance)
             {
-                /*
-                GameManager.m_display_fps = true;
-                bool found = false;
-                foreach (Graph.DecayStructure cur in Graph.data_graphs)
-                {
-                    if (cur.name == "Frametime")
-                    {
-                        found = true;
-                        cur.AddElement(new float[] { UIElement.average_fps });
-                        //uConsole.Log("Adding element: " + UIElement.average_fps+"   size:"+cur.size+"  limit:"+cur.element_limit);
-                    }
-                }
-                if (!found)
-                {
-                    Graph.data_graphs.Add(new Graph.DecayStructure(1000));
-                    Graph.data_graphs[Graph.data_graphs.Count - 1].name = "Frametime";
-                    Graph.data_graphs[Graph.data_graphs.Count - 1].draw_x = -1;
-                    Graph.data_graphs[Graph.data_graphs.Count - 1].draw_y = 0;
-                }
+                if (counter == 1500)
+                    counter = 0;
 
-                if (g != null && g.visible)
+                CreateGraphs();
+                if (GraphManager.graphs.ContainsKey("Framerate"))
+                    GraphManager.graphs["Framerate"].AddDataPointToDecayStructure("Framerate", Time.deltaTime);
+
+                if (graphs != null && graphs.ContainsKey("Framerate"))
                 {
-                    g.Draw(__instance);
-                }*/
+                    graphs["Framerate"].Draw(__instance);
+                }
             }
         }
 
@@ -240,7 +240,7 @@ namespace GameMod
         public Vector2 origin_position;
         public int graph_width;
         public int graph_height;
-        public float ui_inner_line_width = 0.5f;
+        public float ui_inner_line_width = 0.7f;
         public bool visible = true;
         public Dictionary<string, RingBuffer> data_buffers = new Dictionary<string, RingBuffer>();
         public List<DrawRelation> draw_relations = new List<DrawRelation>();
@@ -302,7 +302,7 @@ namespace GameMod
                 end++;
                 if (end >= data_array.Length)
                     end = 0;
-                if (end > start)
+                if (end == start)
                     start++;
                 if (start >= data_array.Length)
                     start = 0;

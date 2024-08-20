@@ -57,7 +57,7 @@ namespace GameMod
                    currentFPS = 1.0f / avgFrameTime;
                }
            }
-           return currentFPS;
+            return currentFPS;
         }
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
