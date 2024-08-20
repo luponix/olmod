@@ -3,7 +3,8 @@ using Overload;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityStandardAssets.ImageEffects;
-using static GameMod.Graph.DecayStructure;
+using static GameMod.Graph.RingBuffer;
+using static UnityStandardAssets.ImageEffects.BloomOptimized;
 
 /*
 Graph.Commands
@@ -32,6 +33,21 @@ namespace GameMod
 
     internal class GraphManager
     {
+        public static bool show_graphs_input = false;
+
+        public static Dictionary<string, Graph> graphs;
+
+        private static void CreateGraphs()
+        {
+            // Pitch
+
+            // Yaw 
+
+            // Roll
+
+            // Framerate
+        }
+
         [HarmonyPatch(typeof(GameplayManager), "LoadLevel")]
         internal class MPClientPredictionDebugReset
         {
@@ -59,6 +75,7 @@ namespace GameMod
         {
             private static void Postfix(UIElement __instance)
             {
+                /*
                 GameManager.m_display_fps = true;
                 bool found = false;
                 foreach (Graph.DecayStructure cur in Graph.data_graphs)
@@ -81,15 +98,19 @@ namespace GameMod
                 if (g != null && g.visible)
                 {
                     g.Draw(__instance);
-                }
+                }*/
             }
         }
 
         [HarmonyPatch(typeof(GameManager), "Start")]
         internal class GraphManager_GameManager_Start
         {
+            /*
             private static void Postfix(GameManager __instance)
             {
+                // Graph preset
+                uConsole.RegisterCommand("toggle_input_graphs", "displays input and output for pitch/yaw/roll", new uConsole.DebugCommand(CmdToggleInputGraphs));
+
                 // general commands for handling the graph
                 uConsole.RegisterCommand("graph", "creates a default graph instance", new uConsole.DebugCommand(CmdCreateGraphInstance));
                 uConsole.RegisterCommand("gshow", "toggles visibility", new uConsole.DebugCommand(CmdToggleVisibility));
@@ -113,7 +134,10 @@ namespace GameMod
                 // uConsole.RegisterCommand("gencurve", "", new uConsole.DebugCommand(CmdCurve));
             }
 
-
+            private static void CmdToggleInputGraphs()
+            {
+                
+            }
 
             private static void CmdCreateGraphInstance()
             {
@@ -201,7 +225,7 @@ namespace GameMod
             private static void CmdSetName()
             {
                 Graph.data_graphs[selected_ds].name = uConsole.GetString();
-            }
+            }*/
         }
 
         private static int selected_ds = 0;
@@ -212,151 +236,127 @@ namespace GameMod
 
     class Graph
     {
-        // general variables
-        public string name;
-        public Vector2 origin = new Vector2(532f, -175);
-        public int xrange = 150;
-        public int yrange = 75;
-        public int qxrange;
-        public int qyrange;
-
+        public string description;
+        public Vector2 origin_position;
+        public int graph_width;
+        public int graph_height;
+        public float ui_inner_line_width = 0.5f;
         public bool visible = true;
-        public float max_x, max_y; // hold the current maximum value of all displayed graphs for the x and y axis
+        public Dictionary<string, RingBuffer> data_buffers = new Dictionary<string, RingBuffer>();
+        public List<DrawRelation> draw_relations = new List<DrawRelation>();
 
-        public static List<DecayStructure> data_graphs = new List<DecayStructure>(); // get populated through InputExperiments.cs
-
-
-        public Graph(Vector2 origin_, int x_, int y_, string name_)
+        public Graph(Vector2 origin_, int x_, int y_, string description_)
         {
-            origin = origin_;
-            xrange = x_;
-            yrange = y_;
-            qxrange = xrange / 4;
-            qyrange = yrange / 4;
-            name = name_;
+            origin_position = origin_;
+            graph_width = x_;
+            graph_height = y_;
+            description = description_;
         }
 
-
-        internal class DecayStructure
+        public void AddDataPointToDecayStructure(string ring_buffer_key, float data_point, int decay_structure_element_count=1000)
         {
-            public Element first, last;
-            public int size = 0;
-            public bool alltimeMaximum = false;
-            public int element_limit = 150; // -1 for no limit
+            if (string.IsNullOrEmpty(ring_buffer_key))
+                return;
 
-            public string name = "";
+            if(!data_buffers.ContainsKey(ring_buffer_key) ){
+                data_buffers.Add(ring_buffer_key, new Graph.RingBuffer(decay_structure_element_count));
+                data_buffers[ring_buffer_key].name = ring_buffer_key;
+            }
+            data_buffers[ring_buffer_key].Add(data_point);
+        }
+
+        // Defines what should be drawn and which datastructures should be used for the x and/or y axis.
+        // Will fallback to using the element count for the other axis if only one datastructure is provided
+        // to correlate two datastructures they have to have the same element count
+        internal class DrawRelation
+        {
+            public bool visible = true;
             public int color = 42069;
-            public bool show = false;
-            public int draw_x, draw_y;
+            public string x_axis_datastructure_key = "";
+            public string y_axis_datastructure_key = "";
 
-            public DecayStructure(int limit)
+            public DrawRelation(int color, string x_axis_datastructure_key, string y_axis_datastructure_key, bool visible = true)
             {
-                element_limit = limit;
-            }
-
-            public void AddElement(float[] val)
-            {
-                if (size == 0)
-                {
-                    first = new Element(val);
-                    last = first;
-                    size++;
-                }
-                else
-                {
-                    last.next = new Element(val);
-                    last = last.next;
-                    size++;
-                }
-                if (size > element_limit && element_limit != -1)
-                {
-                    first = first.next;
-                    size--;
-                }
-            }
-
-            public float findMaximumForIndex(int index)
-            {
-                Element curr = first;
-                float max = curr.getFloatAtIndex(index);
-                while (curr.next != null)
-                {
-                    if (curr.next.getFloatAtIndex(index) > max)
-                    {
-                        max = curr.next.getFloatAtIndex(index);
-                    }
-                    curr = curr.next;
-                }
-                return max;
-            }
-
-            public class Element
-            {
-                public float[] values;
-                public Element next = null;
-
-                public Element(float[] val)
-                {
-                    if (val.Length > 0)
-                    {
-                        values = val;
-                    }
-                    else
-                    {
-                        Debug.Log("Error at InputExperiment.DecayStructure.Element: empty array passed to constructor ");
-                        values = new float[] { 1.7625f };
-                    }
-                }
-
-                public float getMaximum()
-                {
-                    float max = values[0];
-                    foreach (float value in values)
-                    {
-                        if (value > max) max = value;
-                    }
-                    return max;
-                }
-
-                public float getFloatAtIndex(int index)
-                {
-
-                    if (index < values.Length && index >= 0)
-                    {
-                        return values[index];
-                    }
-                    return -1.7625f;
-                }
+                this.visible = visible;
+                this.color = color;
+                this.x_axis_datastructure_key = x_axis_datastructure_key;
+                this.y_axis_datastructure_key = y_axis_datastructure_key;
             }
         }
 
+        internal class RingBuffer
+        {
+            public string name;
+            public int end, start; // end points to the newest element, start to the oldest
+            public float[] data_array;
 
+            public RingBuffer(int limit)
+            {
+                data_array = new float[limit];
+                end = -1;
+                start = 0;
+            }
+
+            public void Add(float val)
+            {
+                end++;
+                if (end >= data_array.Length)
+                    end = 0;
+                if (end > start)
+                    start++;
+                if (start >= data_array.Length)
+                    start = 0;
+                data_array[end] = val;
+            }
+
+            public float GetMaximumValue()
+            {
+                int loop_end = data_array.Length-1;
+                float maximum = data_array[0];
+                if (start == 0)
+                    loop_end = end;
+                for( int i = 0; i <= loop_end; i++)
+                    if (data_array[i] > maximum)
+                        maximum = data_array[i];
+                return maximum;
+            }
+        }
+
+        // Draws all visible data for this graph
         public void Draw(UIElement instance)
         {
-            if (visible)
-            {
-                DrawStatsAxes(instance, origin, xrange, yrange);
-                // figure out the maximum bounds for all graphs
-                foreach (DecayStructure curr in data_graphs)
+            if (!visible)
+                return;
+
+            // obtain the max values for the x and y axis
+            float maximum_y_axis = float.MinValue;
+            float maximum_x_axis = float.MinValue;
+            foreach (DrawRelation dr in draw_relations)
+                if (dr.visible)
                 {
-                    if (curr.show)
+                    if(!string.IsNullOrEmpty(dr.y_axis_datastructure_key))
                     {
-                        float cur_x = curr.findMaximumForIndex(curr.draw_x);
-                        float cur_y = curr.findMaximumForIndex(curr.draw_y);
-                        if (cur_x > max_x) max_x = cur_x;
-                        if (cur_y > max_y) max_y = cur_y;
+                        float local_max = data_buffers[dr.y_axis_datastructure_key].GetMaximumValue();
+                        if ( local_max > maximum_y_axis)
+                            maximum_y_axis = local_max;
                     }
-                }
-                // draw all graphs that are marked to be shown
-                foreach (DecayStructure curr in data_graphs)
-                {
-                    if (curr.show)
+                    if (!string.IsNullOrEmpty(dr.x_axis_datastructure_key))
                     {
-                        DrawDecayStructureToGraph(curr, origin, instance);
+                        float local_max = data_buffers[dr.x_axis_datastructure_key].GetMaximumValue();
+                        if (local_max > maximum_x_axis)
+                            maximum_x_axis = local_max;
                     }
                 }
 
-            }
+            DrawStatsAxes(instance, origin_position, graph_width, graph_height);
+
+
+            // draw all graphs that are marked to be visible
+            foreach (DrawRelation dr in draw_relations)
+                if (dr.visible)
+                {
+                    DrawDecayStructureToGraph(dr, origin_position, instance, maximum_y_axis, maximum_x_axis);
+                }
         }
 
         public void DrawStatsAxes(UIElement __instance, Vector2 initial_pos, int xrange, int yrange)
@@ -364,20 +364,20 @@ namespace GameMod
             Vector2 zero = initial_pos;
             Color c = UIManager.m_col_ub2;
             c.a = 1f * 0.75f;
-            zero.y -= qyrange;
-            UIManager.DrawQuadBarHorizontal(zero, 1f, 1f, xrange, c, 4);
-            zero.y += qyrange;
-            UIManager.DrawQuadBarHorizontal(zero, 1f, 1f, xrange, c, 4);
-            zero.y += qyrange;
-            UIManager.DrawQuadBarHorizontal(zero, 1f, 1f, xrange, c, 4);
+            zero.y -= graph_height / 4;
+            UIManager.DrawQuadBarHorizontal(zero, ui_inner_line_width, ui_inner_line_width, xrange, c, 4);
+            zero.y += graph_height / 4;
+            UIManager.DrawQuadBarHorizontal(zero, ui_inner_line_width, ui_inner_line_width, xrange, c, 4);
+            zero.y += graph_height / 4;
+            UIManager.DrawQuadBarHorizontal(zero, ui_inner_line_width, ui_inner_line_width, xrange, c, 4);
             zero.y = initial_pos.y;
 
-            zero.x -= qxrange;
-            UIManager.DrawQuadBarVertical(zero, 1f, 1f, yrange, c, 4);
-            zero.x += qxrange;
-            UIManager.DrawQuadBarVertical(zero, 1f, 1f, yrange, c, 4);
-            zero.x += qxrange;
-            UIManager.DrawQuadBarVertical(zero, 1f, 1f, yrange, c, 4);
+            zero.x -= graph_width / 4;
+            UIManager.DrawQuadBarVertical(zero, ui_inner_line_width, ui_inner_line_width, yrange, c, 4);
+            zero.x += graph_width / 4;
+            UIManager.DrawQuadBarVertical(zero, ui_inner_line_width, ui_inner_line_width, yrange, c, 4);
+            zero.x += graph_width / 4;
+            UIManager.DrawQuadBarVertical(zero, ui_inner_line_width, ui_inner_line_width, yrange, c, 4);
 
             zero.x = initial_pos.x;
             UIManager.DrawFrameEmptyCenter(zero, 4f, 4f, xrange - (5 + ((-500 + xrange) / 50)), yrange - (5 + ((-200 + yrange) / 20)), c, 8);
@@ -385,57 +385,77 @@ namespace GameMod
             c.a = 0.8f;
 
             zero = initial_pos;
-            zero.y += yrange * 0.7f;
-            zero.x += xrange * 0.55f;
-            __instance.DrawStringSmall("[" + RUtility.ConvertFloatToSeconds(GameplayManager.m_game_time, false) + "]", zero, 0.3f, StringOffset.RIGHT, UIManager.m_col_ui0, 1f, -1f);
-            zero.x -= xrange * 1.1f;
+            __instance.DrawStringSmall("[0:00]", zero, 0.3f, StringOffset.LEFT, UIManager.m_col_ui0, 1f, -1f);
+            //zero.y += yrange * 0.7f;
+            //zero.x += xrange * 0.55f;
+            //__instance.DrawStringSmall("[" + RUtility.ConvertFloatToSeconds(GameplayManager.m_game_time, false) + "]", zero, 0.3f, StringOffset.RIGHT, UIManager.m_col_ui0, 1f, -1f);
+            //zero.x -= xrange * 1.1f;
             //__instance.DrawStringSmall("[0:00]", zero, 0.3f, StringOffset.LEFT, UIManager.m_col_ui0, 1f, -1f);
             zero.x = initial_pos.x;
-            __instance.DrawStringSmall(name, zero, 0.3f, StringOffset.CENTER, UIManager.m_col_ub1, 1f, -1f);
+            __instance.DrawStringSmall(description, zero, 0.3f, StringOffset.CENTER, UIManager.m_col_ub1, 1f, -1f);
         }
 
-        public void DrawDecayStructureToGraph(DecayStructure ds, Vector2 initial_pos, UIElement instance)
+        public void DrawDecayStructureToGraph(DrawRelation dr, Vector2 initial_pos, UIElement instance, float max_y, float max_x)
         {
-            if (ds.size > 0)
+            if (dr == null
+                | (string.IsNullOrEmpty(dr.x_axis_datastructure_key) & string.IsNullOrEmpty(dr.y_axis_datastructure_key))
+                | (max_x == float.MinValue & max_y == float.MinValue)
+                | initial_pos == null
+                | instance == null
+                ) { return; }
+
+            Color color = new Color((dr.color >> 16) / 255f, ((dr.color >> 8) & 0xff) / 255f, (dr.color & 0xff) / 255f);
+            Vector2 start = Vector2.zero;
+            Vector2 end = Vector2.zero;
+
+            if (string.IsNullOrEmpty(dr.x_axis_datastructure_key))
             {
-                Color color = new Color((ds.color >> 16) / 255f, ((ds.color >> 8) & 0xff) / 255f, (ds.color & 0xff) / 255f);
-                float local_max_x = 0f;
-                if (ds.draw_x != -1)
+                RingBuffer data = data_buffers[dr.y_axis_datastructure_key];
+
+                // If all displayed Relations associated with this graph do not have an X component fall back to the Element count to get a resolution 
+                if (max_x == float.MinValue)
+                    max_x = data.data_array.Length;
+
+                // Define the start position
+                start.y = (initial_pos.y + graph_height / 2) - (data.data_array[data.start] / max_y) * graph_height;
+                start.x = (initial_pos.x - graph_width / 2);
+
+                // Draw all points
+                int point_counter = 1;
+                int i = data.start + 1;
+                if (i >= data.data_array.Length)
+                    i = 0;
+                while ( i != data.end )
                 {
-                    local_max_x = ds.findMaximumForIndex(ds.draw_x);
-                }
-                float local_max_y = ds.findMaximumForIndex(ds.draw_y);
-                float resolution = -1;
-                if (ds.draw_x == -1)
-                {
-                    resolution = ds.element_limit != -1 ? (float)(xrange) / ds.element_limit : (float)xrange / ds.size;
-                }
-
-                Vector2 start = Vector2.zero;
-                Vector2 end = Vector2.zero;
-
-                Element current = ds.first;
-                start.y = (initial_pos.y + yrange / 2) - (current.values[ds.draw_y] / local_max_y) * yrange;
-                start.x = (initial_pos.x - xrange / 2);
-
-                while (current.next != null)
-                {
-                    current = current.next;
-
-                    end.y = (initial_pos.y + yrange / 2) - (current.values[ds.draw_y] / local_max_y) * yrange;
-                    if (resolution != -1)
-                    {
-                        end.x = start.x + resolution;
-                    }
-                    else
-                    {
-                        end.x = (initial_pos.x - xrange / 2) + (current.values[ds.draw_x] / local_max_x) * xrange;
-                    }
+                    end.y = (initial_pos.y + graph_height / 2) - (data.data_array[i] / max_y) * graph_height;
+                    end.x = (initial_pos.x - graph_width / 2) + (point_counter / max_x) * graph_width;
 
                     UIManager.DrawQuadCenterLine(start, end, 0.4f, 0f, color, 4);
-                    start = end;
+                    start = end; // Swap the Points to connect the next line
+
+                    // Iterate over the ring buffer
+                    i++;
+                    if (i >= data.data_array.Length)
+                        i = 0;
+                    point_counter++;
+                    if(point_counter >= data.data_array.Length)
+                    {
+                        Debug.Log("GraphManager: Exceeded Exit Condition of while loop in DrawDecayStructureToGraph()");
+                        break;
+                    }
                 }
+
             }
+            else if (string.IsNullOrEmpty(dr.y_axis_datastructure_key))
+            {
+
+            }
+            else // 2 data buffers
+            {
+                
+            }
+
+            
         }
     }
 }
