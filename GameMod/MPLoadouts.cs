@@ -13,10 +13,12 @@ namespace GameMod
 {
     public class MPLoadouts
     {
+        public const WeaponType DefaultWeaponEnd = WeaponType.LANCER; // all weapons in the enum before that are not part of default loadouts
+        public const MissileType DefaultMissileEnd = MissileType.NOVA; // all missiles in the enum before that are not part of default loadouts
         public const int MASK_ALL_WEAPONS = (1 << (int)WeaponType.NUM) - 1;
         public const int MASK_ALL_MISSILES = (( 1 << (int)MissileType.NUM) -1) << (int)WeaponType.NUM;
-        public const int MASK_DEFAULT_WEAPONS = (1 << (int)WeaponType.LANCER) - 1;
-        public const int MASK_DEFAULT_MISSILES = (( 1 << (int)MissileType.NOVA) -1) << (int)WeaponType.NUM;
+        public const int MASK_DEFAULT_WEAPONS = (1 << (int)DefaultWeaponEnd) - 1;
+        public const int MASK_DEFAULT_MISSILES = (( 1 << (int)DefaultMissileEnd) -1) << (int)WeaponType.NUM;
 
         public const int MASK_DEFAULT = (MASK_DEFAULT_WEAPONS | MASK_DEFAULT_MISSILES);
         public static int LoadoutFilterBitmask = MASK_DEFAULT;
@@ -84,24 +86,70 @@ namespace GameMod
             SetFilterBit(GetFilterBit(missile), allowed);
         }
 
-        private static WeaponType FindFirstUnsedAllowed(List<WeaponType> weapons, int filter)
+        private static WeaponType FindFirstUnusedAllowed(List<WeaponType> weapons, int filter)
         {
             for (WeaponType weapon = (WeaponType)0; weapon < WeaponType.NUM; weapon++) {
-                if (IsAllowedByFilter(weapon, filter) && !weapons.Exists(x => x == weapon)) {
+                if (IsAllowedByFilter(weapon, filter) && !weapons.Contains(weapon)) {
                     return weapon;
                 }
             }
             return WeaponType.NUM;
         }
 
-        private static MissileType FindFirstUnsedAllowed(List<MissileType> missiles, int filter)
+        private static MissileType FindFirstUnusedAllowed(List<MissileType> missiles, int filter)
         {
             for (MissileType missile = (MissileType)0; missile < MissileType.NUM; missile++) {
-                if (IsAllowedByFilter(missile, filter) && !missiles.Exists(x => x == missile)) {
+                if (IsAllowedByFilter(missile, filter) && !missiles.Contains(missile)) {
                     return missile;
                 }
             }
             return MissileType.NUM;
+        }
+
+        private static int CountAllowed(int filter)
+        {
+            int cnt = 0;
+            for (int i=0; i<((int)WeaponType.NUM+(int)MissileType.NUM); i++) {
+                if ( (filter & (1<<i)) != 0) {
+                    cnt++;
+                }
+            }
+            return cnt;
+        }
+
+        public static List<string> GetItems(int filter, ref string mode)
+        {
+            int cntDefault = CountAllowed(filter & MASK_DEFAULT);
+            int cntAll = CountAllowed(filter & (MASK_ALL_WEAPONS | MASK_ALL_MISSILES));
+            int cntDefaultMax = CountAllowed(MASK_DEFAULT);
+            if ((cntAll > 0) && (cntDefault > cntDefaultMax / 2)) {
+                // more than half of the default elements are allowed, list only the disabled ones
+                mode = "DISABLED IN LOADOUTS:";
+                return GetDefaultItems(filter, false, (WeaponType)0, DefaultWeaponEnd, (MissileType)0, DefaultMissileEnd);
+            }
+            mode = "RESTRICTED LOADOUTS:";
+            if (cntAll < 1) {
+                return new List<string>() {"NONE"};
+            }
+            return GetDefaultItems(filter, true, (WeaponType)0, WeaponType.NUM, (MissileType)0, MissileType.NUM);
+        }
+
+        public static List<string> GetDefaultItems(int filter, bool allowed, WeaponType wStart, WeaponType wEnd, MissileType mStart, MissileType mEnd)
+        {
+            List<string> list = new List<string>();
+            for (WeaponType weapon = wStart; weapon < wEnd; weapon++) {
+                bool isAllowed = IsAllowedByFilter(weapon, filter);
+                if ((allowed && isAllowed) || (!allowed && !isAllowed)) {
+                    list.Add(Player.GetWeaponNameNoDefault(weapon));
+                }
+            }
+            for (MissileType missile = mStart; missile < mEnd; missile++) {
+                bool isAllowed = IsAllowedByFilter(missile, filter);
+                if ((allowed && isAllowed) || (!allowed && !isAllowed)) {
+                    list.Add(Player.GetMissileNameNoDefault(missile));
+                }
+            }
+            return list;
         }
 
         public static Dictionary<int, LoadoutDataMessage> NetworkLoadouts = new Dictionary<int, LoadoutDataMessage>();
@@ -139,14 +187,14 @@ namespace GameMod
                     if (i > 0) {
                         desc = desc + ", ";
                     }
-                    desc = Player.GetWeaponNameNoDefault(weapons[i]);
+                    desc = desc + Player.GetWeaponNameNoDefault(weapons[i]);
                 }
                 desc = desc + "} missiles: {";
                 for(int i=0; i<missiles.Count; i++) {
                     if (i > 0) {
                         desc = desc + ", ";
                     }
-                    desc = Player.GetMissileNameNoDefault(missiles[i]);
+                    desc = desc + Player.GetMissileNameNoDefault(missiles[i]);
                 }
                 desc = desc + "}";
                 return desc;
@@ -179,39 +227,49 @@ namespace GameMod
                 }
             }
 
-            public void ApplyFilter(int filter)
+            public int ApplyFilter(int filter)
             {
+                int i;
+                int replaced = 0;
                 int weaponCnt = weapons.Count;
                 int missileCnt = missiles.Count;
 
-                Debug.LogFormat("Loadout filter: {0:X8}", LoadoutFilterBitmask);
-                Debug.LogFormat("Loadout filter: before: {0}", Describe());
+                //Debug.LogFormat("Loadout filter: XX: {0}", filter);
+                //Debug.LogFormat("Loadout filter: before: {0}", Describe());
 
-                // filter out not allowed entries
-                weapons.RemoveAll(weapon => !IsAllowedByFilter(weapon, filter));
-                missiles.RemoveAll(missile => !IsAllowedByFilter(missile, filter));
-
-                // fill out the loadout to the same counts as before, use
-                // only allowed entities and avoid duplicates
-                while (weapons.Count < weaponCnt) {
-                    weapons.Add(FindFirstUnsedAllowed(weapons, filter));
+                // filter out not allowed entries, replace by allowed ones
+                for (i=0; i<weapons.Count; i++) {
+                    if (!IsAllowedByFilter(weapons[i], filter)) {
+                        weapons[i] = WeaponType.NUM;
+                        replaced++;
+                    }
+                    if (weapons[i] == WeaponType.NUM) {
+                        weapons[i] = FindFirstUnusedAllowed(weapons, filter);
+                    }
                 }
-                while (missiles.Count < missileCnt) {
-                    missiles.Add(FindFirstUnsedAllowed(missiles, filter));
+                for (i=0; i<missiles.Count; i++) {
+                    if (!IsAllowedByFilter(missiles[i], filter)) {
+                        missiles[i] = MissileType.NUM;
+                        replaced++;
+                    }
+                    if (missiles[i] == MissileType.NUM) {
+                        missiles[i] = FindFirstUnusedAllowed(missiles, filter);
+                    }
                 }
                 // sort the available entries before all "NUM" empty markers
                 CleanupList<WeaponType>(weapons, WeaponType.NUM);
                 CleanupList<MissileType>(missiles, MissileType.NUM);
 
-                // Overload crashes when used without any weapon
                 /*
+                // Overload crashes when used without any weapon
                 if (weapons.Count > 0 && weapons[0] == WeaponType.NUM) {
                     weapons[0] = (WeaponType)0;
                 }
                 */
 
 
-                Debug.LogFormat("Loadout filter: after: {0}", Describe());
+                //Debug.LogFormat("Loadout filter: after: {0}", Describe());
+                return replaced;
             }
 
             public void ApplyFilter()
@@ -238,47 +296,32 @@ namespace GameMod
                 }
             }
 
-            public void ExportToLegacyLoadout(Overload.LoadoutDataMessage ldm, int index)
+            public int ExportToLegacyLoadout(Overload.LoadoutDataMessage ldm)
             {
                 if (loadoutType == LoadoutType.BOMBER) {
                     for (int i=0; i<6; i++) {
-                        if (ldm.GetMpLoadoutWeapon1(i)  == weapons[0] && ldm.GetMpLoadoutMissile1(i) == missiles[0] && ldm.GetMpLoadoutMissile2(i) == missiles[1]) {
-                            if (index > 0) {
-                                ldm.m_mp_loadout2 = i;
-                            } else {
-                                ldm.m_mp_loadout1 = i;
-                            }
-                            return;
+                        MissileType m1 = ldm.GetMpLoadoutMissile1(i);
+                        MissileType m2 = ldm.GetMpLoadoutMissile2(i);
+                        if (ldm.GetMpLoadoutWeapon1(i)  == weapons[0] && ( (m1 == missiles[0] && m2 == missiles[1]) || (m1 == missiles[1] && m2 == missiles[0]) )) {
+                            return i;
                         }
-                    }
-                    if (index > 0) {
-                        ldm.m_mp_loadout2 = 6;
-                    } else {
-                        ldm.m_mp_loadout1 = 6;
                     }
                     ldm.m_mp_custom1_w1 = weapons[0];
                     ldm.m_mp_custom1_m1 = missiles[0];
                     ldm.m_mp_custom1_m2 = missiles[1];
-                } else {
-                    for (int i=0; i<6; i++) {
-                        if (ldm.GetMpLoadoutWeapon1(i)  == weapons[0] && ldm.GetMpLoadoutWeapon2(i) == weapons[1] && ldm.GetMpLoadoutMissile1(i) == missiles[0]) {
-                            if (index > 0) {
-                                ldm.m_mp_loadout2 = i;
-                            } else {
-                                ldm.m_mp_loadout1 = i;
-                            }
-                            return;
-                        }
-                    }
-                    if (index > 0) {
-                        ldm.m_mp_loadout2 = 7;
-                    } else {
-                        ldm.m_mp_loadout1 = 7;
-                    }
-                    ldm.m_mp_custom2_w1 = weapons[0];
-                    ldm.m_mp_custom2_w2 = weapons[1];
-                    ldm.m_mp_custom2_m1 = missiles[0];
+                    return 6;
                 }
+                for (int i=0; i<6; i++) {
+                    WeaponType w1 = ldm.GetMpLoadoutWeapon1(i);
+                    WeaponType w2 = ldm.GetMpLoadoutWeapon2(i);
+                    if ( ((w1 == weapons[0] && w2 == weapons[1]) || (w1 == weapons[1] && w2 == weapons[0])) && ldm.GetMpLoadoutMissile1(i) == missiles[0]) {
+                        return i;
+                    }
+                }
+                ldm.m_mp_custom2_w1 = weapons[0];
+                ldm.m_mp_custom2_w2 = weapons[1];
+                ldm.m_mp_custom2_m1 = missiles[0];
+                return 7;
             }
         }
 
@@ -481,6 +524,23 @@ namespace GameMod
             clm.selected_idx = idx;
             Client.GetClient().Send(MessageTypes.MsgSetCustomLoadout, clm);
         }
+
+        public static bool MaybeIncomplete()
+        {
+            int allowedWeapons = 0;
+            int allowedMissiles = 0;
+            for (WeaponType w = (WeaponType)0; w < WeaponType.NUM;  w++) {
+                if (IsAllowed(w)) {
+                    allowedWeapons++;
+                }
+            }
+            for (MissileType m = (MissileType)0; m < MissileType.NUM;  m++) {
+                if (IsAllowed(m)) {
+                    allowedMissiles++;
+                }
+            }
+            return ((allowedWeapons < 2) || (allowedMissiles < 2));
+        }
     }
 
     [HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
@@ -505,40 +565,21 @@ namespace GameMod
     [HarmonyPatch(typeof(Server), "SendLoadoutDataToClients")]
     internal class MPLoadouts_Server_SendLoadoutDataToClients
     {
-        /*
-        static void Prefix()
-        {
-            foreach (var kvp in MPLoadouts.NetworkLoadouts)
-            {
-                foreach (var loadout in kvp.Value.loadouts)
-                {
-                    loadout.weapons.RemoveAll(weapon => weapon == WeaponType.IMPULSE);
-                    loadout.weapons.Clear();
-                    loadout.missiles.Clear();
-                    loadout.weapons.Add(WeaponType.THUNDERBOLT);
-                    loadout.weapons.Add(WeaponType.NUM);
-                    loadout.missiles.Add(MissileType.NUM);
-                    loadout.missiles.Add(MissileType.NUM);
-
-                }
-            }
-        }
-        */
-
         static void Postfix()
         {
+            bool incompleteLoadouts = MPLoadouts.MaybeIncomplete();
             foreach (var player in Overload.NetworkManager.m_Players.Where(x => x.connectionToClient.connectionId > 0))
             {
+                // disconnect legacy clients with a message if they do not support the filtered loadouts
+                if (incompleteLoadouts && !MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "incompleteloadouts")) {
+                    NetworkServer.SendToClient(player.connectionToClient.connectionId, CustomMsgType.UnsupportedMatch, new StringMessage("This match enforces INCOMPLETE LOADOUTS, which is not supported for legacy clients"));
+                }
                 if (MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "customloadouts"))
                 {
                     foreach (var kvp in MPLoadouts.NetworkLoadouts)
                     {
                         NetworkServer.SendToClient(player.connectionToClient.connectionId, MessageTypes.MsgCustomLoadouts, kvp.Value);
                     }
-                }
-                if ((MPLoadouts.LoadoutFilterBitmask & MPLoadouts.MASK_ALL_WEAPONS) == 0 && !MPTweaks.ClientHasTweak(player.connectionToClient.connectionId, "noprimaries")) {
-                    // this client can't join this game
-                    NetworkServer.SendToClient(player.connectionToClient.connectionId, CustomMsgType.UnsupportedMatch, new StringMessage("This match enforces NO PRIMARIES in the loadout, which is not supported for legacy clients"));
                 }
             }
         }
@@ -1128,8 +1169,8 @@ namespace GameMod
             l1.ApplyFilter();
             l2.ApplyFilter();
 
-            l1.ExportToLegacyLoadout(ldm, 0);
-            l2.ExportToLegacyLoadout(ldm, 1);
+            ldm.m_mp_loadout1 = l1.ExportToLegacyLoadout(ldm);
+            ldm.m_mp_loadout2 = l2.ExportToLegacyLoadout(ldm);
         }
     }
 
