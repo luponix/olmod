@@ -124,6 +124,12 @@ namespace GameMod
         TAUNT_4 = 64,
         TAUNT_5 = 65,
         TAUNT_6 = 66,
+        TAUNT_7 = 67,
+        TAUNT_8 = 68,
+        TAUNT_9 = 69,
+        TAUNT_10 = 70,
+        TAUNT_11 = 71,
+        TAUNT_12 = 72,
 
     };
 

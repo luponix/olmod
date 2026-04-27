@@ -253,6 +253,11 @@ namespace GameMod {
             uConsole.RegisterCommand("vr_scale", "Set VR scale (0.1 to 10)", new uConsole.DebugCommand(CmdVRScale));
             uConsole.RegisterCommand("xp", "Set XP", new uConsole.DebugCommand(CmdXP));
             uConsole.RegisterCommand("loadout_mask", "Manually set the loadout mask", CmdLoadoutMask);
+            uConsole.RegisterCommand("tex_test", "Browse texture atlas indices (main menu, left/right arrow to page)", () => {
+                Menus.textureTestActive = !Menus.textureTestActive;
+                Menus.textureTestPage = 0;
+                uConsole.Log("Texture test: " + Menus.textureTestActive);
+            });
         }
     }
 

@@ -27,7 +27,8 @@ namespace GameMod
 
         public const int AUDIO_TAUNT_SIZE_LIMIT = 131072;           // 128 kB, maximum allowed audio taunt file size in bytes
         public const int PACKET_PAYLOAD_SIZE = 800;                 // maximum payload size in bytes for packets that carry chunks of an audio taunt file
-        public const int AMOUNT_OF_TAUNTS_PER_CLIENT = 6;           // the amount of taunts a client is allowed to bring into a match
+        public const int AMOUNT_OF_TAUNTS_PER_CLIENT = 12;          // the amount of taunts a client is allowed to bring into a match
+        public const int TAUNTS_MAX_VISIBLE = 8;                    // max rows shown at once in the taunt menu; must not exceed 7 (screen height limit)
         public const float DEFAULT_TAUNT_COOLDOWN = 4f;             // defines the minimum interval between sending taunts for the client
         public const float TAUNT_PLAYTIME = 3f;                     // defines the time in seconds that taunts are allowed to play till they get cutoff on the client
         public const float DEFAULT_SPECTRUM_UPDATE_COOLDOWN = 0.07f;
@@ -148,7 +149,7 @@ namespace GameMod
 
                         ImportAudioTaunts(LocalAudioTauntDirectory, new List<string>(), false);
                         ImportAudioTaunts(ExternalAudioTauntDirectory, new List<string>(), true);
-                        for (int i = 0; i < 6; i++){
+                        for (int i = 0; i < AMOUNT_OF_TAUNTS_PER_CLIENT; i++){
                             local_taunts[i] = new AudioTaunt{
                                 hash = "EMPTY",
                                 name = "EMPTY",
@@ -253,7 +254,7 @@ namespace GameMod
 
                     AClient.ImportAudioTaunts(AClient.LocalAudioTauntDirectory, new List<string>(), false, true);
                     AClient.ImportAudioTaunts(AClient.ExternalAudioTauntDirectory, new List<string>(), true, true);
-                    for (int i = 0; i < 6; i++){
+                    for (int i = 0; i < AMOUNT_OF_TAUNTS_PER_CLIENT; i++){
                         AClient.local_taunts[i] = new AudioTaunt
                         {
                             hash = "EMPTY",
@@ -426,7 +427,7 @@ namespace GameMod
                 string[] file_hashes = loaded_local_taunts.Split('/');
                 int index = 0;
                 foreach (string hash in file_hashes){
-                    if (index < 6){
+                    if (index < AMOUNT_OF_TAUNTS_PER_CLIENT){
                         AudioTaunt at = taunts.Find(t => t.hash.Equals(hash) && !t.is_external_taunt);
                         if (at == null){
                             at = new AudioTaunt{
@@ -722,9 +723,9 @@ namespace GameMod
                             if (remaining_cooldown > 0f)
                                 remaining_cooldown -= Time.unscaledDeltaTime;
 
-                            for (int i = 0; i < 6; i++)
+                            for (int i = 0; i < AMOUNT_OF_TAUNTS_PER_CLIENT; i++)
                             {
-                                if (remaining_cooldown <= 0f && keybinds[i] > 0 && (Input.GetKeyDown((KeyCode)keybinds[i]) && local_taunts[i].audioclip != null || Controls.JustPressed((CCInput)(61+i))))
+                                if (remaining_cooldown <= 0f && keybinds[i] > 0 && (Input.GetKeyDown((KeyCode)keybinds[i]) && local_taunts[i].audioclip != null || Controls.JustPressed((CCInput)(61 + i))))
                                 {
                                     remaining_cooldown = DEFAULT_TAUNT_COOLDOWN;
                                     PlayAudioTauntFromAudioclip(local_taunts[i].audioclip, GameManager.m_local_player.m_mp_name, local_taunts[i].hash);
