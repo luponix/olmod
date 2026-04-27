@@ -10,8 +10,8 @@ namespace GameMod {
     {
         public static bool KeyEnabled;
         public static int CustomUIColor;
-        public static KeyCode ActivationKeyCode = KeyCode.BackQuote;
-        public static string ActivationChar = "`";
+        public static KeyCode ActivationKeyCode = KeyCode.Semicolon;
+        public static string ActivationChar = "ö";
 
         private static MethodInfo _GameManager_InitializeMissionList_Method = typeof(GameManager).GetMethod("InitializeMissionList", AccessTools.all);
         public static void CmdReloadMissions()
