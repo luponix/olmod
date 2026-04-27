@@ -69,22 +69,10 @@ namespace GameMod
                         Debug.Log("Extended config does not exist for pilot, attempting to load pre-0.4.1 autoselect.");
                         using (StreamReader sr = File.OpenText(textFile))
                         {
-                            MPAutoSelection.PrimaryPriorityArray[0] = sr.ReadLine();
-                            MPAutoSelection.PrimaryPriorityArray[1] = sr.ReadLine();
-                            MPAutoSelection.PrimaryPriorityArray[2] = sr.ReadLine();
-                            MPAutoSelection.PrimaryPriorityArray[3] = sr.ReadLine();
-                            MPAutoSelection.PrimaryPriorityArray[4] = sr.ReadLine();
-                            MPAutoSelection.PrimaryPriorityArray[5] = sr.ReadLine();
-                            MPAutoSelection.PrimaryPriorityArray[6] = sr.ReadLine();
-                            MPAutoSelection.PrimaryPriorityArray[7] = sr.ReadLine();
-                            MPAutoSelection.SecondaryPriorityArray[0] = sr.ReadLine();
-                            MPAutoSelection.SecondaryPriorityArray[1] = sr.ReadLine();
-                            MPAutoSelection.SecondaryPriorityArray[2] = sr.ReadLine();
-                            MPAutoSelection.SecondaryPriorityArray[3] = sr.ReadLine();
-                            MPAutoSelection.SecondaryPriorityArray[4] = sr.ReadLine();
-                            MPAutoSelection.SecondaryPriorityArray[5] = sr.ReadLine();
-                            MPAutoSelection.SecondaryPriorityArray[6] = sr.ReadLine();
-                            MPAutoSelection.SecondaryPriorityArray[7] = sr.ReadLine();
+                            for (int i = 0; i < 8; i++)
+                                MPAutoSelection.PrimaryPriority[i] = (WeaponType)Enum.Parse(typeof(WeaponType), sr.ReadLine());
+                            for (int i = 0; i < 8; i++)
+                                MPAutoSelection.SecondaryPriority[i] = (MissileType)Enum.Parse(typeof(MissileType), sr.ReadLine());
                             MPAutoSelection.PrimaryNeverSelect[0] = sr.ReadLine().ToLower() == "true";
                             MPAutoSelection.PrimaryNeverSelect[1] = sr.ReadLine().ToLower() == "true";
                             MPAutoSelection.PrimaryNeverSelect[2] = sr.ReadLine().ToLower() == "true";
@@ -481,22 +469,22 @@ namespace GameMod
             public static void Set(bool mirror = false)
             {
                 settings = new Dictionary<string, string>();
-                settings.Add("p_priority_0", mirror ? MPAutoSelection.PrimaryPriorityArray[0] : "THUNDERBOLT");
-                settings.Add("p_priority_1", mirror ? MPAutoSelection.PrimaryPriorityArray[1] : "CYCLONE");
-                settings.Add("p_priority_2", mirror ? MPAutoSelection.PrimaryPriorityArray[2] : "DRILLER");
-                settings.Add("p_priority_3", mirror ? MPAutoSelection.PrimaryPriorityArray[3] : "IMPULSE");
-                settings.Add("p_priority_4", mirror ? MPAutoSelection.PrimaryPriorityArray[4] : "FLAK");
-                settings.Add("p_priority_5", mirror ? MPAutoSelection.PrimaryPriorityArray[5] : "CRUSHER");
-                settings.Add("p_priority_6", mirror ? MPAutoSelection.PrimaryPriorityArray[6] : "LANCER");
-                settings.Add("p_priority_7", mirror ? MPAutoSelection.PrimaryPriorityArray[7] : "REFLEX");
-                settings.Add("s_priority_0", mirror ? MPAutoSelection.SecondaryPriorityArray[0] : "DEVASTATOR");
-                settings.Add("s_priority_1", mirror ? MPAutoSelection.SecondaryPriorityArray[1] : "NOVA");
-                settings.Add("s_priority_2", mirror ? MPAutoSelection.SecondaryPriorityArray[2] : "TIMEBOMB");
-                settings.Add("s_priority_3", mirror ? MPAutoSelection.SecondaryPriorityArray[3] : "VORTEX");
-                settings.Add("s_priority_4", mirror ? MPAutoSelection.SecondaryPriorityArray[4] : "HUNTER");
-                settings.Add("s_priority_5", mirror ? MPAutoSelection.SecondaryPriorityArray[5] : "FALCON");
-                settings.Add("s_priority_6", mirror ? MPAutoSelection.SecondaryPriorityArray[6] : "MISSILE_POD");
-                settings.Add("s_priority_7", mirror ? MPAutoSelection.SecondaryPriorityArray[7] : "CREEPER");
+                settings.Add("p_priority_0", mirror ? MPAutoSelection.PrimaryPriority[0].ToString() : "THUNDERBOLT");
+                settings.Add("p_priority_1", mirror ? MPAutoSelection.PrimaryPriority[1].ToString() : "CYCLONE");
+                settings.Add("p_priority_2", mirror ? MPAutoSelection.PrimaryPriority[2].ToString() : "DRILLER");
+                settings.Add("p_priority_3", mirror ? MPAutoSelection.PrimaryPriority[3].ToString() : "IMPULSE");
+                settings.Add("p_priority_4", mirror ? MPAutoSelection.PrimaryPriority[4].ToString() : "FLAK");
+                settings.Add("p_priority_5", mirror ? MPAutoSelection.PrimaryPriority[5].ToString() : "CRUSHER");
+                settings.Add("p_priority_6", mirror ? MPAutoSelection.PrimaryPriority[6].ToString() : "LANCER");
+                settings.Add("p_priority_7", mirror ? MPAutoSelection.PrimaryPriority[7].ToString() : "REFLEX");
+                settings.Add("s_priority_0", mirror ? MPAutoSelection.SecondaryPriority[0].ToString() : "DEVASTATOR");
+                settings.Add("s_priority_1", mirror ? MPAutoSelection.SecondaryPriority[1].ToString() : "NOVA");
+                settings.Add("s_priority_2", mirror ? MPAutoSelection.SecondaryPriority[2].ToString() : "TIMEBOMB");
+                settings.Add("s_priority_3", mirror ? MPAutoSelection.SecondaryPriority[3].ToString() : "VORTEX");
+                settings.Add("s_priority_4", mirror ? MPAutoSelection.SecondaryPriority[4].ToString() : "HUNTER");
+                settings.Add("s_priority_5", mirror ? MPAutoSelection.SecondaryPriority[5].ToString() : "FALCON");
+                settings.Add("s_priority_6", mirror ? MPAutoSelection.SecondaryPriority[6].ToString() : "MISSILE_POD");
+                settings.Add("s_priority_7", mirror ? MPAutoSelection.SecondaryPriority[7].ToString() : "CREEPER");
                 settings.Add("p_neverselect_0", mirror ? MPAutoSelection.PrimaryNeverSelect[0].ToString() : "false");
                 settings.Add("p_neverselect_1", mirror ? MPAutoSelection.PrimaryNeverSelect[1].ToString() : "false");
                 settings.Add("p_neverselect_2", mirror ? MPAutoSelection.PrimaryNeverSelect[2].ToString() : "false");
@@ -525,22 +513,10 @@ namespace GameMod
             {
                 try
                 {
-                    MPAutoSelection.PrimaryPriorityArray[0] = settings["p_priority_0"];
-                    MPAutoSelection.PrimaryPriorityArray[1] = settings["p_priority_1"];
-                    MPAutoSelection.PrimaryPriorityArray[2] = settings["p_priority_2"];
-                    MPAutoSelection.PrimaryPriorityArray[3] = settings["p_priority_3"];
-                    MPAutoSelection.PrimaryPriorityArray[4] = settings["p_priority_4"];
-                    MPAutoSelection.PrimaryPriorityArray[5] = settings["p_priority_5"];
-                    MPAutoSelection.PrimaryPriorityArray[6] = settings["p_priority_6"];
-                    MPAutoSelection.PrimaryPriorityArray[7] = settings["p_priority_7"];
-                    MPAutoSelection.SecondaryPriorityArray[0] = settings["s_priority_0"];
-                    MPAutoSelection.SecondaryPriorityArray[1] = settings["s_priority_1"];
-                    MPAutoSelection.SecondaryPriorityArray[2] = settings["s_priority_2"];
-                    MPAutoSelection.SecondaryPriorityArray[3] = settings["s_priority_3"];
-                    MPAutoSelection.SecondaryPriorityArray[4] = settings["s_priority_4"];
-                    MPAutoSelection.SecondaryPriorityArray[5] = settings["s_priority_5"];
-                    MPAutoSelection.SecondaryPriorityArray[6] = settings["s_priority_6"];
-                    MPAutoSelection.SecondaryPriorityArray[7] = settings["s_priority_7"];
+                    for (int i = 0; i < 8; i++)
+                        MPAutoSelection.PrimaryPriority[i] = (WeaponType)Enum.Parse(typeof(WeaponType), settings["p_priority_" + i]);
+                    for (int i = 0; i < 8; i++)
+                        MPAutoSelection.SecondaryPriority[i] = (MissileType)Enum.Parse(typeof(MissileType), settings["s_priority_" + i]);
                     MPAutoSelection.PrimaryNeverSelect[0] = Convert.ToBoolean(settings["p_neverselect_0"]);
                     MPAutoSelection.PrimaryNeverSelect[1] = Convert.ToBoolean(settings["p_neverselect_1"]);
                     MPAutoSelection.PrimaryNeverSelect[2] = Convert.ToBoolean(settings["p_neverselect_2"]);

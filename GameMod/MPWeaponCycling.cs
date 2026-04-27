@@ -22,14 +22,8 @@ namespace GameMod
             {
                 for (int b = 0; b < 8; b++)
                 {
-                    if (((WeaponType)a).ToString().Equals(MPAutoSelection.PrimaryPriorityArray[b]))
-                    {
-                        pPos[b] = a;
-                    }
-                    if (((MissileType)a).ToString().Equals(MPAutoSelection.SecondaryPriorityArray[b]))
-                    {
-                        mPos[b] = a;
-                    }
+                    if ((WeaponType)a == MPAutoSelection.PrimaryPriority[b]) pPos[b] = a;
+                    if ((MissileType)a == MPAutoSelection.SecondaryPriority[b]) mPos[b] = a;
                 }
             }
         }

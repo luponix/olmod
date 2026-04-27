@@ -1,6 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.IO;
-using System.Reflection.Emit;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
@@ -443,9 +441,6 @@ namespace GameMod
                 }   
             }
 
-            static string[] PrimaryPriorityArray = new string[8];
-            static string[] SecondaryPriorityArray = new string[8];
-
             static void DrawAutoSelectWindow(UIElement uie)
             {
                 UIManager.X_SCALE = 0.2f;
@@ -478,8 +473,8 @@ namespace GameMod
                 //Draw the neverselect Buttons
                 for (int i = 0; i < 8; i++)
                 {
-                    int primaryindex = getWeaponIconIndex(MPAutoSelection.PrimaryPriorityArray[i]);
-                    int secondaryindex = getWeaponIconIndex(MPAutoSelection.SecondaryPriorityArray[i]);
+                    int primaryindex = (int)MPAutoSelection.PrimaryPriority[i];
+                    int secondaryindex = (int)MPAutoSelection.SecondaryPriority[i];
                     UIManager.DrawSpriteUI(left, 0.2f, 0.2f, UIColorPrimaries, uie.m_alpha, 26 + primaryindex);
                     UIManager.DrawSpriteUI(right, 0.2f, 0.2f, UIColorSecondaries, uie.m_alpha, 104 + secondaryindex);
 
@@ -505,7 +500,7 @@ namespace GameMod
                     position.x += 55f;
                     uie.SelectAndDrawItem(!MPAutoSelection.PrimaryNeverSelect[i] ? "+" : "-", position, 2000 + i, false, 0.022f, 1f);
                     position.x += 150f;
-                    uie.SelectAndDrawHalfItem(MPAutoSelection.PrimaryPriorityArray[i], position, 1720 + i, false);
+                    uie.SelectAndDrawHalfItem(MPAutoSelection.PrimaryPriority[i].ToString(), position, 1720 + i, false);
                     position.y += 50f;
 
 
@@ -529,7 +524,7 @@ namespace GameMod
                     position2.x -= 55f;
                     uie.SelectAndDrawItem((!MPAutoSelection.SecondaryNeverSelect[i] ? "+" : "-"), position2, 2010 + i, false, 0.022f, 1f);
                     position2.x -= 150f;
-                    uie.SelectAndDrawHalfItem(MPAutoSelection.SecondaryPriorityArray[i], position2, 1728 + i, false);
+                    uie.SelectAndDrawHalfItem(MPAutoSelection.SecondaryPriority[i].ToString(), position2, 1728 + i, false);
                     position2.y += 50f;
                 }
 
@@ -621,9 +616,9 @@ namespace GameMod
                         break;
                     }
                 }
-                string temp = MPAutoSelection.PrimaryPriorityArray[selection[0]];
-                MPAutoSelection.PrimaryPriorityArray[selection[0]] = MPAutoSelection.PrimaryPriorityArray[selection[1]];
-                MPAutoSelection.PrimaryPriorityArray[selection[1]] = temp;
+                WeaponType temp = MPAutoSelection.PrimaryPriority[selection[0]];
+                MPAutoSelection.PrimaryPriority[selection[0]] = MPAutoSelection.PrimaryPriority[selection[1]];
+                MPAutoSelection.PrimaryPriority[selection[1]] = temp;
 
                 int idx = MPWeaponCycling.pPos[selection[0]];
                 MPWeaponCycling.pPos[selection[0]] = MPWeaponCycling.pPos[selection[1]];
@@ -636,7 +631,6 @@ namespace GameMod
 
                 ExtendedConfig.Section_AutoSelect.Set(true);
                 ExtendedConfig.Section_WeaponCycling.Set(true);
-                MPAutoSelection.Initialise();
             }
 
             public static void SwapSelectedSecondary()
@@ -655,9 +649,9 @@ namespace GameMod
                         break;
                     }
                 }
-                string temp = MPAutoSelection.SecondaryPriorityArray[selection[0]];
-                MPAutoSelection.SecondaryPriorityArray[selection[0]] = MPAutoSelection.SecondaryPriorityArray[selection[1]];
-                MPAutoSelection.SecondaryPriorityArray[selection[1]] = temp;
+                MissileType temp = MPAutoSelection.SecondaryPriority[selection[0]];
+                MPAutoSelection.SecondaryPriority[selection[0]] = MPAutoSelection.SecondaryPriority[selection[1]];
+                MPAutoSelection.SecondaryPriority[selection[1]] = temp;
 
                 int idx = MPWeaponCycling.mPos[selection[0]];
                 MPWeaponCycling.mPos[selection[0]] = MPWeaponCycling.mPos[selection[1]];
@@ -670,7 +664,6 @@ namespace GameMod
 
                 ExtendedConfig.Section_AutoSelect.Set(true);
                 ExtendedConfig.Section_WeaponCycling.Set(true);
-                MPAutoSelection.Initialise();
             }
 
 
@@ -689,23 +682,6 @@ namespace GameMod
                 if (n == 2107) return "RESETS AUTOSELECT SETTINGS TO DEFAULTS FOR THIS PILOT";
                 else {
                     return MPAutoSelection.last_valid_description;
-                }
-            }
-
-            public static int getWeaponIconIndex(string weapon)
-            {
-                if (weapon.Equals("IMPULSE") || weapon.Equals("FALCON")) return 0;
-                if (weapon.Equals("CYCLONE") || weapon.Equals("MISSILE_POD")) return 1;
-                if (weapon.Equals("REFLEX") || weapon.Equals("HUNTER")) return 2;
-                if (weapon.Equals("CRUSHER") || weapon.Equals("CREEPER")) return 3;
-                if (weapon.Equals("DRILLER") || weapon.Equals("NOVA")) return 4;
-                if (weapon.Equals("FLAK") || weapon.Equals("DEVASTATOR")) return 5;
-                if (weapon.Equals("THUNDERBOLT") || weapon.Equals("TIMEBOMB")) return 6;
-                if (weapon.Equals("LANCER") || weapon.Equals("VORTEX")) return 7;
-                else
-                {
-                    uConsole.Log("-AUTOORDERSELECT- [ERROR] getWeaponIconIndex didnt recognise the given weapon string");
-                    return 0;
                 }
             }
 
