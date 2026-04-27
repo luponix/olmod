@@ -92,7 +92,15 @@ namespace GameMod.Core {
 
             uConsole.RegisterCommand("getval", "Gets the value of a specified variable -- \"getval [static class].[field]\" (classes can be nested to reach instance fields)", new uConsole.DebugCommand(GetVal));
             
-            if (FindArg("-telemetry")) 
+            if (FindArgVal("-console_key", out string consoleKey))
+            {
+                try { global::GameMod.Console.ActivationKeyCode = (KeyCode)System.Enum.Parse(typeof(KeyCode), consoleKey, true); }
+                catch { global::GameMod.Console.ActivationChar = consoleKey; }
+            }
+            if (FindArgVal("-console_char", out string consoleChar))
+                global::GameMod.Console.ActivationChar = consoleChar;
+
+            if (FindArg("-telemetry"))
                 TelemetryMod.telemetry_enabled = true;
 
             if (FindArgVal("-telemetry-ip", out string ip_string)){

@@ -10,6 +10,8 @@ namespace GameMod {
     {
         public static bool KeyEnabled;
         public static int CustomUIColor;
+        public static KeyCode ActivationKeyCode = KeyCode.BackQuote;
+        public static string ActivationChar = "`";
 
         private static MethodInfo _GameManager_InitializeMissionList_Method = typeof(GameManager).GetMethod("InitializeMissionList", AccessTools.all);
         public static void CmdReloadMissions()
@@ -270,6 +272,7 @@ namespace GameMod {
             GameObject go = UnityEngine.Object.Instantiate((GameObject)Resources.Load("uConsole"));
             go.transform.parent = __instance.transform;
             Console.RegisterCommands();
+            uConsole.m_Instance.m_Activate = Console.ActivationKeyCode;
         }
     }
 
@@ -352,9 +355,56 @@ namespace GameMod {
     [HarmonyPatch(typeof(uConsoleInput), "ProcessActivationInput")]
     class ConsoleEnablePatch
     {
+        private static bool lastFrameHadActivationChar = false;
+
         private static bool Prefix()
         {
-            return Console.KeyEnabled || uConsole.IsOn();
+            bool inputCharPresent = !string.IsNullOrEmpty(Console.ActivationChar)
+                && Input.inputString.Contains(Console.ActivationChar);
+            bool inputCharDown = inputCharPresent && !lastFrameHadActivationChar;
+            lastFrameHadActivationChar = inputCharPresent;
+
+            if (!(Console.KeyEnabled || uConsole.IsOn()))
+                return false;
+
+            bool keyCodeDown = Input.GetKeyDown(uConsole.m_Instance.m_Activate);
+            bool toggle = keyCodeDown || (!keyCodeDown && inputCharDown);
+
+            if (toggle)
+            {
+                if (!uConsole.IsOn())
+                {
+                    uConsole.TurnOn();
+                    uConsole.m_GUI.InputFieldMoveCaretToEnd();
+                    uConsole.m_GUI.InputFieldSetFocus();
+                }
+                else
+                {
+                    uConsole.TurnOff();
+                    uConsole.m_GUI.InputFieldDeactivate();
+                }
+            }
+            else if (Input.GetKeyUp(uConsole.m_Instance.m_Activate) && uConsole.IsOn())
+            {
+                uConsole.m_GUI.InputFieldSetFocus();
+            }
+
+            return false;
+        }
+
+        private static void Postfix()
+        {
+            if (string.IsNullOrEmpty(Console.ActivationChar)) return;
+            string text = uConsole.m_GUI.InputFieldGetText();
+            if (text == null || !text.Contains(Console.ActivationChar)) return;
+            string stripped = text.Replace(Console.ActivationChar, "");
+            if (stripped.Length == 0)
+                uConsole.m_GUI.InputFieldClearText();
+            else
+            {
+                uConsole.m_GUI.InputFieldSetText(stripped);
+                uConsole.m_GUI.InputFieldMoveCaretToEnd();
+            }
         }
     }
 
