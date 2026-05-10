@@ -31,7 +31,7 @@ namespace GameMod
         public const float DEFAULT_TAUNT_COOLDOWN = 4f;             // defines the minimum interval between sending taunts for the client
         public const float TAUNT_PLAYTIME = 3f;                     // defines the time in seconds that taunts are allowed to play till they get cutoff on the client
         public const float DEFAULT_SPECTRUM_UPDATE_COOLDOWN = 0.07f;
-        public static WaitForSecondsRealtime delay = new WaitForSecondsRealtime(0.016f);    // interval between sending packets
+        public static WaitForSecondsRealtime delay = new WaitForSecondsRealtime(0.05f);    // interval between sending packets (~20/sec)
 
 
         public class AudioTaunt
@@ -1064,6 +1064,49 @@ namespace GameMod
 
                 }
 
+                private static void OnAudioTauntPacketBin(NetworkMessage rawMsg)
+                {
+                    if (!active)
+                        return;
+
+                    try
+                    {
+                        var msg = rawMsg.ReadMessage<AudioTauntPacketBin>();
+                        if (msg.data == null || !match_taunts.ContainsKey(msg.hash))
+                            return;
+
+                        if (match_taunts[msg.hash].timestamp == -1)
+                        {
+                            match_taunts[msg.hash].timestamp = Time.frameCount;
+                            match_taunts[msg.hash].audio_taunt_data = new byte[msg.filesize];
+                        }
+
+                        if (match_taunts[msg.hash].received_packets == null)
+                            match_taunts[msg.hash].received_packets = new List<int>();
+
+                        if (!match_taunts[msg.hash].received_packets.Contains(msg.packet_id))
+                        {
+                            int startindex = msg.packet_id * PACKET_PAYLOAD_SIZE;
+                            for (int i = 0; i < msg.amount_of_bytes_sent; i++)
+                                match_taunts[msg.hash].audio_taunt_data[startindex + i] = msg.data[i];
+                            match_taunts[msg.hash].received_packets.Add(msg.packet_id);
+
+                            if (match_taunts[msg.hash].received_packets.Count * PACKET_PAYLOAD_SIZE >= msg.filesize)
+                            {
+                                match_taunts[msg.hash].is_data_complete = true;
+                                string path = Path.Combine(ExternalAudioTauntDirectory, msg.hash + ".ogg");
+                                File.WriteAllBytes(path, match_taunts[msg.hash].audio_taunt_data);
+                                match_taunts[msg.hash].audioclip = LoadAsAudioClip(msg.hash + ".ogg", ExternalAudioTauntDirectory);
+                                match_taunts[msg.hash].ready_to_play = true;
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.Log(" (Marker.UnusualEvent): Exception in OnAudioTauntPacketBin: " + ex);
+                    }
+                }
+
                 private static void OnPlayAudioTaunt(NetworkMessage rawMsg)
                 {
                     if (!active) return;
@@ -1113,6 +1156,7 @@ namespace GameMod
                     Client.GetClient().RegisterHandler(MessageTypes.MsgShareAudioTauntIdentifiers, OnShareAudioTauntIdentifiers);
                     Client.GetClient().RegisterHandler(MessageTypes.MsgRequestAudioTaunt, OnAudioTauntRequest);
                     Client.GetClient().RegisterHandler(MessageTypes.MsgAudioTauntPacket, OnAudioTauntPacket);
+                    Client.GetClient().RegisterHandler(MessageTypes.MsgAudioTauntPacketBin, OnAudioTauntPacketBin);
                     Client.GetClient().RegisterHandler(MessageTypes.MsgPlayAudioTaunt, OnPlayAudioTaunt);
                 }
             }
@@ -1139,7 +1183,36 @@ namespace GameMod
             public static bool server_supports_audiotaunts = false;
 
             public static Dictionary<string, AudioTaunt> match_taunts = new Dictionary<string, AudioTaunt>();
-            public static Dictionary<string, AudioTaunt> taunt_buffer = new Dictionary<string, AudioTaunt>(); // this holds taunts whose data has been uploaded 
+            public static Dictionary<string, AudioTaunt> taunt_buffer = new Dictionary<string, AudioTaunt>(); // this holds taunts whose data has been uploaded
+
+            // Serializes outgoing file transfers so N concurrent client requests don't flood the transport queue
+            private struct TransferRequest { public string hash; public byte[] data; public int connId; }
+            private static Queue<TransferRequest> pendingTransfers = new Queue<TransferRequest>();
+            private static bool transferRunning = false;
+
+            public static void EnqueueTransfer(string hash, byte[] data, int connId)
+            {
+                pendingTransfers.Enqueue(new TransferRequest { hash = hash, data = data, connId = connId });
+                if (!transferRunning)
+                    GameManager.m_gm.StartCoroutine(RunTransferQueue());
+            }
+
+            public static void ResetTransferQueue()
+            {
+                pendingTransfers.Clear();
+                transferRunning = false;
+            }
+
+            private static IEnumerator RunTransferQueue()
+            {
+                transferRunning = true;
+                while (pendingTransfers.Count > 0)
+                {
+                    TransferRequest req = pendingTransfers.Dequeue();
+                    yield return GameManager.m_gm.StartCoroutine(MPAudioTaunts_Server_RegisterHandlers.UploadAudioTauntToClient(req.hash, req.data, req.connId));
+                }
+                transferRunning = false;
+            }
 
 
             [HarmonyPatch(typeof(Server), "OnDisconnect")]
@@ -1197,6 +1270,7 @@ namespace GameMod
                     }
 
                     match_taunts.Clear();
+                    ResetTransferQueue();
                     Debug.Log("[AudioTaunts] Initialisation:"
                         + "\n[match_taunt]: " + match_taunts.Count
                         + "\n" + content
@@ -1369,7 +1443,7 @@ namespace GameMod
                             if (taunt.is_data_complete)
                             {
                                 // start upload
-                                GameManager.m_gm.StartCoroutine(UploadAudioTauntToClient(hash, taunt.audio_taunt_data, rawMsg.conn.connectionId));
+                                EnqueueTransfer(hash, taunt.audio_taunt_data, rawMsg.conn.connectionId);
                             }
 
                             // if it is not then request that data from the client the shared this audiotaunt
@@ -1404,59 +1478,76 @@ namespace GameMod
                 public static IEnumerator UploadAudioTauntToClient(string hash, byte[] data, int connectionId)
                 {
                     Debug.Log("[AudioTaunts] Started uploading AudioTaunt to client");
+                    bool useBinary = MPTweaks.ClientHasTweak(connectionId, "audiotaunts_bin");
                     bool ended_early = false;
-                    if (data.Length < PACKET_PAYLOAD_SIZE)
-                    {
-                        AudioTauntPacket packet = new AudioTauntPacket
-                        {
-                            filesize = data.Length,
-                            amount_of_bytes_sent = data.Length,
-                            hash = hash,
-                            packet_id = 0,
-                            data = data,
-                        };
-                        NetworkServer.SendToClient(connectionId, MessageTypes.MsgAudioTauntPacket, packet);
-                    }
-                    else
-                    {
-                        int position = 0;
-                        int packet_id = 0;
-                        while (position < data.Length)
-                        {
-                            // stop the transmission if the game is over
-                            if(NetworkMatch.m_match_state == MatchState.POSTGAME | NetworkMatch.m_match_state == MatchState.SCOREBOARD)
-                            {
-                                ended_early = true;
-                                break;
-                            }
 
-                            int index = 0;
-                            byte[] to_send = new byte[PACKET_PAYLOAD_SIZE];
+                    // Adaptive rate: one frame between successful sends; exponential backoff on queue full.
+                    // backoffSeconds == 0 means no failure yet; on first failure jumps to BACKOFF_INITIAL.
+                    float backoffSeconds = 0f;
+                    const float BACKOFF_INITIAL = 0.05f;
+                    const float BACKOFF_MAX = 0.5f;
 
-                            while (index < PACKET_PAYLOAD_SIZE & ((position + index) < data.Length))
-                            {
-                                to_send[index] = data[position + index];
-                                index++;
-                            }
-                            AudioTauntPacket packet = new AudioTauntPacket
+                    int position = 0;
+                    int packet_id = 0;
+                    while (position < data.Length)
+                    {
+                        if (NetworkMatch.m_match_state == MatchState.POSTGAME | NetworkMatch.m_match_state == MatchState.SCOREBOARD)
+                        {
+                            ended_early = true;
+                            break;
+                        }
+
+                        // Resolve the connection each iteration — abort if client disconnected
+                        NetworkConnection conn = null;
+                        foreach (NetworkConnection c in NetworkServer.connections)
+                            if (c != null && c.connectionId == connectionId) { conn = c; break; }
+                        if (conn == null) break;
+
+                        int count = Math.Min(PACKET_PAYLOAD_SIZE, data.Length - position);
+                        byte[] to_send = new byte[count];
+                        Array.Copy(data, position, to_send, 0, count);
+
+                        bool sent;
+                        if (useBinary)
+                            sent = conn.SendByChannel(MessageTypes.MsgAudioTauntPacketBin, new AudioTauntPacketBin
                             {
                                 filesize = data.Length,
-                                amount_of_bytes_sent = index,
+                                amount_of_bytes_sent = count,
                                 hash = hash,
                                 packet_id = packet_id,
                                 data = to_send,
-                            };
-                            NetworkServer.SendToClient(connectionId, MessageTypes.MsgAudioTauntPacket, packet);
-                            position += PACKET_PAYLOAD_SIZE;
+                            }, 0);
+                        else
+                            sent = conn.SendByChannel(MessageTypes.MsgAudioTauntPacket, new AudioTauntPacket
+                            {
+                                filesize = data.Length,
+                                amount_of_bytes_sent = count,
+                                hash = hash,
+                                packet_id = packet_id,
+                                data = to_send,
+                            }, 0);
+
+                        if (sent)
+                        {
+                            position += count;
                             packet_id++;
-                            yield return null;
+                            backoffSeconds = 0f;
+                            yield return null;  // one frame between successful sends
                         }
-                        Debug.Log("[AudioTaunts]   completed the upload to "+connectionId+" for " + hash);
+                        else
+                        {
+                            // Queue full — back off and retry this packet
+                            backoffSeconds = Mathf.Min(
+                                backoffSeconds < BACKOFF_INITIAL ? BACKOFF_INITIAL : backoffSeconds * 2f,
+                                BACKOFF_MAX);
+                            yield return new WaitForSecondsRealtime(backoffSeconds);
+                        }
                     }
+
                     if (!ended_early)
-                        Debug.Log("[AudioTaunts] successfully transmitted taunt to client" + hash);
+                        Debug.Log("[AudioTaunts] successfully transmitted taunt to client " + hash);
                     else
-                        Debug.Log("[AudioTaunts] stopped the transmission of an audiotaunt due to reaching the end of the match "+hash);               
+                        Debug.Log("[AudioTaunts] stopped the transmission of an audiotaunt due to reaching the end of the match " + hash);
                 }
 
 
@@ -1524,7 +1615,7 @@ namespace GameMod
                                         {
                                             duplicate_free_requests.Add(connectionId);
                                             Debug.Log("         Uploading Requested Taunt to: " + connectionId);
-                                            GameManager.m_gm.StartCoroutine(UploadAudioTauntToClient(msg.hash, match_taunts[msg.hash].audio_taunt_data, connectionId));
+                                            EnqueueTransfer(msg.hash, match_taunts[msg.hash].audio_taunt_data, connectionId);
                                         }
                                     }
 
@@ -1716,11 +1807,47 @@ namespace GameMod
                 {
                     Debug.Log($"[AudioTaunts] AudioTauntPacket.Deserialize: data couldn't format properly: {ex.ToString()}");
                 }
-                
+
             }
         }
 
+        // Binary-encoded packet for new-client↔new-server transfers (type 156).
+        // Keeps packets under PacketSize (no Base64 overhead) and cannot produce FormatException.
+        public class AudioTauntPacketBin : MessageBase
+        {
+            public int filesize;
+            public int amount_of_bytes_sent;
+            public string hash;
+            public int packet_id;
+            public byte[] data;
 
+            public override void Serialize(NetworkWriter writer)
+            {
+                writer.Write(packet_id);
+                writer.Write(filesize);
+                writer.Write(amount_of_bytes_sent);
+                writer.Write(hash);
+                writer.WriteBytesAndSize(data, amount_of_bytes_sent);
+            }
+            public override void Deserialize(NetworkReader reader)
+            {
+                packet_id            = reader.ReadInt32();
+                filesize             = reader.ReadInt32();
+                amount_of_bytes_sent = reader.ReadInt32();
+                hash                 = reader.ReadString();
+                data                 = reader.ReadBytesAndSize();
+            }
+        }
 
+    }
+
+    // Raises the per-connection send queue to give burst file transfers more headroom.
+    [HarmonyPatch(typeof(Overload.NetworkManager), "GetConnectionConfig")]
+    class MPAudioTaunts_ConnectionConfig
+    {
+        static void Postfix(ConnectionConfig __result)
+        {
+            __result.MaxSentMessageQueueSize = 512;
+        }
     }
 }
