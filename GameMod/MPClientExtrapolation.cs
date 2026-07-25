@@ -399,6 +399,10 @@ namespace GameMod {
                 m_last_message_time = Time.time;
                 m_last_message_server_time = msg.m_server_timestamp;
             } // end lock
+
+            // feed the SMART prediction tracker (no-op unless prediction mode 3
+            // is selected; uses its own lock and stays cheap)
+            MPShipPrediction.CaptureSnapshot(msg, version);
         }
 
         // Re-Sync the m_last_update_time
@@ -489,6 +493,14 @@ namespace GameMod {
         {
             if (HandlePlayerRespawn(player, snapshot))
             {
+                return;
+            }
+
+            // SMART prediction mode: fully handled by MPShipPrediction.
+            // Modes 0-2 below remain byte-for-byte identical.
+            if (Menus.mms_lag_compensation_prediction_mode == 3)
+            {
+                MPShipPrediction.ExtrapolatePlayerSmart(player, snapshot, t);
                 return;
             }
 
