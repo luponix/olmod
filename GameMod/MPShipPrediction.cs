@@ -20,15 +20,17 @@ namespace GameMod {
     //   1. A per-ship tracker fed from the raw 60 Hz server snapshots that
     //      derives smoothed velocity/acceleration and the reconstructed control
     //      input (thrustEst = acc + k*vel with k = 2.5 rigidbody drag), plus
-    //      lateral-thrust flip statistics and juke period/amplitude/phase.
-    //   2. Three position predictors: CV (identical math to today's behavior),
-    //      Ballistic (closed-form drag integration with a commit-decayed thrust
-    //      term), and Juke-phase (sinusoidal lateral velocity when the target's
-    //      juke oscillation is regular enough to trust).
-    //   3. A reversal-hazard adaptive horizon: the extrapolation time shrinks
-    //      when a lateral reversal is likely (measured flip rate, floored when
-    //      thrust visibly opposes velocity) and is frozen on server-fabricated
-    //      "synthetic" ticks.
+    //      lateral-thrust flip statistics in a velocity-orthogonal frame built
+    //      from a direction-smoothed velocity.
+    //   2. Position predictors: CV (identical math to today's behavior) and
+    //      Ballistic (closed-form drag integration with a commit-decayed,
+    //      magnitude-clamped thrust term). A Juke-phase predictor (sinusoidal
+    //      lateral velocity) exists but is disabled by default -- see
+    //      PredictionParams.JukeEnabled.
+    //   3. A reversal-hazard adaptive horizon: the ballistic extrapolation time
+    //      shrinks when a lateral reversal is likely (measured flip rate,
+    //      strongly discounted while the target is visibly committed to its
+    //      current thrust) and is frozen on server-fabricated "synthetic" ticks.
     //   4. Online model selection: each model's prediction is periodically filed
     //      into a ledger and later scored against the actual (interpolated)
     //      server positions; rendering uses the lowest-residual model. CV is
@@ -40,38 +42,49 @@ namespace GameMod {
     //      but the clipped remainder of the motion slides along the hit plane
     //      (with a second corner-guard raycast) instead of stopping dead.
     //
+    // The PredictionParams defaults are BENCHMARK-TUNED: they come from the
+    // offline replay benchmark in tools/lagcomp_bench/ (13-replay corpus,
+    // tune/validate split, coordinate-descent search; validated -41% mean
+    // position error vs CV at 200 ms). tools/lagcomp_bench/predictors.py is
+    // the semantic reference for the tracker/predictor math in this file, and
+    // tools/lagcomp_bench/DESIGN.md documents the methodology, the validated
+    // results and every porting decision.
+    //
     // No code path here runs unless prediction mode 3 is selected; modes 0-2 use
     // the untouched legacy code in MPClientExtrapolation.cs.
     // ==========================================================================
 
     // ----------------------------------------------------------------------
-    // All tunable constants live here. A later tuning pass (offline benchmark
-    // against recorded snapshot streams) overwrites these defaults.
+    // All tunable constants live here. Values marked "tuned" were produced by
+    // the offline benchmark (tools/lagcomp_bench/, 13-replay corpus, 2026-07);
+    // see tools/lagcomp_bench/DESIGN.md.
     // ----------------------------------------------------------------------
     public static class PredictionParams {
         // ---- engine facts ----
         public const float Kdrag = 2.5f;              // 1/s; PlayerShip rigidbody linear drag (verified engine value)
         public const float ShipRadius = 0.98f;        // m; collision-clamp sphere (ship collider is ~1, kept identical to legacy clamp)
 
-        // ---- tracker smoothing ----
-        public const float VelSmoothTau = 0.02f;      // s; velocity EWMA time constant (near-raw; kills half-float LSB jitter only)
-        public const float AccSmoothTau = 0.10f;      // s; acceleration EWMA time constant
+        // ---- tracker smoothing (all EWMAs use alpha = 1 - exp(-dt/tau), the
+        //      exact form the benchmark tuned; do not swap in dt/(dt+tau)) ----
+        public const float VelSmoothTau = 0.005f;     // s; velocity EWMA tau. Tuned on 13-replay corpus, 2026-07: offline optimum was 0.001 (effectively raw), but live network streams are jitterier than clean recordings; this safety-margin value costs ~2% of the win.
+        public const float AccSmoothTau = 0.01f;      // s; acceleration EWMA tau. Tuned on 13-replay corpus, 2026-07: offline optimum 0.005; widened for live-stream jitter (see VelSmoothTau note).
+        public const float DirSmoothTau = 0.8f;       // s; direction-smoothing tau for the velocity-orthogonal lateral frame. Tuned on 13-replay corpus, 2026-07.
         public const float TrackResetJump = 20f;      // m; consecutive position jump larger than this = respawn/teleport -> reset track
         public const float TrackResetGap = 1.0f;      // s; server-time gap between snapshots larger than this -> reset track
         public const float TrackPruneAge = 5f;        // s; local age after which a silent track is dropped entirely
         public const int MinSnapsForSmart = 5;        // snapshots needed before the smart pipeline runs (else CV fallback)
 
         // ---- flip / reversal-hazard statistics ----
-        public const float ThrustDeadzone = 6f;       // m/s^2; lateral thrust below this is idle jitter, not a commanded flip
-        public const float FlipRateTau = 2f;          // s; decay time of the Poisson flip-rate estimate
-        public const float FlipRateInc = 0.5f;        // 1/s; rate increment per detected flip (= 1/FlipRateTau)
-        public const float HazardDamping = 0.5f;      // unitless 0..1; horizon reduction at hazard = 1 (t_eff = t*(1-damping*hazard))
-        public const float OpposingHazardFloor = 0.6f;// unitless; minimum hazard when thrust visibly opposes velocity
-        public const float OpposingVelMin = 2f;       // m/s; |vel| needed before "thrust opposes velocity" is meaningful
-        public const float OpposingThrustMin = 8f;    // m/s^2; |thrustEst| needed for the opposing/committed tests
-        public const float OpposingDotFrac = 0.3f;    // unitless; dot(thrust,vel) < -frac*|v||thrust| => opposing
-        public const float CommittedDotFrac = 0.7f;   // unitless; dot(thrust,vel) > frac*|v||thrust| => committed
-        public const float CommittedMinFlipAge = 0.3f;// s; no flip within this window required for "committed"
+        public const float ThrustDeadzone = 30f;      // m/s^2; hysteresis band: a lateral-thrust sign only commits when |component| exceeds this. Tuned on 13-replay corpus, 2026-07.
+        public const float FlipRateTau = 5f;          // s; decay time of the Poisson flip-rate estimate. Tuned on 13-replay corpus, 2026-07.
+        public const float FlipRateInc = 0.2f;        // 1/s; rate increment per committed flip (= 1/FlipRateTau). Tuned on 13-replay corpus, 2026-07.
+        public const float HazardDamping = 0.15f;     // unitless 0..1; horizon reduction at hazard = 1 (t_eff = t*(1-damping*hazard)). Tuned on 13-replay corpus, 2026-07 (was 0.5).
+        // NOTE: the opposing-thrust hazard floor that used to live here was
+        // tuned to 0 on the 13-replay corpus (the mechanism never paid off)
+        // and has been removed entirely.
+        public const float CommittedDotFrac = 0.7f;   // unitless; dot(thrust,vel) > frac*|v||thrust| => committed. Tuned on 13-replay corpus, 2026-07.
+        public const float CommittedHazardMult = 0.1f;// unitless; hazard multiplier while committed (replaces the old hazard=0 short-circuit). Tuned on 13-replay corpus, 2026-07.
+        public const float CommittedMinFlipAge = 0.2f;// s; no committed flip within this window required for "committed". Tuned on 13-replay corpus, 2026-07 (was 0.3).
 
         // ---- synthetic-tick handling ----
         public const int SyntheticRunLength = 3;      // consecutive bit-identical vel samples (while moving) => synthetic
@@ -79,9 +92,16 @@ namespace GameMod {
         public const float SyntheticHorizonCap = 0.034f;// s; t_eff clamp while the server fabricates ticks (~2 physics ticks)
 
         // ---- ballistic predictor ----
-        public const float TCommit = 0.35f;           // s; how long the current thrust input is trusted to be held
+        public const float TCommit = 3.5f;            // s; thrust commit window. Tuned on 13-replay corpus, 2026-07: response was flat beyond 2.5 s -- effectively "hold thrust"; the exp-decay code path is kept.
+        public const float ThrustMax = 60f;           // m/s^2; |thrustEst| magnitude clamp. Tuned on 13-replay corpus, 2026-07.
 
         // ---- juke-phase predictor ----
+        // Benchmark verdict (13-replay corpus, 2026-07): the juke model never
+        // fired -- 0% confident frames; its select picks were residual noise.
+        // Disabled by default; may be revisited with in-game LOS-frame data.
+        // (static readonly, not const, so mcs doesn't emit unreachable-code
+        // warnings for the gated expressions; the JIT folds it just the same)
+        public static readonly bool JukeEnabled = false;
         public const float JukeCrossMinVel = 0.5f;    // m/s; |lateral vel| needed to count a zero crossing (noise gate)
         public const float JukeEwmaAlpha = 0.3f;      // unitless; EWMA gain for period/amplitude updates
         public const int JukeMinCrossings = 4;        // zero crossings observed before the juke model becomes a candidate
@@ -93,7 +113,7 @@ namespace GameMod {
 
         // ---- model-selection ledger ----
         public const float LedgerInterval = 0.05f;    // s; throttle between prediction filings per track
-        public const float ResidualAlpha = 0.2f;      // unitless; EWMA gain for the per-model residual
+        public const float ResidualTau = 2.0f;        // s; time-based residual EWMA tau (alpha per scored sample = 1-exp(-dtSinceLastScore/tau)). Tuned on 13-replay corpus, 2026-07 (tau_sel).
         public const float ResidualPrior = 0.5f;      // m; residual prior before any samples are scored
         public const int MinModelSamples = 8;         // scored samples before a non-CV model may be selected
         public const float ModelSwitchMargin = 0.9f;  // unitless; challenger residual must be < margin * active residual to switch
@@ -152,13 +172,15 @@ namespace GameMod {
 
         // --- derived features (valid once count >= 2) ---
         public Vector3 pos;                           // newest raw server position
-        public Vector3 vel;                           // server velocity, LSB-smoothed
+        public Vector3 velRaw;                        // newest raw (unsmoothed) server velocity; the drag step + hazard tests use this, matching the benchmark
+        public Vector3 vel;                           // server velocity, EWMA-smoothed (VelSmoothTau)
         public Vector3 acc;
-        public Vector3 thrustEst;                     // acc + Kdrag*vel = reconstructed control input
+        public Vector3 thrustEst;                     // acc + Kdrag*vel, clamped to ThrustMax = reconstructed control input
+        public Vector3 dirSmooth;                     // direction-smoothed velocity (DirSmoothTau); basis of the lateral frame
         public float tServerNewest;
         public float tLocalNewest;
 
-        // flip / juke statistics (lateral frame = LOS from the local ship, or velocity-orthogonal fallback)
+        // flip / juke statistics (lateral frame = velocity-orthogonal, built from dirSmooth)
         public float flipRate;                        // lateral-thrust sign flips per second (decaying)
         public float lastFlipT = -100f;               // server time of last flip
         public float jukePeriod;                      // EWMA of zero-cross interval * 2 (s)
@@ -173,10 +195,11 @@ namespace GameMod {
         public bool synthetic;                        // server is fabricating linear ticks for this player
         public int identicalVelRun;
 
-        // per-model EWMA |predicted - actual| residuals (m)
+        // per-model time-based EWMA |predicted - actual| residuals (m)
         public readonly float[] residual = new float[ShipPredModel.Count];
         public readonly int[] residualN = new int[ShipPredModel.Count];
-        public int activeModel = ShipPredModel.CV;
+        public readonly float[] residualLastScoreT = new float[ShipPredModel.Count]; // server time of the last scored sample (drives the time-based alpha)
+        public int activeModel = ShipPredModel.Ballistic;
 
         // prediction ledger (filed on render, scored as snapshots pass the impact time)
         public struct LedgerEntry {
@@ -213,7 +236,7 @@ namespace GameMod {
         public void Reset() {
             head = -1; count = 0; consumed = 0;
             pos = Vector3.zero;
-            vel = acc = thrustEst = Vector3.zero;
+            velRaw = vel = acc = thrustEst = dirSmooth = Vector3.zero;
             flipRate = 0f; lastFlipT = -100f;
             jukePeriod = 0f; jukeAmp = 0f; jukePeriodJitter = 0f;
             jukeCrossings = 0; lastCrossT = -100f; latVelSign = 0f;
@@ -225,8 +248,10 @@ namespace GameMod {
             for (int m = 0; m < ShipPredModel.Count; m++) {
                 residual[m] = PredictionParams.ResidualPrior;
                 residualN[m] = 0;
+                residualLastScoreT[m] = -1e9f;    // first score gets alpha ~ 1 (EWMA seeds on its first sample)
             }
-            activeModel = ShipPredModel.CV;
+            // Ballistic by default until residuals mature (benchmark: select default=1)
+            activeModel = ShipPredModel.Ballistic;
             smoothValid = false;
             smoothOffset = Vector3.zero;
             lastBasisT = -1f;
@@ -288,16 +313,15 @@ namespace GameMod {
 
         // ---- per-snapshot feature derivation (main thread, under the registry lock) ----
         // backIdx counts back from newest; called oldest-first for each fresh entry.
-        // ownPos = local ship position for the LOS-lateral frame; haveOwn = it is valid.
-        public void ConsumeOne(int backIdx, Vector3 ownPos, bool haveOwn) {
+        public void ConsumeOne(int backIdx) {
             ShipSnap s = Back(backIdx);
             pos = s.pos;
             tServerNewest = s.tServer;
             tLocalNewest = s.tLocal;
 
             if (backIdx >= count - 1) {
-                // first sample of a (re)fresh ring: seed
-                vel = s.vel;
+                // first sample of a (re)fresh ring: seed (EWMAs seed on x0)
+                velRaw = vel = dirSmooth = s.vel;
                 return;
             }
 
@@ -328,44 +352,60 @@ namespace GameMod {
                 synthetic = identicalVelRun >= PredictionParams.SyntheticRunLength;
             }
 
-            float velAlpha = dt / (dt + PredictionParams.VelSmoothTau);
+            velRaw = rawVel;
+
+            // EWMA form alpha = 1 - exp(-dt/tau): the exact update the benchmark
+            // tuned its taus in (NOT dt/(dt+tau) -- the taus don't transfer).
+            float velAlpha = 1f - Mathf.Exp(-dt / PredictionParams.VelSmoothTau);
             Vector3 newVel = Vector3.Lerp(vel, rawVel, velAlpha);
             Vector3 rawAcc = (newVel - vel) / dt;
-            float accAlpha = dt / (dt + PredictionParams.AccSmoothTau);
+            float accAlpha = 1f - Mathf.Exp(-dt / PredictionParams.AccSmoothTau);
             acc = Vector3.Lerp(acc, rawAcc, accAlpha);
             vel = newVel;
             thrustEst = acc + PredictionParams.Kdrag * vel;
+            float thrustMag = thrustEst.magnitude;
+            if (thrustMag > PredictionParams.ThrustMax) {
+                thrustEst *= PredictionParams.ThrustMax / thrustMag;
+            }
 
-            // --- lateral frame: LOS from the local ship, else velocity-orthogonal ---
-            Vector3 frameFwd = Vector3.zero;
-            if (haveOwn) {
-                Vector3 los = pos - ownPos;
-                if (los.sqrMagnitude > 1f) {
-                    frameFwd = los.normalized;
+            // --- lateral frame: velocity-orthogonal, from the direction-smoothed
+            //     velocity (benchmark semantics; the flip deadzone was calibrated
+            //     in this frame, and it needs no local-player state) ---
+            float dirAlpha = 1f - Mathf.Exp(-dt / PredictionParams.DirSmoothTau);
+            dirSmooth = Vector3.Lerp(dirSmooth, rawVel, dirAlpha);
+            if (dirSmooth.sqrMagnitude > 1e-8f) {
+                Vector3 u = dirSmooth.normalized;
+                Vector3 l1 = Vector3.Cross(u, Vector3.up);
+                if (l1.magnitude <= 0.2f) {
+                    // travel nearly vertical: world-X fallback (same 0.2 threshold
+                    // on |u x up| as the benchmark's frame construction)
+                    l1 = Vector3.Cross(u, Vector3.right);
                 }
-            }
-            if (frameFwd == Vector3.zero && vel.sqrMagnitude > 1f) {
-                frameFwd = vel.normalized;
-            }
-            if (frameFwd != Vector3.zero) {
-                Vector3 l1 = Vector3.Cross(frameFwd, Vector3.up);
-                if (l1.sqrMagnitude < 1e-4f) {
-                    l1 = Vector3.Cross(frameFwd, Vector3.right);
+                if (l1.sqrMagnitude > 1e-8f) {
+                    lat1 = l1.normalized;
+                    lat2 = Vector3.Cross(u, lat1);    // unit: u and lat1 are orthonormal
                 }
-                lat1 = l1.normalized;
-                lat2 = Vector3.Cross(frameFwd, lat1).normalized;
             }
             // else: keep the previous frame (better than a degenerate one)
 
             // --- flip / juke statistics (frozen while synthetic) ---
             flipRate *= Mathf.Exp(-dt / PredictionParams.FlipRateTau);
             if (!synthetic) {
-                // thrust sign flips on either lateral axis = commanded reversals
+                // committed-sign flips on either lateral axis = commanded reversals.
+                // Hysteresis: a sign only commits when |component| exceeds the
+                // deadzone band; a flip counts only on a committed sign change.
+                // Both axes flipping in one sample counts twice (benchmark: f1+f2).
                 float t1 = Vector3.Dot(thrustEst, lat1);
                 float t2 = Vector3.Dot(thrustEst, lat2);
-                if (DetectFlip(ref m_latSign1, t1, PredictionParams.ThrustDeadzone) |
-                    DetectFlip(ref m_latSign2, t2, PredictionParams.ThrustDeadzone)) {
-                    flipRate += PredictionParams.FlipRateInc;
+                int flips = 0;
+                if (DetectFlip(ref m_latSign1, t1, PredictionParams.ThrustDeadzone)) {
+                    flips++;
+                }
+                if (DetectFlip(ref m_latSign2, t2, PredictionParams.ThrustDeadzone)) {
+                    flips++;
+                }
+                if (flips > 0) {
+                    flipRate += flips * PredictionParams.FlipRateInc;
                     lastFlipT = s.tServer;
                 }
 
@@ -406,7 +446,13 @@ namespace GameMod {
                 Vector3 actual = PosAtServerTime(ledger[i].tImpactServer);
                 float err = (ledger[i].predicted - actual).magnitude;
                 int m = ledger[i].model;
-                residual[m] = Mathf.Lerp(residual[m], err, PredictionParams.ResidualAlpha);
+                // time-based EWMA (benchmark tau_sel): alpha depends on the server
+                // time elapsed since this model's previous scored sample, so the
+                // tuned tau transfers regardless of the filing/scoring cadence.
+                float dtScore = Mathf.Max(ledger[i].tImpactServer - residualLastScoreT[m], 0f);
+                float alpha = 1f - Mathf.Exp(-dtScore / PredictionParams.ResidualTau);
+                residual[m] = Mathf.Lerp(residual[m], err, alpha);
+                residualLastScoreT[m] = ledger[i].tImpactServer;
                 residualN[m]++;
                 ledger[i].live = false;
             }
@@ -431,8 +477,12 @@ namespace GameMod {
         }
 
         // Is the juke oscillation regular enough to model as a sinusoid?
+        // Always false while PredictionParams.JukeEnabled is off (benchmark
+        // verdict: the model never fired offline); selection then runs over
+        // {CV, Ballistic} only.
         public bool JukeUsable() {
-            return !synthetic
+            return PredictionParams.JukeEnabled
+                && !synthetic
                 && jukeCrossings >= PredictionParams.JukeMinCrossings
                 && jukePeriod >= PredictionParams.JukePeriodMin
                 && jukePeriod <= PredictionParams.JukePeriodMax
@@ -525,9 +575,6 @@ namespace GameMod {
         // Main thread, once per render frame.
         // ------------------------------------------------------------------
         private static void ConsumeAll() {
-            PlayerShip own = GameManager.m_player_ship;
-            bool haveOwn = own != null && own.c_transform != null;
-            Vector3 ownPos = haveOwn ? own.c_transform.position : Vector3.zero;
             float now = Time.time;
 
             lock (s_lock) {
@@ -535,7 +582,7 @@ namespace GameMod {
                     ShipTrack tr = s_trackList[t];
                     int fresh = tr.count - tr.consumed;
                     for (int i = fresh - 1; i >= 0; i--) {
-                        tr.ConsumeOne(i, ownPos, haveOwn);
+                        tr.ConsumeOne(i);
                     }
                     tr.consumed = tr.count;
                 }
@@ -579,7 +626,7 @@ namespace GameMod {
         }
 
         // Ballistic: velocity decays under drag; the current thrust input is
-        // trusted with weight `commit` (decays with horizon and hazard).
+        // trusted with weight `commit` = exp(-h/TCommit) (raw-horizon decay).
         public static Vector3 PredictBallistic(Vector3 p0, Vector3 v0, Vector3 thrust, float tau, float commit) {
             return p0 + v0 * D1(tau) + thrust * (Mathf.Clamp01(commit) * D2(tau));
         }
@@ -629,49 +676,49 @@ namespace GameMod {
                 smart = tr != null && tr.count >= PredictionParams.MinSnapsForSmart && t > 0f;
 
                 if (smart) {
-                    // --- reversal hazard ---
-                    Vector3 tVel = tr.vel;
-                    Vector3 tThrust = tr.thrustEst;
-                    float committedDot = Vector3.Dot(tThrust, tVel);
-                    float tvMag = tVel.magnitude, thMag = tThrust.magnitude;
-                    bool opposing = tvMag > PredictionParams.OpposingVelMin
-                                    && thMag > PredictionParams.OpposingThrustMin
-                                    && committedDot < -PredictionParams.OpposingDotFrac * tvMag * thMag;
-                    bool committed = tvMag > PredictionParams.OpposingVelMin
-                                     && thMag > PredictionParams.OpposingThrustMin
-                                     && committedDot > PredictionParams.CommittedDotFrac * tvMag * thMag
+                    // --- reversal hazard (benchmark semantics: no opposing-thrust
+                    //     floor -- tuned to 0, mechanism removed; "committed"
+                    //     multiplies the hazard by CommittedHazardMult instead of
+                    //     zeroing it; raw velocity feeds the dot test) ---
+                    float committedDot = Vector3.Dot(tr.thrustEst, tr.velRaw);
+                    float tvMag = tr.velRaw.magnitude, thMag = tr.thrustEst.magnitude;
+                    bool committed = committedDot > PredictionParams.CommittedDotFrac * tvMag * thMag
                                      && (tr.tServerNewest - tr.lastFlipT) > PredictionParams.CommittedMinFlipAge;
 
                     hazard = 1f - Mathf.Exp(-tr.flipRate * t);
-                    if (opposing) {
-                        hazard = Mathf.Max(hazard, PredictionParams.OpposingHazardFloor);
-                    }
                     if (committed) {
-                        hazard = 0f;
+                        hazard *= PredictionParams.CommittedHazardMult;
                     }
+                    hazard = Mathf.Clamp01(hazard);
 
-                    // --- adaptive horizon ---
-                    tEff = t * (1f - PredictionParams.HazardDamping * Mathf.Clamp01(hazard));
+                    // --- adaptive horizon (damps the ballistic kinematic step;
+                    //     CV stays at the raw horizon, like the benchmark's
+                    //     select over {cv, ballistic_hazard}) ---
+                    tEff = t * (1f - PredictionParams.HazardDamping * hazard);
                     if (tr.synthetic && tEff > PredictionParams.SyntheticHorizonCap) {
                         // the server is fabricating linear ticks: freeze extrapolation growth
                         tEff = PredictionParams.SyntheticHorizonCap;
                     }
 
-                    // --- model predictions at the effective horizon ---
-                    float commit = Mathf.Exp(-tEff / PredictionParams.TCommit) * (1f - Mathf.Clamp01(hazard));
-                    Vector3 pCv = PredictCV(basePos, rawVel, tEff);
-                    Vector3 pBal = PredictBallistic(basePos, tr.vel, tr.thrustEst, tEff, commit);
+                    // --- model predictions ---
+                    // benchmark semantics: the commit decay runs on the RAW horizon
+                    // (T = thrust * exp(-h/t_commit)), the drag step on the damped
+                    // one; the drag step integrates the raw snapshot velocity.
+                    float commit = Mathf.Exp(-t / PredictionParams.TCommit);
+                    Vector3 pCv = PredictCV(basePos, rawVel, t);
+                    Vector3 pBal = PredictBallistic(basePos, tr.velRaw, tr.thrustEst, tEff, commit);
                     bool jukeOk = tr.JukeUsable();
                     Vector3 pJuke = jukeOk ? PredictJuke(tr, basePos, tEff) : pBal;
 
-                    // --- ledger: file each model's prediction for later scoring ---
+                    // --- ledger: file each model's prediction for later scoring,
+                    //     at the raw horizon (that is when the render is "for") ---
                     float now = Time.time;
-                    if (now - tr.lastLedgerT >= PredictionParams.LedgerInterval && tEff > 1e-4f) {
+                    if (now - tr.lastLedgerT >= PredictionParams.LedgerInterval && t > 1e-4f) {
                         tr.lastLedgerT = now;
-                        tr.FilePrediction(ShipPredModel.CV, tEff, pCv);
-                        tr.FilePrediction(ShipPredModel.Ballistic, tEff, pBal);
+                        tr.FilePrediction(ShipPredModel.CV, t, pCv);
+                        tr.FilePrediction(ShipPredModel.Ballistic, t, pBal);
                         if (jukeOk) {
-                            tr.FilePrediction(ShipPredModel.Juke, tEff, pJuke);
+                            tr.FilePrediction(ShipPredModel.Juke, t, pJuke);
                         }
                     }
 
@@ -858,13 +905,19 @@ namespace GameMod {
                         name = pl.m_mp_name + (pl.isLocalPlayer ? " (self)" : "");
                     }
                     uConsole.Log(string.Format(
-                        "  {0}: model={1} snaps={2} flips/s={3:F2} jukeP={4:F2}s jukeA={5:F1}m/s cross={6}{7} t={8:F0}ms t_eff={9:F0}ms hazard={10:F2}",
+                        "  {0}: model={1} snaps={2} flips/s={3:F2} juke={4}{5} t={6:F0}ms t_eff={7:F0}ms hazard={8:F2}",
                         name, ShipPredModel.Name(tr.activeModel), tr.count, tr.flipRate,
-                        tr.jukePeriod, tr.jukeAmp, tr.jukeCrossings,
+                        PredictionParams.JukeEnabled
+                            ? string.Format("P={0:F2}s A={1:F1}m/s cross={2}", tr.jukePeriod, tr.jukeAmp, tr.jukeCrossings)
+                            : "disabled",
                         tr.synthetic ? " SYNTH" : "",
                         tr.lastT * 1000f, tr.lastTEff * 1000f, tr.lastHazard));
                     StringBuilder sb = new StringBuilder("    residuals:");
                     for (int m = 0; m < ShipPredModel.Count; m++) {
+                        if (m == ShipPredModel.Juke && !PredictionParams.JukeEnabled) {
+                            sb.Append(" JUKE=disabled");
+                            continue;
+                        }
                         sb.Append(string.Format(" {0}={1:F2}m/{2}", ShipPredModel.Name(m), tr.residual[m], tr.residualN[m]));
                     }
                     uConsole.Log(sb.ToString());
