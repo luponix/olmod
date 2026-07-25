@@ -1,0 +1,15 @@
+horizon_ms,predictor,snap_m
+200,cv,0.06990
+200,ballistic,0.12629
+200,ballistic_hazard,0.12446
+200,jukephase,0.12449
+200,select,0.12334
+200,select4,0.12288
+200,select_blend,0.12058
+300,cv,0.11726
+300,ballistic,0.23385
+300,ballistic_hazard,0.22856
+300,jukephase,0.22865
+300,select,0.22420
+300,select4,0.22142
+300,select_blend,0.21649
