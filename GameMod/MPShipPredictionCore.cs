@@ -88,6 +88,15 @@ namespace GameMod {
         public static int MinModelSamples = 8;         // scored samples before a non-CV model may be selected
         public static float ModelSwitchMargin = 0.9f;  // unitless; challenger residual must be < margin * active residual to switch
 
+        // ---- blended mode (lup.test3 / prediction mode 4): soft model
+        //      mixing + in-core continuity smoothing (PredictSmartBlend) ----
+        public static float BlendResidPower = 8f;   // unitless; weight = (rMin/residual)^power. Tuned on 45-replay corpus, 2026-08. Higher = closer to SMART's hard select, lower = closer to a plain average.
+        public static float BlendSmoothTau = 0.02f; // s; continuity EWMA tau of the displayed point (innovation correction rate). Tuned on 45-replay corpus, 2026-08.
+        public static float BlendSnapDist = 3f;     // m; innovation larger than this hard-snaps (respawn/teleport scale)
+        public static float BlendMaxDt = 0.1f;      // s; per-call dt clamp for the continuity decay (hitch protection)
+        public static float BlendCarrierAcc = 1f;   // unitless; how much of the model's horizon-velocity correction feeds the continuity carrier (carrier = rawVel + this*(vModel(h) - rawVel)). The displayed point tracks position at t+h, whose velocity is vModel(h), not rawVel -- at 0 the filter lags by ~a*h*tau under acceleration
+        public static float BlendMaxCorrVel = 12f;  // m/s; tuned on 45-replay corpus, 2026-08; cap on the correction speed of the displayed point relative to the carrier -- bounds the visible warp speed (jitter tail) while small corrections pass at the tau rate
+
         // ---- projective smoothing (render-side; used by the glue only) ----
         public static float SmoothTau = 0.08f;         // s; exponential decay time of the render-offset correction
         public static float SmoothSnapDist = 3f;       // m; offsets larger than this hard-snap (respawn/teleport scale)
@@ -189,6 +198,11 @@ namespace GameMod {
         public float lastBasisT = -1f;                // snapshot server time the last render was based on
         public int lastBasisModel = -1;               // model the last render used
 
+        // continuity state of the blended mode (PredictSmartBlend only)
+        public bool contValid;
+        public Vector3 contPos;                       // last displayed position handed out
+        public float contT;                           // caller clock of that call
+
         // diagnostics
         public float lastT;                           // last requested horizon (s)
         public float lastTEff;                        // last effective horizon (s)
@@ -224,6 +238,7 @@ namespace GameMod {
             activeModel = ShipPredModel.Ballistic;
             smoothValid = false;
             smoothOffset = Vector3.zero;
+            contValid = false;
             lastBasisT = -1f;
             lastBasisModel = -1;
         }
@@ -652,6 +667,133 @@ namespace GameMod {
             tr.lastTEff = tEff;
             tr.lastHazard = hazard;
             return rawPos;
+        }
+
+        // ------------------------------------------------------------------
+        // The blended smart prediction (mode 4, "lup.test3"): same tracker,
+        // hazard, adaptive horizon, ledger and residuals as PredictSmart, but
+        //   1. the model predictions are MIXED with soft residual-derived
+        //      weights (w = residual^-BlendResidPower) instead of hard-switched
+        //      -- no model-flip pops, and the ensemble usually beats the
+        //      single best member;
+        //   2. the displayed point is continuity-smoothed IN THE CORE: it is
+        //      carried along the ship's velocity between calls and corrected
+        //      toward the raw blend at rate 1-exp(-dt/BlendSmoothTau), so
+        //      snapshot-to-snapshot innovations become short glides instead
+        //      of warps. Teleport-scale innovations (> BlendSnapDist) snap.
+        // `now` is the same caller clock as PredictSmart's nowLedger (game:
+        // Time.time, evaluator: replay clock); it also drives the continuity
+        // dt, so the smoothing is frame-rate independent in both hosts.
+        // ------------------------------------------------------------------
+        public static Vector3 PredictSmartBlend(ShipTrack tr, Vector3 basePos, Vector3 rawVel,
+                                                float t, float now,
+                                                out int model, out float tEff, out float hazard) {
+            model = ShipPredModel.CV;
+            tEff = t;
+            hazard = 0f;
+
+            if (!SmartUsable(tr, t)) {
+                if (tr != null) {
+                    tr.lastT = t;
+                    tr.lastTEff = t;
+                    tr.lastHazard = 0f;
+                    tr.contValid = false;    // don't glide across a track reset
+                }
+                return PredictCV(basePos, rawVel, t);
+            }
+
+            // hazard + adaptive horizon: identical to PredictSmart
+            float committedDot = Vector3.Dot(tr.thrustEst, tr.velRaw);
+            float tvMag = tr.velRaw.magnitude, thMag = tr.thrustEst.magnitude;
+            bool committed = committedDot > PredictionParams.CommittedDotFrac * tvMag * thMag
+                             && (tr.tServerNewest - tr.lastFlipT) > PredictionParams.CommittedMinFlipAge;
+            hazard = 1f - Mathf.Exp(-tr.flipRate * t);
+            if (committed) {
+                hazard *= PredictionParams.CommittedHazardMult;
+            }
+            hazard = Mathf.Clamp01(hazard);
+            tEff = t * (1f - PredictionParams.HazardDamping * hazard);
+            if (tr.synthetic && tEff > PredictionParams.SyntheticHorizonCap) {
+                tEff = PredictionParams.SyntheticHorizonCap;
+            }
+
+            // model predictions + ledger filing: identical to PredictSmart
+            // (the residuals scored off this ledger feed the weights below)
+            float commit = Mathf.Exp(-t / PredictionParams.TCommit);
+            Vector3 pCv = PredictCV(basePos, rawVel, t);
+            Vector3 pBal = PredictBallistic(basePos, tr.velRaw, tr.thrustEst, tEff, commit);
+            bool jukeOk = tr.JukeUsable();
+            Vector3 pJuke = jukeOk ? PredictJuke(tr, basePos, tEff) : pBal;
+
+            if (now - tr.lastLedgerT >= PredictionParams.LedgerInterval && t > 1e-4f) {
+                tr.lastLedgerT = now;
+                tr.FilePrediction(ShipPredModel.CV, t, pCv);
+                tr.FilePrediction(ShipPredModel.Ballistic, t, pBal);
+                if (jukeOk) {
+                    tr.FilePrediction(ShipPredModel.Juke, t, pJuke);
+                }
+            }
+
+            // soft weights from the residual EWMAs (floored so a lucky streak
+            // can't produce a runaway weight); juke joins only when usable AND
+            // matured, matching PredictSmart's eligibility rule
+            float pw = PredictionParams.BlendResidPower;
+            float rCv = Mathf.Max(tr.residual[ShipPredModel.CV], 1e-3f);
+            float rBal = Mathf.Max(tr.residual[ShipPredModel.Ballistic], 1e-3f);
+            bool jukeMature = jukeOk && tr.residualN[ShipPredModel.Juke] >= PredictionParams.MinModelSamples;
+            float rJuke = jukeMature ? Mathf.Max(tr.residual[ShipPredModel.Juke], 1e-3f) : float.MaxValue;
+            // scale-invariant weights (rMin/r)^p: the best model gets weight 1,
+            // so arbitrarily high powers stay finite (pow16 of a raw inverse
+            // residual overflows float)
+            float rMin = Mathf.Min(rCv, Mathf.Min(rBal, rJuke));
+            float wCv = Mathf.Pow(rMin / rCv, pw);
+            float wBal = Mathf.Pow(rMin / rBal, pw);
+            float wJuke = jukeMature ? Mathf.Pow(rMin / rJuke, pw) : 0f;
+            Vector3 pRaw = (pCv * wCv + pBal * wBal + pJuke * wJuke) / (wCv + wBal + wJuke);
+            model = (wBal >= wCv && wBal >= wJuke) ? ShipPredModel.Ballistic
+                  : (wJuke > wCv) ? ShipPredModel.Juke : ShipPredModel.CV;
+
+            // continuity smoothing: carry the last displayed point along the
+            // ship's velocity, then correct toward the raw blend
+            Vector3 outPos = pRaw;
+            if (tr.contValid) {
+                float dtc = now - tr.contT;
+                if (dtc < 0f) {
+                    dtc = 0f;
+                }
+                if (dtc > PredictionParams.BlendMaxDt) {
+                    dtc = PredictionParams.BlendMaxDt;
+                }
+                // carrier velocity: the blend's own velocity estimate at the
+                // horizon (CV moves at rawVel; ballistic at the drag-decayed
+                // velocity plus the committed-thrust response). Using the
+                // model velocity instead of raw acceleration keeps the
+                // carrier smooth AND first-order correct under acceleration.
+                Vector3 vBal = tr.velRaw * Mathf.Exp(-PredictionParams.Kdrag * tEff)
+                             + tr.thrustEst * D1(tEff);
+                Vector3 vModel = (rawVel * wCv + vBal * (wBal + wJuke)) / (wCv + wBal + wJuke);
+                Vector3 vCarrier = rawVel + (vModel - rawVel) * PredictionParams.BlendCarrierAcc;
+                Vector3 cont = tr.contPos + vCarrier * dtc;
+                Vector3 innovation = pRaw - cont;
+                if (innovation.sqrMagnitude <= PredictionParams.BlendSnapDist * PredictionParams.BlendSnapDist) {
+                    float alpha = 1f - Mathf.Exp(-dtc / PredictionParams.BlendSmoothTau);
+                    Vector3 corr = innovation * alpha;
+                    float maxCorr = PredictionParams.BlendMaxCorrVel * dtc;
+                    float corrMag = corr.magnitude;
+                    if (corrMag > maxCorr && corrMag > 1e-6f) {
+                        corr *= maxCorr / corrMag;
+                    }
+                    outPos = cont + corr;
+                }
+            }
+            tr.contValid = true;
+            tr.contPos = outPos;
+            tr.contT = now;
+
+            tr.lastT = t;
+            tr.lastTEff = tEff;
+            tr.lastHazard = hazard;
+            return outPos;
         }
     }
 }

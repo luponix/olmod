@@ -225,7 +225,9 @@ namespace GameMod {
                 case 2:
                     return "MOTION ARC";
                 case 3:
-                    return "SMART";
+                    return "lup.test2";
+                case 4:
+                    return "lup.test3";
             }
         }
 
@@ -886,7 +888,7 @@ namespace GameMod {
                         SelectAndDrawSliderItem(__instance, Loc.LS("LIMIT SHIPS DIVING INTO WALLS"), position, 11, Menus.mms_lag_compensation_collision_limit, 100, "LIMIT HOW FAR SHIPS MIGHT DIVE INTO WALLS (BUT SHIPS MIGHT APPEAR STUCK AT THE WALLS FOR SHORT MOMENTS INSTEAD)." + Environment.NewLine + "0 FOR UNLIMITED (NO CALCULATION OVERHEAD), OTHERWISE PERCENTAGE OF SHIP DIAMETER WHICH MUST REMAIN VISIBLE (100 = NO DIVE-IN AT ALL).");
                         position.y += 58f;
                         position.x = -260f;
-                        __instance.SelectAndDrawStringOptionItem(Loc.LS("VECTOR PREDICTION"), position, 12, Menus.GetMMSLagCompensationPredictionMode(), Loc.LS("\"VELOCITY\" PROJECTS ONLY THE STRAIGHT-LINE VELOCITY - \"VELOCITY + ROTATION\" PROJECTS THE STRAIGHT-LINE VELOCITY AND CONTINUES ROTATION - \"MOTION ARC\" PARTIALLY ROTATES THE PREDICTED VELOCITY VECTOR AS THE SHIP ROTATES - \"SMART\" ADAPTS THE PREDICTION TO EACH PLAYER'S MOVEMENT TO REDUCE OVERSHOOT ON DODGING SHIPS"), 0.9f);
+                        __instance.SelectAndDrawStringOptionItem(Loc.LS("VECTOR PREDICTION"), position, 12, Menus.GetMMSLagCompensationPredictionMode(), Loc.LS("\"VELOCITY\" PROJECTS ONLY THE STRAIGHT-LINE VELOCITY - \"VELOCITY + ROTATION\" PROJECTS THE STRAIGHT-LINE VELOCITY AND CONTINUES ROTATION - \"MOTION ARC\" PARTIALLY ROTATES THE PREDICTED VELOCITY VECTOR AS THE SHIP ROTATES - \"LUP.TEST2\" ADAPTS THE PREDICTION TO EACH PLAYER'S MOVEMENT TO REDUCE OVERSHOOT ON DODGING SHIPS - \"LUP.TEST3\" ADDS SMOOTHING TO THE ADAPTIVE PREDICTION SO SHIPS DO NOT WARP ON CORRECTIONS"), 0.9f);
                         position.x = 260f;
                         __instance.SelectAndDrawStringOptionItem(Loc.LS("ROTATION STRENGTH"), position, 13, Menus.GetMMSLagCompensationRotationStrength(), Loc.LS("HOW STRONGLY ANGULAR MOMENTUM IS APPLIED TO PREDICTIONS (IF AN APPLICABLE MODE IS SELECTED)"), 0.9f, (Menus.mms_lag_compensation_prediction_mode == 0));
                         position.x = 0f;
@@ -1296,7 +1298,7 @@ namespace GameMod {
                                         Menus.mms_lag_compensation_collision_limit = (int)(UIElement.SliderPos * 100f + 0.5f);
                                         break;
                                     case 12:
-                                        Menus.mms_lag_compensation_prediction_mode = (Menus.mms_lag_compensation_prediction_mode + 4 + UIManager.m_select_dir) % 4;
+                                        Menus.mms_lag_compensation_prediction_mode = (Menus.mms_lag_compensation_prediction_mode + 5 + UIManager.m_select_dir) % 5;
                                         MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
                                         break;
                                     case 13:

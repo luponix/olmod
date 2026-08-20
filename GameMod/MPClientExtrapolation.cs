@@ -504,6 +504,14 @@ namespace GameMod {
                 return;
             }
 
+            // Blended smart mode (lup.test3): soft model mixing + in-core
+            // continuity smoothing, see ShipPredictionCore.PredictSmartBlend.
+            if (Menus.mms_lag_compensation_prediction_mode == 4)
+            {
+                MPShipPrediction.ExtrapolatePlayerSmartBlend(player, snapshot, t);
+                return;
+            }
+
             Vector3 newPos = Vector3.LerpUnclamped(snapshot.m_pos, snapshot.m_pos + snapshot.m_vel, t);
             Quaternion newRot;
 

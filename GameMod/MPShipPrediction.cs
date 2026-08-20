@@ -76,7 +76,10 @@ namespace GameMod {
         private static int s_lastConsumeFrame = -1;
 
         public static bool SmartModeActive {
-            get { return Menus.mms_lag_compensation_prediction_mode == 3; }
+            get {
+                return Menus.mms_lag_compensation_prediction_mode == 3
+                    || Menus.mms_lag_compensation_prediction_mode == 4;
+            }
         }
 
         // ------------------------------------------------------------------
@@ -241,6 +244,49 @@ namespace GameMod {
             player.c_player_ship.c_mesh_collider_trans.localRotation = player.c_player_ship.c_transform.localRotation;
         }
 
+        // The blended smart path (mode 4, "lup.test3"): same tracker and
+        // pipeline entry as ExtrapolatePlayerSmart, but the position comes
+        // from ShipPredictionCore.PredictSmartBlend, which mixes the models
+        // softly and does its own continuity smoothing in the core -- so no
+        // projective-smoothing layer here (it would double-filter). The wall
+        // clamp and rotation handling stay identical.
+        public static void ExtrapolatePlayerSmartBlend(Player player, NewPlayerSnapshot snapshot, float t) {
+            // feature-update all tracks once per render frame
+            if (Time.frameCount != s_lastConsumeFrame) {
+                s_lastConsumeFrame = Time.frameCount;
+                ConsumeAll();
+            }
+
+            Vector3 basePos = snapshot.m_pos;
+            Vector3 rawVel = snapshot.m_vel;
+
+            int model;
+            float tEff;
+            float hazard;
+            Vector3 newPos;
+
+            lock (s_lock) {
+                ShipTrack tr;
+                s_tracks.TryGetValue(snapshot.m_net_id.Value, out tr);
+                newPos = ShipPredictionCore.PredictSmartBlend(tr, basePos, rawVel, t, Time.time,
+                                                              out model, out tEff, out hazard);
+            } // lock
+
+            // ---- wall clamp with slide (same maxDive semantics as the legacy clamp) ----
+            if (Menus.mms_lag_compensation_collision_limit > 0) {
+                newPos = ClampWithSlide(basePos, newPos);
+            }
+
+            // ---- rotation: same handling as the VEL+ROTATION mode, at the effective horizon ----
+            float rotScale = RotScale();
+            Quaternion newRot = Quaternion.Euler(snapshot.m_vrot * (Mathf.Rad2Deg * tEff * rotScale)) * snapshot.m_rot;
+
+            player.c_player_ship.c_transform.localPosition = newPos;
+            player.c_player_ship.c_transform.rotation = newRot;
+            player.c_player_ship.c_mesh_collider_trans.localPosition = player.c_player_ship.c_transform.localPosition;
+            player.c_player_ship.c_mesh_collider_trans.localRotation = player.c_player_ship.c_transform.localRotation;
+        }
+
         // Rotation-strength mapping, identical to the legacy switch in
         // extrapolatePlayer (the arc scale is not used by the smart mode).
         private static float RotScale() {
@@ -319,7 +365,7 @@ namespace GameMod {
                 Menus.mms_lag_compensation_prediction_mode, Menus.GetMMSLagCompensationPredictionMode()));
             lock (s_lock) {
                 if (s_trackList.Count == 0) {
-                    uConsole.Log("[LagComp] no tracked ships (SMART mode inactive or no snapshots yet)");
+                    uConsole.Log("[LagComp] no tracked ships (lup.test2 mode inactive or no snapshots yet)");
                     return;
                 }
                 for (int i = 0; i < s_trackList.Count; i++) {
@@ -356,7 +402,7 @@ namespace GameMod {
     class MPShipPrediction_GameManager_Start {
         static void Postfix() {
             uConsole.RegisterCommand("lagcomp_stats",
-                "Prints per-player SMART lag-compensation prediction statistics",
+                "Prints per-player lup.test2 lag-compensation prediction statistics",
                 new uConsole.DebugCommand(MPShipPrediction.CmdLagCompStats));
         }
     }

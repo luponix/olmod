@@ -253,7 +253,7 @@ namespace GameMod {
                 Menus.mms_weapon_lag_compensation_scale = ModPrefs.GetInt("MP_PM_WEAPON_LAG_COMPENSATION_SCALE", Menus.mms_weapon_lag_compensation_scale);
                 Menus.mms_lag_compensation_collision_limit = ModPrefs.GetInt("MP_PM_SHIP_LAG_COMPENSATION_COLLISION_LIMIT", Menus.mms_lag_compensation_collision_limit);
                 Menus.mms_lag_compensation_prediction_mode = ModPrefs.GetInt("MP_LAG_COMPENSATION_PREDICTION_MODE", Menus.mms_lag_compensation_prediction_mode);
-                if (Menus.mms_lag_compensation_prediction_mode < 0 || Menus.mms_lag_compensation_prediction_mode > 3)
+                if (Menus.mms_lag_compensation_prediction_mode < 0 || Menus.mms_lag_compensation_prediction_mode > 4)
                     Menus.mms_lag_compensation_prediction_mode = 0;
                 Menus.mms_lag_compensation_rotation_strength = ModPrefs.GetInt("MP_LAG_COMPENSATION_ROTATION_STRENGTH", Menus.mms_lag_compensation_rotation_strength);
                 Menus.mms_sticky_death_summary = ModPrefs.GetBool("MP_PM_STICKY_DEATH_SUMMARY", Menus.mms_sticky_death_summary);
