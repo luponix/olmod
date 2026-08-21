@@ -400,9 +400,9 @@ namespace GameMod {
                 m_last_message_server_time = msg.m_server_timestamp;
             } // end lock
 
-            // feed the SMART prediction tracker (no-op unless prediction mode 3
-            // is selected; uses its own lock and stays cheap)
-            MPShipPrediction.CaptureSnapshot(msg, version);
+            // feed the adaptive prediction tracker (no-op unless prediction
+            // mode 3 is selected; uses its own lock and stays cheap)
+            MPShipPredictionAdaptive.CaptureSnapshot(msg, version);
         }
 
         // Re-Sync the m_last_update_time
@@ -496,19 +496,12 @@ namespace GameMod {
                 return;
             }
 
-            // SMART prediction mode: fully handled by MPShipPrediction.
+            // Adaptive mode: drag physics + one online model choice +
+            // continuity smoothing, fully handled by MPShipPredictionAdaptive.
             // Modes 0-2 below remain byte-for-byte identical.
             if (Menus.mms_lag_compensation_prediction_mode == 3)
             {
-                MPShipPrediction.ExtrapolatePlayerSmart(player, snapshot, t);
-                return;
-            }
-
-            // Blended smart mode (lup.test3): soft model mixing + in-core
-            // continuity smoothing, see ShipPredictionCore.PredictSmartBlend.
-            if (Menus.mms_lag_compensation_prediction_mode == 4)
-            {
-                MPShipPrediction.ExtrapolatePlayerSmartBlend(player, snapshot, t);
+                MPShipPredictionAdaptive.ExtrapolatePlayerAdaptive(player, snapshot, t);
                 return;
             }
 
