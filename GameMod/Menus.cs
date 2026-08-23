@@ -888,7 +888,7 @@ namespace GameMod {
                         position.x = -260f;
                         __instance.SelectAndDrawStringOptionItem(Loc.LS("VECTOR PREDICTION"), position, 12, Menus.GetMMSLagCompensationPredictionMode(), Loc.LS("\"VELOCITY\" PROJECTS ONLY THE STRAIGHT-LINE VELOCITY - \"VELOCITY + ROTATION\" PROJECTS THE STRAIGHT-LINE VELOCITY AND CONTINUES ROTATION - \"MOTION ARC\" PARTIALLY ROTATES THE PREDICTED VELOCITY VECTOR AS THE SHIP ROTATES - \"ADAPTIVE\" ADAPTS THE PREDICTION TO EACH PLAYER'S MOVEMENT TO REDUCE OVERSHOOT ON DODGING SHIPS AND SMOOTHS CORRECTIONS SO SHIPS DO NOT WARP"), 0.9f);
                         position.x = 260f;
-                        __instance.SelectAndDrawStringOptionItem(Loc.LS("ROTATION STRENGTH"), position, 13, Menus.GetMMSLagCompensationRotationStrength(), Loc.LS("HOW STRONGLY ANGULAR MOMENTUM IS APPLIED TO PREDICTIONS (IF AN APPLICABLE MODE IS SELECTED)"), 0.9f, (Menus.mms_lag_compensation_prediction_mode == 0));
+                        __instance.SelectAndDrawStringOptionItem(Loc.LS("ROTATION STRENGTH"), position, 13, Menus.GetMMSLagCompensationRotationStrength(), Loc.LS("HOW STRONGLY ANGULAR MOMENTUM IS APPLIED TO PREDICTIONS (IF AN APPLICABLE MODE IS SELECTED)"), 0.9f, (Menus.mms_lag_compensation_prediction_mode == 0 || Menus.mms_lag_compensation_prediction_mode == 3));
                         position.x = 0f;
                     }
                     break;

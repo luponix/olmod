@@ -50,8 +50,8 @@ namespace GameMod {
     // results, parameter sweeps). Keep the two in sync when tuning -- the
     // tunables keep their `Lean` names for exactly that reason. This file
     // adds only the engine glue: message capture, the registry lock, the
-    // wall-slide clamp and rotation, and the reconnect reset. No code path
-    // here runs unless mode 3 is selected.
+    // wall-slide clamp, and the reconnect reset. No code path here runs
+    // unless mode 3 is selected.
     // ==========================================================================
     public static class MPShipPredictionAdaptive {
 
@@ -367,9 +367,16 @@ namespace GameMod {
                 newPos = ClampWithSlide(basePos, newPos);
             }
 
-            // rotation: same handling as the VEL+ROTATION mode
-            float rotScale = RotScale();
-            Quaternion newRot = Quaternion.Euler(snapshot.m_vrot * (Mathf.Rad2Deg * t * rotScale)) * snapshot.m_rot;
+            // Rotation is NOT extrapolated, and ROTATION STRENGTH does not apply to
+            // this mode (the menu fades it out for mode 3 alongside mode 0). Modes
+            // 1-2 spin the hull forward by the angular velocity because their
+            // position prediction is a straight line and the drawn orientation is
+            // the only cue left that the ship is turning; here the position already
+            // carries the turn, so spinning the hull on top of it only adds a second
+            // guess -- one that snaps back on its own whenever the pilot stops
+            // turning, on a ship whose position does not. The snapshot rotation is
+            // the last known truth, so that is what is drawn.
+            Quaternion newRot = snapshot.m_rot;
 
             player.c_player_ship.c_transform.localPosition = newPos;
             player.c_player_ship.c_transform.rotation = newRot;
@@ -382,19 +389,6 @@ namespace GameMod {
         // ------------------------------------------------------------------
         private const float ShipRadius = 0.98f;    // m; collision-clamp sphere (ship collider is ~1, identical to the legacy clamp)
         private const float SlideMinLen = 0.01f;   // m; slide motions shorter than this are dropped
-
-        // Rotation-strength mapping, identical to the legacy switch in
-        // extrapolatePlayer (the arc scale is not used by this mode).
-        private static float RotScale() {
-            switch (Menus.mms_lag_compensation_rotation_strength) {
-                default:
-                case 0: return 1f;      // 100%
-                case 1: return 0.75f;   // 75%
-                case 2: return 0.5f;    // 50%
-                case 3: return 0.25f;   // 25%
-                case 4: return 0.1f;    // 10%
-            }
-        }
 
         // Dive-in clamp with wall slide: the extrapolated position is limited to
         // maxDive along the ray into the wall (legacy semantics), and the clipped
