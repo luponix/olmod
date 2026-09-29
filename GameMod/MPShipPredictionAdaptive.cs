@@ -37,6 +37,10 @@ namespace GameMod {
     // Corpus results (45 replays, mean error m, vs the legacy VELOCITY mode):
     // 30 ms 0.018 -> 0.012, 100 ms 0.126 -> 0.073, 150 ms 0.256 -> 0.160.
     //
+    // Respawn/teleport handling is a SPEED test, not a distance test -- see
+    // ResetSpeed below; the distance form silently missed short respawns and was
+    // the cause of the "one ship parked in the wrong room" bug.
+    //
     // There is deliberately NO innovation snap guard (lup.test3 hard-snapped
     // innovations > 3 m): at 400 ms it fired on almost every innovation and
     // posted a displayed-step jitter p99 of 193 m/s against 27 without it,
@@ -68,7 +72,17 @@ namespace GameMod {
         }
 
         // Not tunables: "is this still the same flight" guards and ring sizing.
-        private const float ResetJump = 20f;      // m; a step this large is a respawn/teleport, not flight
+        // A teleport is recognised by the SPEED a step implies, never by its length.
+        // Measured over the recorded corpus (2.0M alive-pair snapshot steps, 10 replays):
+        // real flight's p99.99 is 89 m/s and nothing at all lands between 200 and 600 m/s,
+        // so 200 sits in an empty band -- 3.3 m per 60 Hz tick, ~2x above any boosted ship.
+        // The old test was a flat 20 m step, i.e. 1200 m/s at 60 Hz. It missed every
+        // respawn that moved a player less than 20 m (dying near your own spawn point):
+        // continuity survived the teleport and the displayed point then had to walk the
+        // whole distance at LeanMaxCorrVel, leaving that ONE ship drawn at its death spot
+        // for 1.6 s (8 m jump) to 4.4 s (19 m). The old form also falsely reset legitimate
+        // flight across a long snapshot gap, which the speed form gets right for free.
+        private const float ResetSpeed = 200f;    // m/s; a step implying more than this is a teleport, not flight
         private const float ResetGap = 1f;        // s; longer silence than this makes the motion history stale
         private const float MaxSmoothDt = 0.1f;   // s; continuity dt clamp (hitch protection)
         private const float ResidualPrior = 0.5f; // m; equal prior for both models, so neither is favoured before evidence
@@ -207,8 +221,10 @@ namespace GameMod {
         // prediction whose impact time has now passed. Caller holds s_lock.
         private static void Capture(LeanShip ship, Vector3 pos, Vector3 vel, float tServer) {
             if (ship.seeded) {
-                if ((pos - ship.pos).sqrMagnitude > ResetJump * ResetJump
-                    || tServer - ship.t > ResetGap) {
+                float gap = tServer - ship.t;
+                float reach = ResetSpeed * gap;
+                if (gap > ResetGap
+                    || (gap > 1e-5f && (pos - ship.pos).sqrMagnitude > reach * reach)) {
                     ship.Reset();
                 }
             }
