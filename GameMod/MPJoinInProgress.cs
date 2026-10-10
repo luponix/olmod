@@ -278,7 +278,7 @@ namespace GameMod {
                 lmsg = new LobbyChatMessage(connectionId, "Server", MpTeam.TEAM0, "See olmod.overloadmaps.com for instructions...", false);
                 NetworkServer.SendToClient(connectionId, 75, lmsg);
                 if (delaySeconds > 0) {
-                    yield return new WaitForSecondsRealtime((float)(delaySeconds*10));
+                    yield return new WaitForSecondsRealtime((float)delaySeconds);
                 }
             }
         }
