@@ -42,6 +42,10 @@ namespace GameMod
             public static void LoadPilotExtendedConfig(string name)
             {
                 SetDefaultConfig();
+                // Section_JoystickCurve.Load only appends; without clearing here, a pilot whose
+                // file lacks the section keeps the previous pilot's raw curve lines and both
+                // applies and re-saves them, silently overwriting the new pilot's curves.
+                Section_JoystickCurve.lines.Clear();
 
                 if (GameplayManager.IsDedicatedServer())
                 {
