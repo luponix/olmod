@@ -953,4 +953,29 @@ namespace GameMod {
         }
     }
 
+
+    // JIP resends CustomMsgType.MatchStart to existing players so they recompute
+    // head-to-head when the 3rd player arrives (Client.OnMatchStart -> SetMode).
+    // But OnMatchStart also calls ClearMpOverlays, which wipes overlay element 1 -
+    // the MP_DEATH_OVERLAY a dead player is looking at. Route that one call through
+    // a guard so a player who is dead/dying mid-match keeps their death HUD; at a
+    // genuine match start nobody is dead, so clearing still runs as before.
+    [HarmonyPatch(typeof(Client), "OnMatchStart")]
+    class MPJoinInProgress_Client_OnMatchStart
+    {
+        static void ClearMpOverlaysUnlessDead()
+        {
+            var ship = GameManager.m_local_player?.c_player_ship;
+            if (ship != null && ((bool)ship.m_dead || (bool)ship.m_dying))
+                return;
+            Client.ClearMpOverlays();
+        }
+
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+        {
+            return Trans.ReplaceCall("ClearMpOverlays",
+                AccessTools.Method(typeof(MPJoinInProgress_Client_OnMatchStart), "ClearMpOverlaysUnlessDead"), codes);
+        }
+    }
+
 }
