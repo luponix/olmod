@@ -152,7 +152,7 @@ namespace GameMod
                             rigidbody.velocity *= .8f;
                         else
                             rigidbody.velocity = proj_info[i].m_vel + diff / (1.1f - age);
-                        return;
+                        continue;
                     }
                 }
                 if (sqrDiff > 0.01f)
