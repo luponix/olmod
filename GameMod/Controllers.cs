@@ -177,6 +177,18 @@ namespace GameMod
             }
         }
 
+        // SET DEFAULT CALIBRATION (vanilla ResetAxisCalibration) makes Rewired reload the hardware
+        // default calibration, which also overwrites the axis deadzone and sensitivity with the
+        // hardware defaults. olmod owns those two values, so re-apply them afterwards - otherwise
+        // the axis silently runs on a deadzone/sensitivity that neither the sliders nor the config
+        // files show until the next pilot load.
+        static void ReapplyAxisSettings()
+        {
+            Controllers.Controller.Axis axis = Controllers.controllers[MenuManager.m_calibration_current_controller].axes[MenuManager.m_calibration_current_axis];
+            Controllers.SetAxisSensitivity(MenuManager.m_calibration_current_controller, MenuManager.m_calibration_current_axis, axis.sensitivity);
+            Controllers.SetAxisDeadzone(MenuManager.m_calibration_current_controller, MenuManager.m_calibration_current_axis, axis.deadzone);
+        }
+
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             int state = 0;
@@ -208,6 +220,13 @@ namespace GameMod
                         yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Controllers), "SetAxisDeadzone"));
                         continue;
                     }
+                }
+
+                if (code.opcode == OpCodes.Callvirt && code.operand == AccessTools.Method(typeof(Overload.Controller), "ResetAxisCalibration"))
+                {
+                    yield return code;
+                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Controllers_MenuManager_ControlsOptionsUpdate), "ReapplyAxisSettings"));
+                    continue;
                 }
 
                 if (code.opcode == OpCodes.Stloc_S && ((LocalBuilder)code.operand).LocalType == typeof(Overload.Controller))
