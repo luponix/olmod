@@ -49,11 +49,6 @@ namespace GameMod.VersionHandling {
             if (_fullVersionString == null) {
                 Setup();
             }
-            
-            if (GameManager.m_gm != null)
-            {
-                GameManager.m_gm.StartCoroutine(VersionRequest());
-            }
         }
 
         static IEnumerator VersionRequest() 
