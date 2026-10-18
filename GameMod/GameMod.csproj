@@ -212,6 +212,7 @@
     <Compile Include="MPProjInit.cs" />
     <Compile Include="MPPwdPaste.cs" />
     <Compile Include="MPSetup.cs" />
+    <Compile Include="MPShipPredictionAdaptive.cs" />
     <Compile Include="MPSkipClientResimulation.cs" />
     <Compile Include="MPTeams.cs" />
     <Compile Include="MPTeamsEnemyArrow.cs" />

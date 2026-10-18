@@ -399,6 +399,10 @@ namespace GameMod {
                 m_last_message_time = Time.time;
                 m_last_message_server_time = msg.m_server_timestamp;
             } // end lock
+
+            // feed the adaptive prediction tracker (no-op unless prediction
+            // mode 3 is selected; uses its own lock and stays cheap)
+            MPShipPredictionAdaptive.CaptureSnapshot(msg, version);
         }
 
         // Re-Sync the m_last_update_time
@@ -489,6 +493,15 @@ namespace GameMod {
         {
             if (HandlePlayerRespawn(player, snapshot))
             {
+                return;
+            }
+
+            // Adaptive mode: drag physics + one online model choice +
+            // continuity smoothing, fully handled by MPShipPredictionAdaptive.
+            // Modes 0-2 below remain byte-for-byte identical.
+            if (Menus.mms_lag_compensation_prediction_mode == 3)
+            {
+                MPShipPredictionAdaptive.ExtrapolatePlayerAdaptive(player, snapshot, t);
                 return;
             }
 
