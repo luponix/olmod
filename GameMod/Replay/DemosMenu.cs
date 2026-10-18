@@ -228,13 +228,15 @@ namespace GameMod.Replay
             const float rowStride = 62f;
             const float listTop = -279f;
             const float listBottom = listTop + rowStride * (ROWS_PER_PAGE - 1);
+            const float actionY = listBottom - 90f;
+            const float recordToggleY = actionY + 132f;
 
             ui.m_alpha = 1f;
             UIManager.ui_bg_dark = true;
             ui.DrawMenuBG();
             ui.DrawHeaderMedium(Vector2.up * (UIManager.UI_TOP + 30f), "DEMOS", 265f);
             ui.DrawMenuSeparator(new Vector2(0f, UIManager.UI_TOP + 55f));
-            ui.DrawMenuSeparator(new Vector2(0f, UIManager.UI_BOTTOM - 80f));
+            ui.DrawMenuSeparator(new Vector2(0f, UIManager.UI_BOTTOM - 140f));
 
             if (replays.Count == 0)
             {
@@ -307,17 +309,6 @@ namespace GameMod.Replay
                         MenuManager.m_list_items_last < replays.Count - 1, false);
                 }
 
-                if (MenuManager.m_list_item_paging)
-                    ui.DrawPageControls(new Vector2(0f, listBottom + 72f),
-                        string.Format("DEMOS {0}-{1} OF {2}",
-                            MenuManager.m_list_items_first + 1,
-                            MenuManager.m_list_items_last + 1,
-                            MenuManager.m_list_items_total_count),
-                        true, true,
-                        MenuManager.m_list_items_first > 0,
-                        MenuManager.m_list_items_last < MenuManager.m_list_items_total_count - 1);
-
-                // ---- right column: details of the selected demo plus its roster ----
                 if (selectedIndex < 0 || selectedIndex >= replays.Count)
                 {
                     ui.DrawLabelSmall(new Vector2(detailX, listTop), "SELECT A DEMO", columnHalfWidth);
@@ -346,7 +337,6 @@ namespace GameMod.Replay
                     }
                 }
 
-                float actionY = listBottom - 52f;
                 bool buttonsDisabled = selectedIndex < 0;
                 ui.SelectAndDrawItem("PLAY", new Vector2(detailX, actionY - 52f),
                     SEL_PLAY, buttonsDisabled, itemScale, itemTextSize);
@@ -358,9 +348,9 @@ namespace GameMod.Replay
             }
 
             ui.SelectAndDrawItem("RECORD MATCHES: " + (Session.RecordReplays ? "ON" : "OFF"),
-                new Vector2(listX, UIManager.UI_BOTTOM - 45f), SEL_RECORD_TOGGLE, false,
+                new Vector2(detailX, recordToggleY), SEL_RECORD_TOGGLE, false,
                 itemScale, itemTextSize);
-            ui.SelectAndDrawItem(Loc.LS("BACK"), new Vector2(detailX, UIManager.UI_BOTTOM - 45f),
+            ui.SelectAndDrawItem(Loc.LS("BACK"), new Vector2(0f, UIManager.UI_BOTTOM - 105f),
                 SEL_BACK, false, itemScale, itemTextSize);
         }
 

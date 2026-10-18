@@ -71,21 +71,11 @@ namespace GameMod.Replay
 
             pendingSeekSeconds = -1f;
             if (on)
-            {
-                FreeCursor();
                 GameplayManager.AddHUDMessage("Replay: controls shown - N to hide and fly");
-            }
             else if (Viewpoint.IsFree)
-            {
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
                 GameplayManager.AddHUDMessage("Replay: flying - N for controls");
-            }
             else
-            {
-                FreeCursor();
                 GameplayManager.AddHUDMessage("Replay: controls hidden - N to show");
-            }
         }
 
         public static void FreeCursor()
@@ -94,10 +84,14 @@ namespace GameMod.Replay
             Cursor.visible = true;
         }
 
+        public static void CaptureCursor()
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+
         public static void ReadMouseInput()
         {
-            FreeCursor();
-
             if (uConsole.IsOn())
             {
                 hovered = BarButton.None;
@@ -269,8 +263,6 @@ namespace GameMod.Replay
                 hovered == BarButton.SkipForward, false, SKIP_HALF_WIDTH / SMALL_ITEM_HALF_WIDTH, BUTTON_TEXT_SIZE);
             ui.DrawSmallItem("-", new Vector2(SPEED_DOWN_X, buttonRowY),
                 hovered == BarButton.SpeedDown, false, SPEED_STEP_HALF_WIDTH / SMALL_ITEM_HALF_WIDTH, BUTTON_TEXT_SIZE);
-            ui.DrawSmallItem("", new Vector2(SPEED_READOUT_X, buttonRowY),
-                false, false, SPEED_READOUT_HALF_WIDTH / SMALL_ITEM_HALF_WIDTH, BUTTON_TEXT_SIZE);
             ui.DrawSmallItem("+", new Vector2(SPEED_UP_X, buttonRowY),
                 hovered == BarButton.SpeedUp, false, SPEED_STEP_HALF_WIDTH / SMALL_ITEM_HALF_WIDTH, BUTTON_TEXT_SIZE);
             ui.DrawSmallItem("PREV POV", new Vector2(PREVIOUS_POV_X, buttonRowY),

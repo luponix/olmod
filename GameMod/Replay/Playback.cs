@@ -339,21 +339,18 @@ namespace GameMod.Replay
         {
             if (MenuPaused)
                 return;
-            if (Hud.InfoShown)
+            bool flying = !Hud.InfoShown && !ControlBar.Shown && Viewpoint.IsFree &&
+                          !uConsole.IsOn() && !PlayerShip.m_typing_in_chat;
+            if (flying)
             {
-                ControlBar.FreeCursor();
-            }
-            else if (ControlBar.Shown)
-            {
-                ControlBar.ReadMouseInput();
-            }
-            else if (Viewpoint.IsFree && !uConsole.IsOn() && !PlayerShip.m_typing_in_chat)
-            {
+                ControlBar.CaptureCursor();
                 Viewpoint.FlyFree();
             }
-            else if (!Viewpoint.IsFree)
+            else
             {
                 ControlBar.FreeCursor();
+                if (ControlBar.Shown && !Hud.InfoShown)
+                    ControlBar.ReadMouseInput();
             }
         }
 

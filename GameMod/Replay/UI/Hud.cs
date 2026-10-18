@@ -422,12 +422,6 @@ namespace GameMod.Replay
             else if (!shown && wasShown)
             {
                 RestoreInfoBlackout();
-
-                if (!ControlBar.Shown && Viewpoint.IsFree)
-                {
-                    Cursor.lockState = CursorLockMode.Locked;
-                    Cursor.visible = false;
-                }
             }
         }
 
