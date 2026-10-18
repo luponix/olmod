@@ -2891,7 +2891,7 @@ namespace GameMod {
     [HarmonyPatch(typeof(UIElement), "DrawGraphicsAdvancedMenu")]
     class Menus_UIElement_DrawGraphicsAdvancedMenu
     {
-        const int PAGES = 3;
+        const int PAGES = 4;
 
         static bool Prefix(UIElement __instance)
         {
@@ -2947,6 +2947,13 @@ namespace GameMod {
                     break;
                 case 2:
                     position.y += 40f;
+                    __instance.DrawSmallHeader1(position, Loc.LS("QUALITY SETTINGS"), 250f);
+                    position.y = -232.5f;
+                    __instance.DrawMenuSeparator(position - Vector2.up * 40f);
+                    GfxQualitySettings.DrawPage(__instance, ref position);
+                    break;
+                case 3:
+                    position.y += 40f;
                     __instance.DrawSmallHeader1(position, Loc.LS("PERFORMANCE"), 250f);
                     position.y = -232.5f;
                     __instance.DrawMenuSeparator(position - Vector2.up * 40f);
@@ -2969,7 +2976,7 @@ namespace GameMod {
     [HarmonyPatch(typeof(MenuManager), "GraphicsAdvancedUpdate")]
     class Menus_MenuManager_GraphicsAdvancedUpdate
     {
-        const int PAGES = 3;
+        const int PAGES = 4;
 
         private static readonly MethodInfo _GoBack = AccessTools.Method(typeof(MenuManager), "GoBack");
         private static readonly MethodInfo _PlayHighlightSound = AccessTools.Method(typeof(MenuManager), "PlayHighlightSound");
@@ -3112,6 +3119,14 @@ namespace GameMod {
                                 }
                                 break;
                             case 2:
+                                if (UIManager.m_menu_selection == 100)
+                                {
+                                    GoBack();
+                                    break;
+                                }
+                                GfxQualitySettings.HandleSelection(UIManager.m_menu_selection);
+                                break;
+                            case 3:
                                 if (UIManager.m_menu_selection == 100)
                                 {
                                     GoBack();
