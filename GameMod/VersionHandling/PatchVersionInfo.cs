@@ -23,7 +23,7 @@ namespace GameMod.VersionHandling
     {
         static string GetVersion(string stockVersion)
         {
-            return $"{stockVersion} {OlmodVersion.FullVersionString.ToUpperInvariant()}";
+            return $"{stockVersion}   {OlmodVersion.FullVersionString.ToUpperInvariant()}";
         }
 
         // append olmod version to the regular version display on the main menu
