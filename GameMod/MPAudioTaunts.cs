@@ -12,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Diagnostics;
+using System.Threading;
 using UnityEngine.Audio;
 using Debug = UnityEngine.Debug;
 
@@ -146,8 +147,6 @@ namespace GameMod
                             asc[i] = new AudioSourceContainer();
                         }
 
-                        ImportAudioTaunts(LocalAudioTauntDirectory, new List<string>(), false);
-                        ImportAudioTaunts(ExternalAudioTauntDirectory, new List<string>(), true);
                         for (int i = 0; i < 6; i++){
                             local_taunts[i] = new AudioTaunt{
                                 hash = "EMPTY",
@@ -157,10 +156,13 @@ namespace GameMod
                                 requested_taunt = false
                             };
                         }
-                        LoadLocalAudioTauntsFromPilotPrefs();
+                        // hashing + file IO run on a worker thread, clips get created a few
+                        // per frame from a GameManager.Update pump; a full 1000-file library
+                        // used to block this Awake for ~4 seconds. Pilot-pref resolution and
+                        // the sort run when the import completes.
+                        StartAsyncImport();
                     }
 
-                    taunts.Sort((x, y) => x.name.CompareTo(y.name));
                     initialized = true;
                 }
 
@@ -251,8 +253,6 @@ namespace GameMod
                         AClient.asc[i] = new AudioSourceContainer();
 
 
-                    AClient.ImportAudioTaunts(AClient.LocalAudioTauntDirectory, new List<string>(), false, true);
-                    AClient.ImportAudioTaunts(AClient.ExternalAudioTauntDirectory, new List<string>(), true, true);
                     for (int i = 0; i < 6; i++){
                         AClient.local_taunts[i] = new AudioTaunt
                         {
@@ -263,10 +263,9 @@ namespace GameMod
                             requested_taunt = false
                         };
                     }
-                    AClient.LoadLocalAudioTauntsFromPilotPrefs();
-                    taunts.Sort((x, y) => x.name.CompareTo(y.name));
-
-                    Debug.Log("Reload complete. amount of taunts: " + AClient.taunts.Count);
+                    // cancels a still-running import (generation bump) and re-imports the
+                    // now-empty list; pilot-pref resolution + sort run at completion.
+                    AClient.StartAsyncImport();
                 }
             }
 
@@ -322,6 +321,223 @@ namespace GameMod
                 long elapsedMilliseconds = stopwatch.ElapsedMilliseconds;
 
                 Debug.Log("Loading the taunts took "+ (stopwatch.ElapsedMilliseconds/1000f).ToString("0.0000")+"s");
+            }
+
+            // ==== asynchronous full-directory import ====
+            // ImportAudioTaunts above stays for the network path (a handful of just-downloaded
+            // files mid-lobby); the full-library imports on startup and audio reset go through
+            // this pipeline instead: directory scan, MD5 and File.ReadAllBytes on a worker
+            // thread, AudioClip creation (WWW, main-thread-only) a few at a time per frame from
+            // a GameManager.Update pump. A generation counter cancels a superseded import when
+            // an audio reset triggers a new one mid-run.
+
+            private class PendingTauntFile
+            {
+                public int gen;
+                public string directory;
+                public string file_name;      // on-disk name (hash-prefixed)
+                public string display_name;   // name without the hash prefix
+                public string hash;
+                public byte[] data;
+                public bool external;
+            }
+
+            private class InflightClipLoad
+            {
+                public PendingTauntFile rec;
+                public WWW www;
+            }
+
+            private const int IMPORT_MAX_INFLIGHT_CLIPS = 4;
+            private static readonly object import_lock = new object();
+            private static readonly Queue<PendingTauntFile> import_ready = new Queue<PendingTauntFile>();
+            private static volatile int import_generation = 0;
+            private static volatile bool import_scan_done = false;
+            private static readonly List<InflightClipLoad> import_inflight = new List<InflightClipLoad>();
+            private static Stopwatch import_watch;
+            private static int import_count;
+
+            public static void StartAsyncImport()
+            {
+                int gen;
+                lock (import_lock)
+                {
+                    gen = ++import_generation;
+                    import_ready.Clear();
+                    import_scan_done = false;
+                }
+                import_inflight.Clear();  // main thread only, stale entries are gen-checked anyway
+                import_count = 0;
+                import_watch = Stopwatch.StartNew();
+
+                // display names already produced -- mirrors the original import's dedup
+                // (skip a file whose on-disk name equals any existing t.name), which is also
+                // what keeps a plain "X.ogg" from being hash-renamed onto an existing
+                // "<hash>-X.ogg": the prefixed twin sorts first and claims the name
+                var known = new HashSet<string>();
+                foreach (var t in taunts)
+                    known.Add(t.name);
+
+                string localDir = LocalAudioTauntDirectory;
+                string extDir = ExternalAudioTauntDirectory;
+                var thread = new Thread(() => ScanTauntFiles(gen, localDir, extDir, known));
+                thread.IsBackground = true;
+                thread.Name = "olmod-taunt-import";
+                thread.Start();
+            }
+
+            private static void ScanTauntFiles(int gen, string localDir, string extDir, HashSet<string> known)
+            {
+                try
+                {
+                    ScanTauntDirectory(gen, localDir, false, known);
+                    ScanTauntDirectory(gen, extDir, true, known);
+                }
+                catch (Exception ex)
+                {
+                    Debug.Log("Async taunt import scan failed: " + ex);
+                }
+                finally
+                {
+                    lock (import_lock)
+                    {
+                        if (gen == import_generation)
+                            import_scan_done = true;
+                    }
+                }
+            }
+
+            private static void ScanTauntDirectory(int gen, string directory, bool external, HashSet<string> known)
+            {
+                foreach (FileInfo file in new DirectoryInfo(directory).GetFiles())
+                {
+                    if (gen != import_generation)
+                        return;
+                    if (!file.Extension.Equals(".ogg") || file.Length > AUDIO_TAUNT_SIZE_LIMIT || known.Contains(file.Name))
+                        continue;
+
+                    try
+                    {
+                        string hash = CalculateMD5ForFile(Path.Combine(directory, file.Name));
+                        string diskName = file.Name;
+                        string displayName;
+                        if (diskName.StartsWith(hash))
+                        {
+                            displayName = diskName.Remove(0, hash.Length + 1);
+                        }
+                        else
+                        {
+                            displayName = diskName;
+                            diskName = hash + "-" + file.Name;
+                            File.Move(Path.Combine(directory, file.Name), Path.Combine(directory, diskName));
+                        }
+                        byte[] data = File.ReadAllBytes(Path.Combine(directory, diskName));
+                        known.Add(displayName);
+
+                        lock (import_lock)
+                        {
+                            if (gen != import_generation)
+                                return;
+                            import_ready.Enqueue(new PendingTauntFile
+                            {
+                                gen = gen,
+                                directory = directory,
+                                file_name = diskName,
+                                display_name = displayName,
+                                hash = hash,
+                                data = data,
+                                external = external
+                            });
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // one unreadable/unmovable file must not abort the rest of the library
+                        Debug.Log("Async taunt import: skipping " + file.Name + ": " + ex.Message);
+                    }
+                }
+            }
+
+            // runs every frame on the main thread (GameManager.Update postfix)
+            public static void PumpAsyncImport()
+            {
+                if (import_watch == null)
+                    return;
+
+                while (import_inflight.Count < IMPORT_MAX_INFLIGHT_CLIPS)
+                {
+                    PendingTauntFile rec = null;
+                    lock (import_lock)
+                    {
+                        if (import_ready.Count > 0)
+                            rec = import_ready.Dequeue();
+                    }
+                    if (rec == null)
+                        break;
+                    if (rec.gen != import_generation)
+                        continue;
+                    import_inflight.Add(new InflightClipLoad
+                    {
+                        rec = rec,
+                        www = new WWW("file:///" + Path.Combine(rec.directory, rec.file_name))
+                    });
+                }
+
+                for (int i = import_inflight.Count - 1; i >= 0; i--)
+                {
+                    InflightClipLoad load = import_inflight[i];
+                    if (!load.www.isDone)
+                        continue;
+                    import_inflight.RemoveAt(i);
+                    if (load.rec.gen != import_generation)
+                        continue;
+                    if (!string.IsNullOrEmpty(load.www.error))
+                    {
+                        Debug.Log("Error loading audiotaunt clip: " + load.www.error + " : " + load.rec.file_name);
+                        continue;
+                    }
+                    // true duplicate only (a network import may have raced us); display names
+                    // alone collide legitimately -- every external "<hash>.ogg" strips to "ogg"
+                    if (taunts.Find(t => t.hash.Equals(load.rec.hash) && t.name.Equals(load.rec.display_name)) != null)
+                        continue;
+                    taunts.Add(new AudioTaunt
+                    {
+                        hash = load.rec.hash,
+                        name = load.rec.display_name,
+                        audio_taunt_data = load.rec.data,
+                        is_data_complete = true,
+                        timestamp = Time.frameCount,
+                        is_external_taunt = load.rec.external,
+                        audioclip = load.www.GetAudioClip(true, false),
+                        ready_to_play = true,
+                        requested_taunt = false
+                    });
+                    import_count++;
+                }
+
+                bool done;
+                lock (import_lock)
+                {
+                    done = import_scan_done && import_ready.Count == 0;
+                }
+                if (done && import_inflight.Count == 0)
+                {
+                    import_watch.Stop();
+                    Debug.Log(string.Format("Imported {0} audiotaunts asynchronously over {1:F2}s, total: {2}",
+                        import_count, import_watch.ElapsedMilliseconds / 1000f, taunts.Count));
+                    import_watch = null;
+                    LoadLocalAudioTauntsFromPilotPrefs();
+                    taunts.Sort((x, y) => x.name.CompareTo(y.name));
+                }
+            }
+
+            [HarmonyPatch(typeof(GameManager), "Update")]
+            class MPAudioTaunts_AsyncImport_GameManager_Update
+            {
+                static void Postfix()
+                {
+                    PumpAsyncImport();
+                }
             }
 
             // finds the next client audiotaunt in the taunts list.
