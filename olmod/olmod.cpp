@@ -580,6 +580,10 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPWSTR lpCmdLi
 }
 
 // From LIBCTINY - Matt Pietrek 2001, MSDN Magazine, January 2001, CRT0TWIN.CPP
+// Only for the MSVC build, which links with IgnoreAllDefaultLibraries and so
+// has no CRT startup of its own. mingw-w64 (-municode) brings its own
+// wWinMainCRTStartup that calls wWinMain for us.
+#ifdef _MSC_VER
 int WINAPI wWinMainCRTStartup(void)
 {
 	STARTUPINFO StartupInfo = { sizeof(STARTUPINFO),0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
@@ -619,3 +623,4 @@ int WINAPI wWinMainCRTStartup(void)
 
 	ExitProcess(mainret);
 }
+#endif
