@@ -43,7 +43,7 @@ namespace GameMod
 
         private static readonly bool[] m_unusable = new bool[Tracks.Length];
 
-        public static PlayMode Mode { get; private set; } = PlayMode.Default;
+        public static PlayMode Mode { get; private set; } = PlayMode.Shuffle;
 
         public static bool Enabled
         {
