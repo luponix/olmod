@@ -1671,17 +1671,25 @@ namespace GameMod {
     [HarmonyPatch(typeof(UIElement), "DrawSoundMenu")]
     class Menus_UIElement_DrawSoundMenu
     {
+        private const float ITEM_SPACING = 56f;
+
+        private static void DrawMenuMusicOption(UIElement uie, ref Vector2 position)
+        {
+            position.y += ITEM_SPACING;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("MENU MUSIC"), position, 10, MenuMusic.ModeName(), MenuMusic.Tooltip());
+        }
+
         private static void DrawAdditionalSoundOptions(UIElement uie, ref Vector2 position)
         {
-            position.y += 60f;
+            position.y += ITEM_SPACING;
             uie.SelectAndDrawSliderItem("AUDIO TAUNT VOLUME", position, 5, MPAudioTaunts.AClient.audio_taunt_volume / 100f);
-            position.y += 60f;
+            position.y += ITEM_SPACING;
             uie.SelectAndDrawStringOptionItem(Loc.LS("AUDIO OCCLUSION STRENGTH"), position, 6, Menus.GetMMSAudioOcclusionStrength(), Loc.LS("SOUND EFFECTS OUT OF LINE-OF-SIGHT WILL BE FILTERED DEPENDING ON DISTANCE"));
-            position.y += 58f;
+            position.y += ITEM_SPACING;
             uie.SelectAndDrawStringOptionItem(Loc.LS("DIRECTIONAL HOMING WARNINGS"), position, 7, Menus.GetMMSDirectionalWarnings(), Loc.LS("PLAYS HOMING WARNINGS FROM THE DIRECTION OF THE INCOMING PROJECTILE"));
-            position.y += 58f;
+            position.y += ITEM_SPACING;
             uie.SelectAndDrawStringOptionItem(Loc.LS("DISTINCT MULTIPLAYER KILL SOUNDS"), position, 8, (Menus.mms_distinct_kill_sound ? "ON" : "OFF"), Loc.LS("PLAY A DISTINCT SOUND EFFECT FOR YOUR OWN KILLS IN MULTIPLAYER"));
-            position.y += 60f;
+            position.y += ITEM_SPACING;
             uie.SelectAndDrawItem("REINITIALIZE AUDIO DEVICE", position, 9, false);
         }
 
@@ -1689,16 +1697,30 @@ namespace GameMod {
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
         {
             int state = 0;
+            int music_state = 0;
             foreach (var code in codes)
             {
                 if (code.opcode == OpCodes.Ldc_R4 && (float)code.operand == 62f)
                 {
-                    code.operand = 60f; // adjusts the menu spacing to be slightly tighter
+                    code.operand = ITEM_SPACING; // adjusts the menu spacing to be slightly tighter
                 }
                 if (code.opcode == OpCodes.Ldc_R4 && (float)code.operand == 93f)
                 {
-                    code.operand = 230f; // offsets the menu up a bit for the extra options
+                    code.operand = 250f; // offsets the menu up a bit for the extra options
                 }
+                if (code.opcode == OpCodes.Ldstr && (string)code.operand == "MUSIC VOLUME")
+                    music_state = 1;
+
+                if (music_state == 1 && code.opcode == OpCodes.Call && code.operand == AccessTools.Method(typeof(UIElement), "SelectAndDrawSliderItem"))
+                {
+                    music_state = 2;
+                    yield return code;
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Ldloca_S, 0);
+                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Menus_UIElement_DrawSoundMenu), "DrawMenuMusicOption"));
+                    continue;
+                }
+
                 if (code.opcode == OpCodes.Ldstr && (string)code.operand == "SPEAKER MODE")
                     state = 1;
 
@@ -1751,6 +1773,10 @@ namespace GameMod {
                     GameManager.m_audio.MusicVolume = MenuManager.opt_volume_music;
                     GameManager.m_audio.VoiceVolume = MenuManager.opt_volume_voice;
                     GameManager.m_audio.AmbientVolume = MenuManager.opt_volume_ambient;
+                    MenuManager.PlaySelectSound(1f);
+                    break;
+                case 10:
+                    MenuMusic.CycleMode(UIManager.m_select_dir);
                     MenuManager.PlaySelectSound(1f);
                     break;
             }

@@ -272,6 +272,7 @@ namespace GameMod {
                 Menus.mms_show_framerate = ModPrefs.GetBool("MP_PM_SHOWFRAMERATE", Menus.mms_show_framerate);
                 MPScoreboards.ShowScores = ModPrefs.GetBool("MP_PM_SHOW_SCORES", MPScoreboards.ShowScores);
                 Menus.mms_audio_occlusion_strength = ModPrefs.GetInt("MP_PM_AUDIO_OCCLUSION_STRENGTH", Menus.mms_audio_occlusion_strength);
+                MenuMusic.SetModeFromPrefs(ModPrefs.GetInt("MENU_MUSIC_MODE", (int)MenuMusic.Mode));
                 Menus.mms_directional_warnings = ModPrefs.GetBool("MP_PM_DIRECTIONAL_WARNINGS", Menus.mms_directional_warnings);
                 Menus.mms_loadout_hotkeys = ModPrefs.GetInt("MP_PM_LOADOUT_HOTKEYS2", Menus.mms_loadout_hotkeys);
                 Menus.mms_creeper_colors = ModPrefs.GetBool("MP_CREEPER_COLORS", Menus.mms_creeper_colors);
@@ -378,6 +379,7 @@ namespace GameMod {
             ModPrefs.SetBool("MP_PM_SHOWFRAMERATE", Menus.mms_show_framerate);
             ModPrefs.SetBool("MP_PM_SHOW_SCORES", MPScoreboards.ShowScores);
             ModPrefs.SetInt("MP_PM_AUDIO_OCCLUSION_STRENGTH", Menus.mms_audio_occlusion_strength);
+            ModPrefs.SetInt("MENU_MUSIC_MODE", (int)MenuMusic.Mode);
             ModPrefs.SetBool("MP_PM_DIRECTIONAL_WARNINGS", Menus.mms_directional_warnings);
             ModPrefs.SetInt("MP_PM_LOADOUT_HOTKEYS2", Menus.mms_loadout_hotkeys);
             ModPrefs.SetInt("MP_PM_LOADOUT_BOMBER1_W1", (int)MPLoadouts.Loadouts[0].weapons[0]);
