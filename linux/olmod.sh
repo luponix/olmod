@@ -17,7 +17,6 @@ do
 			;;
 	esac
 done
-olargs=${args[@]}
 
 if [[ -z "$OSTYPE" || "$OSTYPE" != "darwin"* ]];
 then
@@ -28,7 +27,7 @@ then
 		if [[ -f "${overload}" ]];
 		then
 			cd "${olmoddir}"
-			OLMODDIR="${olmoddir}" LD_PRELOAD="${LD_PRELOAD:+$LD_PRELOAD:}./olmod.so" "${overload}" ${olargs}
+			OLMODDIR="${olmoddir}" LD_PRELOAD="${LD_PRELOAD:+$LD_PRELOAD:}./olmod.so" "${overload}" "${args[@]}"
 		else
 			echo "Error: Overload.x86_64 not found." >&2
 			echo "Looked in ${gamedir}" >&2
@@ -49,7 +48,7 @@ else
 		if [[ -f "${overload}" ]];
 		then
 			cd "${olmoddir}"
-			OLMODDIR="${olmoddir}" DYLD_INSERT_LIBRARIES="${DYLD_INSERT_LIBRARIES:+$DYLD_INSERT_LIBRARIES:}./olmod.dylib" "${overload}" ${olargs}
+			OLMODDIR="${olmoddir}" DYLD_INSERT_LIBRARIES="${DYLD_INSERT_LIBRARIES:+$DYLD_INSERT_LIBRARIES:}./olmod.dylib" "${overload}" "${args[@]}"
 		else
 			echo "Error: Overload.app not found." >&2
 			echo "Looked in ${gamedir}" >&2
