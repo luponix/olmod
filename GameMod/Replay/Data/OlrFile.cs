@@ -515,13 +515,20 @@ namespace GameMod.Replay
 
         private static void AddGameDirectoryReplays(List<string> paths)
         {
-            string gameDirectory = GameDirectory;
-            if (string.IsNullOrEmpty(gameDirectory))
-                return;
             var alreadyListed = new HashSet<string>();
             foreach (var path in paths)
                 alreadyListed.Add(Path.GetFileName(path).ToLowerInvariant());
-            foreach (var directory in new[] { gameDirectory, Path.Combine(gameDirectory, "Replays") })
+            // Config.OLModDir differs from the game dir when olmod runs from a
+            // subfolder of the install, where a shipped demo lands next to olmod.exe
+            var directories = new List<string>();
+            foreach (var root in new[] { GameDirectory, Config.OLModDir })
+            {
+                if (string.IsNullOrEmpty(root))
+                    continue;
+                directories.Add(root);
+                directories.Add(Path.Combine(root, "Replays"));
+            }
+            foreach (var directory in directories)
             {
                 try
                 {
