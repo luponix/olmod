@@ -372,47 +372,6 @@ namespace GameMod
                 m_tooltip += " (NOW PLAYING: " + m_current_label + ")";
         }
 
-        public static void CmdMenuMusic()
-        {
-            if (uConsole.GetNumParameters() > 0)
-            {
-                switch (uConsole.GetString().ToLowerInvariant())
-                {
-                    case "off":
-                    case "default":
-                        SetMode(PlayMode.Default);
-                        break;
-                    case "shuffle":
-                        SetMode(Mode == PlayMode.InOrderAll || Mode == PlayMode.ShuffleAll ? PlayMode.ShuffleAll : PlayMode.Shuffle);
-                        break;
-                    case "order":
-                        SetMode(Mode == PlayMode.InOrderAll || Mode == PlayMode.ShuffleAll ? PlayMode.InOrderAll : PlayMode.InOrder);
-                        break;
-                    case "levels":
-                        switch (Mode)
-                        {
-                            case PlayMode.Shuffle: SetMode(PlayMode.ShuffleAll); break;
-                            case PlayMode.InOrder: SetMode(PlayMode.InOrderAll); break;
-                            case PlayMode.ShuffleAll: SetMode(PlayMode.Shuffle); break;
-                            case PlayMode.InOrderAll: SetMode(PlayMode.InOrder); break;
-                            default: uConsole.Log("pick shuffle or order first"); return;
-                        }
-                        break;
-                    case "next":
-                    case "skip":
-                        Skip();
-                        break;
-                    case "list":
-                        for (int i = 0; i < Tracks.Length; i++)
-                            uConsole.Log(Tracks[i] + (m_unusable[i] ? " (unusable)" : (i == m_current && m_active ? " (playing)" : "")));
-                        return;
-                    default:
-                        uConsole.Log("usage: menu_music [default|shuffle|order|levels|next|list]");
-                        return;
-                }
-            }
-            uConsole.Log("menu music: " + ModeName() + (m_active ? ", playing " + Tracks[m_current] : ""));
-        }
     }
 
     [HarmonyPatch(typeof(UnityAudio), "PlayMusic")]
