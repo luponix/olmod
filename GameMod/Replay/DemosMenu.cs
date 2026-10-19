@@ -357,10 +357,14 @@ namespace GameMod.Replay
     {
         internal static bool TranspilerApplied;
 
+        // 9 rows at 54 px span what the stock 8 rows at 62 px did, so the
+        // separators and the discord/music rows keep their vanilla positions.
+        private const float ROW_SPACING = 54f;
+
         public static void DrawDemosMainMenuRow(UIElement ui, ref Vector2 pos)
         {
             ui.SelectAndDrawItem("DEMOS", pos, DemosMenu.SEL_DEMOS_MAIN_MENU, false);
-            pos.y += 62f;
+            pos.y += ROW_SPACING;
         }
 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -416,7 +420,9 @@ namespace GameMod.Replay
                 return instructions;
             }
 
-            codes[seedIndex].operand = -186f; // start the stack half a row higher to fit the DEMOS row
+            foreach (var code in codes)
+                if (code.opcode == OpCodes.Ldc_R4 && code.operand is float && (float)code.operand == 62f)
+                    code.operand = ROW_SPACING;
             codes.InsertRange(storeIndex + 1, new[]
             {
                 new CodeInstruction(OpCodes.Ldarg_0),
