@@ -254,6 +254,7 @@
     <Compile Include="Replay\DemosMenu.cs" />
     <Compile Include="Replay\Playback.cs" />
     <Compile Include="Replay\Recorder.cs" />
+    <Compile Include="Replay\Scene\DamageFlash.cs" />
     <Compile Include="Replay\Scene\Ships.cs" />
     <Compile Include="Replay\Scene\Shots.cs" />
     <Compile Include="Replay\Scene\Viewpoint.cs" />

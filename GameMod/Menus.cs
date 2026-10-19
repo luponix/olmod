@@ -1061,29 +1061,6 @@ namespace GameMod {
                 ? Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.2f * UIElement.FLICKER))
                 : UIManager.m_col_ui2;
             UIManager.DrawQuadUIInner(thumb_center, 5f, thumb_height * 0.5f, thumb_color, uie.m_alpha, 11, 0.75f);
-
-            const float arrow_arm_length = 5f;
-            if (Menus.mms_mp_general_scroll_offset > 0)
-            {
-                Vector2 up_arrow_center = new Vector2(scrollbar_center_x, track_top_y - 18f);
-                uie.TestMouseInRect(up_arrow_center, 14f, 12f, 1900, true);
-                Color up_arrow_color = UIManager.m_menu_selection == 1900
-                    ? Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.5f * UIElement.FLICKER))
-                    : UIManager.m_col_ui2;
-                UIManager.DrawQuadCenterLine(new Vector2(up_arrow_center.x - arrow_arm_length, up_arrow_center.y + arrow_arm_length * 0.5f), new Vector2(up_arrow_center.x, up_arrow_center.y - arrow_arm_length * 0.5f), 1.5f, 1f, up_arrow_color, 13);
-                UIManager.DrawQuadCenterLine(new Vector2(up_arrow_center.x, up_arrow_center.y - arrow_arm_length * 0.5f), new Vector2(up_arrow_center.x + arrow_arm_length, up_arrow_center.y + arrow_arm_length * 0.5f), 1.5f, 1f, up_arrow_color, 13);
-            }
-
-            if (Menus.mms_mp_general_scroll_offset < max_scroll_offset)
-            {
-                Vector2 down_arrow_center = new Vector2(scrollbar_center_x, track_bottom_y + 18f);
-                uie.TestMouseInRect(down_arrow_center, 14f, 12f, 1901, true);
-                Color down_arrow_color = UIManager.m_menu_selection == 1901
-                    ? Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.5f * UIElement.FLICKER))
-                    : UIManager.m_col_ui2;
-                UIManager.DrawQuadCenterLine(new Vector2(down_arrow_center.x - arrow_arm_length, down_arrow_center.y - arrow_arm_length * 0.5f), new Vector2(down_arrow_center.x, down_arrow_center.y + arrow_arm_length * 0.5f), 1.5f, 1f, down_arrow_color, 13);
-                UIManager.DrawQuadCenterLine(new Vector2(down_arrow_center.x, down_arrow_center.y + arrow_arm_length * 0.5f), new Vector2(down_arrow_center.x + arrow_arm_length, down_arrow_center.y - arrow_arm_length * 0.5f), 1.5f, 1f, down_arrow_color, 13);
-            }
         }
 
         public static void DrawTabs(UIElement uie, Vector2 pos, int tab_selected)
@@ -1299,15 +1276,6 @@ namespace GameMod {
                                         break;
                                     case 11:
                                         MPSpawnHealth.CycleMenuOption();
-                                        break;
-                                    // scrollbar arrows
-                                    case 1900:
-                                        Menus.mms_mp_general_scroll_offset--;
-                                        MenuManager.PlayCycleSound(1f, -1f);
-                                        break;
-                                    case 1901:
-                                        Menus.mms_mp_general_scroll_offset++;
-                                        MenuManager.PlayCycleSound(1f, 1f);
                                         break;
                                 }
                                 break;

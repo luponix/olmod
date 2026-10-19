@@ -19,9 +19,6 @@ namespace GameMod.Replay
         private const int SEL_PLAY = 120;
         private const int SEL_DELETE = 130;
         private const int SEL_BENCHMARK = 160;
-
-        private const int SEL_SCROLL_UP = 140;
-        private const int SEL_SCROLL_DOWN = 150;
         private const int SEL_LIST_BASE = 1000;
         private const int ROWS_PER_PAGE = 8;
 
@@ -99,23 +96,12 @@ namespace GameMod.Replay
                                 MenuManager.PlaySelectSound(1f);
                                 timer = 0f;
                                 UIManager.DestroyAll(false);
-                                Benchmark.Start(replays[selectedIndex].path, 0,
-                                    120f); // cap a button-started benchmark at two minutes
+                                Benchmark.Start(replays[selectedIndex].path, 0, 45f);
                             }
                         }
                         else if (selection == SEL_DELETE)
                         {
                             DoDelete();
-                        }
-                        else if (selection == SEL_SCROLL_UP)
-                        {
-                            ScrollListTo(MenuManager.m_list_items_first - 1);
-                            MenuManager.PlayCycleSound(1f, -1f);
-                        }
-                        else if (selection == SEL_SCROLL_DOWN)
-                        {
-                            ScrollListTo(MenuManager.m_list_items_first + 1);
-                            MenuManager.PlayCycleSound(1f, 1f);
                         }
                         else if (selection >= SEL_LIST_BASE && selection < SEL_LIST_BASE + replays.Count)
                         {
@@ -302,11 +288,6 @@ namespace GameMod.Replay
                         : UIManager.m_col_ui2;
                     UIManager.DrawQuadUIInner(thumbCenter, 5f, thumbHeight * 0.5f, thumbColor,
                         ui.m_alpha, 11, 0.75f);
-
-                    DrawScrollArrow(ui, new Vector2(barX, trackTop - 18f), SEL_SCROLL_UP,
-                        MenuManager.m_list_items_first > 0, true);
-                    DrawScrollArrow(ui, new Vector2(barX, trackBottom + 18f), SEL_SCROLL_DOWN,
-                        MenuManager.m_list_items_last < replays.Count - 1, false);
                 }
 
                 if (selectedIndex < 0 || selectedIndex >= replays.Count)
@@ -352,33 +333,6 @@ namespace GameMod.Replay
                 itemScale, itemTextSize);
             ui.SelectAndDrawItem(Loc.LS("BACK"), new Vector2(0f, UIManager.UI_BOTTOM - 105f),
                 SEL_BACK, false, itemScale, itemTextSize);
-        }
-
-        private static void DrawScrollArrow(UIElement ui, Vector2 center, int selection,
-            bool enabled, bool up)
-        {
-            if (!enabled)
-                return;
-
-            const float arm = 5f;
-            const float boxHalf = 11f;
-            ui.TestMouseInRect(center, boxHalf, boxHalf, selection, false);
-            Color color = UIManager.m_menu_selection == selection
-                ? Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6,
-                    UnityEngine.Random.Range(0f, 0.5f * UIElement.FLICKER))
-                : UIManager.m_col_ui2;
-            float tipY = center.y + (up ? -arm * 0.5f : arm * 0.5f);
-            float baseY = center.y + (up ? arm * 0.5f : -arm * 0.5f);
-            UIManager.DrawQuadCenterLine(new Vector2(center.x - arm, baseY),
-                new Vector2(center.x, tipY), 1.5f, 1f, color, 13);
-            UIManager.DrawQuadCenterLine(new Vector2(center.x, tipY),
-                new Vector2(center.x + arm, baseY), 1.5f, 1f, color, 13);
-            Color boxColor = UIManager.m_col_ui2;
-            boxColor.a = ui.m_alpha;
-            UIManager.DrawBoxOutline(
-                new Vector2(center.x - boxHalf, center.y - boxHalf),
-                new Vector2(center.x + boxHalf, center.y + boxHalf),
-                boxColor, 1.2f, 13);
         }
 
         private static void DrawDetailLine(UIElement ui, ref Vector2 pos, string label, string value)

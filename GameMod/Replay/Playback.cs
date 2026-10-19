@@ -134,6 +134,7 @@ namespace GameMod.Replay
             Hud.Init(Replay);
             World.Begin(Replay);
             Shots.Begin();
+            DamageFlash.Begin(Replay);
 
             baselineTeam = new int[Replay.players.Count];
             baselineColor = new Color[Replay.players.Count];
@@ -169,6 +170,7 @@ namespace GameMod.Replay
             World.End();
             Ships.Destroy();
             Shots.End();
+            DamageFlash.End();
             Hud.Clear();
             Benchmark.OnPlaybackStopped();
             baselineTeam = null;

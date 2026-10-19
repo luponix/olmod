@@ -306,6 +306,8 @@ namespace GameMod.Replay
             SetCloaked(rosterIndex, showMesh && alive && state.IsCloaked);
 
             var renderState = present ? renderStates[rosterIndex] : null;
+            DamageFlash.Apply(rosterIndex, renderState != null ? renderState.renderers : null,
+                              showMesh, Playback.Clock);
             if (renderState != null && renderState.weaponMounts != null &&
                 renderState.shownWeapon != state.weapon)
             {
