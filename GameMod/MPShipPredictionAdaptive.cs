@@ -62,13 +62,16 @@ namespace GameMod {
         // The whole tuning surface (plain mutable statics so the offline
         // evaluator's twin can sweep them; the game never writes them). The
         // field names match the evaluator twin's --set names -- keep them.
+        // The defaults are the corpus-tuned smoothest point (0.04 / 4 / 45 --
+        // corpus @100 ms: 0.112 m mean error, 10.7 m/s jitter p99), which is
+        // still well ahead of the legacy VELOCITY mode on error.
         public static class LeanParams {
             public static float LeanDrag = 2.5f;         // 1/s; PlayerShip rigidbody linear drag (verified engine value)
-            public static float LeanThrustMax = 60f;     // m/s^2; clamp on the reconstructed control input. Uncapped costs +18% jitter p99.
+            public static float LeanThrustMax = 45f;     // m/s^2; clamp on the reconstructed control input. Uncapped costs +18% jitter p99; 45 trims the tail further.
             public static float LeanAccTau = 0.01f;      // s; EWMA tau of the acceleration estimate. Inert on the clean corpus; kept as the one filter against live-stream jitter.
             public static float LeanResidTau = 2f;       // s; EWMA tau of the two model error averages (response is flat from 0.5 to 8)
-            public static float LeanSmoothTau = 0.02f;   // s; continuity correction rate. THE error/jitter dial: 0.01 -> 0.071 mean / 16.8 jitter p99, 0.04 -> 0.083 / 15.2 (corpus @100 ms).
-            public static float LeanMaxCorrVel = 12f;    // m/s; ceiling on the continuity correction speed -- bounds visible warp
+            public static float LeanSmoothTau = 0.04f;   // s; continuity correction rate. THE error/jitter dial: 0.003 -> 0.079 m mean / 23 m/s jitter p99, 0.015 -> 0.086 / 16, 0.04 -> 0.112 / 11 (corpus @100 ms).
+            public static float LeanMaxCorrVel = 4f;     // m/s; ceiling on the continuity correction speed -- bounds visible warp, and past ~0.04 SmoothTau it is what sets the jitter floor
         }
 
         // Not tunables: "is this still the same flight" guards and ring sizing.
