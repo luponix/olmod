@@ -67,6 +67,7 @@ namespace GameMod.Replay
                         float wheel = Input.GetAxis("Mouse ScrollWheel");
                         if (wheel != 0f)
                             ScrollListTo(MenuManager.m_list_items_first + (wheel < 0f ? 1 : -1));
+                        ScrollListWithSelection();
 
                         if (!UIManager.PushedSelect(SEL_BACK))
                             break;
@@ -203,6 +204,39 @@ namespace GameMod.Replay
             first = Mathf.Clamp(first, 0, Math.Max(0, replays.Count - perPage));
             MenuManager.m_list_items_first = first;
             MenuManager.m_list_items_last = Math.Min(first + perPage - 1, replays.Count - 1);
+        }
+
+        private static int previousSelection = -1;
+
+        // Scrolls the list when UP/DOWN is pressed on the edge row of the
+        // visible window, so the keyboard can reach the off-screen demos.
+        private static void ScrollListWithSelection()
+        {
+            int row = previousSelection - SEL_LIST_BASE;
+            if (row >= 0 && row < replays.Count && Controls.JustPressedMenuDirection())
+            {
+                float menuDirY = Controls.MenuDirection().y;
+                if (menuDirY > 0.45f && row == MenuManager.m_list_items_last && row + 1 < replays.Count)
+                {
+                    ScrollListTo(MenuManager.m_list_items_first + 1);
+                    SelectRow(SEL_LIST_BASE + row + 1);
+                }
+                else if (menuDirY < -0.45f && row == MenuManager.m_list_items_first && row > 0)
+                {
+                    ScrollListTo(MenuManager.m_list_items_first - 1);
+                    SelectRow(SEL_LIST_BASE + row - 1);
+                }
+            }
+            previousSelection = UIManager.m_menu_selection;
+        }
+
+        private static void SelectRow(int selection)
+        {
+            bool engineAlreadyMoved = UIManager.m_menu_selection != previousSelection;
+            UIManager.m_menu_selection = selection;
+            UIManager.m_sl_prev_valid = false;
+            if (!engineAlreadyMoved)
+                MenuManager.PlayMoveSound();
         }
 
         private static bool scrollbarDragging;

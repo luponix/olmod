@@ -823,7 +823,7 @@ namespace GameMod {
         private static readonly List<Action> mp_general_tab_rows = new List<Action> {
             () => mp_general_tab_uie.SelectAndDrawStringOptionItem(Loc.LS("TEXT CHAT"), mp_general_tab_row_position, 0, MenuManager.GetMPTextChat(), string.Empty, 1.5f, false),
             () => mp_general_tab_uie.SelectAndDrawStringOptionItem(Loc.LS("AUTO-RESPAWN TIMER"), mp_general_tab_row_position, 2, MenuManager.GetToggleSetting(MenuManager.opt_mp_auto_respawn), string.Empty, 1.5f, false),
-            () => mp_general_tab_uie.SelectAndDrawStringOptionItem(Loc.LS("SPAWN HEALTH"), mp_general_tab_row_position, 11, Menus.mms_spawn_health + "%", Loc.LS("SELF-HANDICAP: SPAWN WITH REDUCED HEALTH, VISIBLE ON THE SCOREBOARD")),
+            () => mp_general_tab_uie.SelectAndDrawStringOptionItem(Loc.LS("SPAWN HEALTH"), mp_general_tab_row_position, 11, Menus.mms_spawn_health + "%", Loc.LS("SELF-HANDICAP: SPAWN WITH REDUCED HEALTH")),
             () => mp_general_tab_uie.SelectAndDrawStringOptionItem(Loc.LS("STICKY DEATH SUMMARY"), mp_general_tab_row_position, 3, Menus.mms_sticky_death_summary ? "YES" : "NO", "KEEP DEATH SUMMARY ON THE SCREEN AFTER LETTING GO OF THE TOGGLE"),
             () => mp_general_tab_uie.SelectAndDrawSliderItem(Loc.LS("DAMAGE BLUR INTENSITY"), mp_general_tab_row_position, 4, ((float)Menus.mms_damageeffect_drunk_blur_mult) / 100f),
             () => mp_general_tab_uie.SelectAndDrawSliderItem(Loc.LS("DAMAGE COLOR INTENSITY"), mp_general_tab_row_position, 5, ((float)Menus.mms_damageeffect_alpha_mult) / 100f),
@@ -834,6 +834,8 @@ namespace GameMod {
             () => mp_general_tab_uie.SelectAndDrawStringOptionItem(Loc.LS("SUPER SPAWN COUNTDOWN"), mp_general_tab_row_position, 10, Menus.mms_super_countdown ? "ON" : "OFF", Loc.LS("FLASH A COUNTDOWN TO THE NEXT SUPER WHEN THE SUPER SIREN SOUNDS")),
             () => mp_general_tab_uie.SelectAndDrawItem(Loc.LS("QUICK CHAT"), mp_general_tab_row_position, 1, false, 1f, 0.75f),
         };
+        // selection ids of mp_general_tab_rows, same order -- keep in step
+        internal static readonly int[] mp_general_tab_row_ids = { 0, 2, 11, 3, 4, 5, 6, 7, 8, 9, 10, 1 };
 
         static bool Prefix(UIElement __instance)
         {
@@ -1172,6 +1174,41 @@ namespace GameMod {
     {
         private static MethodInfo _MenuManager_GoBack_Method = AccessTools.Method(typeof(MenuManager), "GoBack");
         private static MethodInfo _MenuManager_PlayHighlightSound_Method = AccessTools.Method(typeof(MenuManager), "PlayHighlightSound");
+
+        private static int previous_selection = -1;
+
+        // Scrolls the general tab when UP/DOWN is pressed on the edge row of the
+        // visible window, so the keyboard can reach the off-screen rows.
+        private static void ScrollGeneralTabWithSelection()
+        {
+            int[] row_ids = Menus_UIElement_DrawMpOptions.mp_general_tab_row_ids;
+            int selected_row = Array.IndexOf(row_ids, previous_selection);
+            if (selected_row >= 0 && Controls.JustPressedMenuDirection())
+            {
+                float menu_dir_y = Controls.MenuDirection().y;
+                int visible_rows = Math.Min(Menus.SCROLL_ELEMENT_PAGE_VISIBLE_ROWS, row_ids.Length);
+                if (menu_dir_y > 0.45f && selected_row == Menus.mms_mp_general_scroll_offset + visible_rows - 1 && selected_row + 1 < row_ids.Length)
+                {
+                    Menus.mms_mp_general_scroll_offset++;
+                    SelectRow(row_ids[selected_row + 1]);
+                }
+                else if (menu_dir_y < -0.45f && selected_row == Menus.mms_mp_general_scroll_offset && Menus.mms_mp_general_scroll_offset > 0)
+                {
+                    Menus.mms_mp_general_scroll_offset--;
+                    SelectRow(row_ids[selected_row - 1]);
+                }
+            }
+            previous_selection = UIManager.m_menu_selection;
+        }
+
+        private static void SelectRow(int selection)
+        {
+            bool engine_already_moved = UIManager.m_menu_selection != previous_selection;
+            UIManager.m_menu_selection = selection;
+            UIManager.m_sl_prev_valid = false;
+            if (!engine_already_moved)
+                MenuManager.PlayMoveSound();
+        }
 
 
         static bool Prefix(ref float ___m_menu_state_timer)
@@ -1568,6 +1605,7 @@ namespace GameMod {
                         float scroll_wheel_delta = Input.GetAxis("Mouse ScrollWheel");
                         if (scroll_wheel_delta != 0f)
                             Menus.mms_mp_general_scroll_offset = Math.Max(0, Menus.mms_mp_general_scroll_offset + (scroll_wheel_delta < 0f ? 1 : -1));
+                        ScrollGeneralTabWithSelection();
                     }
                 }
                 else if (menu_sub_state == MenuSubState.GET_INPUT)
@@ -2954,6 +2992,7 @@ namespace GameMod {
                     GpuPerf.DrawPage(__instance, ref position);
                     break;
             }
+            position.y = -232.5f + 7f * 62f; // bottom row of the full pages, so the separator and page controls sit at the same height on every page
             __instance.DrawMenuSeparator(position + Vector2.up * 40f);
             __instance.DrawMenuToolTip(position + Vector2.up * 40f);
             __instance.DrawPageControls(position + Vector2.up * 85f,

@@ -52,11 +52,11 @@ namespace GameMod
 
         public static void DrawPage(UIElement uie, ref Vector2 position)
         {
-            uie.SelectAndDrawStringOptionItem(Loc.LS("SKIP IDLE FX PASSES"), position, 0, MenuManager.GetToggleSetting(idleFxVal), Loc.LS("SKIPS HELPER/FLARE CAMERAS, IDLE BLUR/HIGHLIGHT PASSES AND MOUSE RAYCASTS; NO VISUAL CHANGE"));
+            uie.SelectAndDrawStringOptionItem(Loc.LS("SKIP IDLE FX PASSES"), position, 0, MenuManager.GetToggleSetting(idleFxVal), Loc.LS("REMOVE OR SKIP EFFECT CAMERAS WHEN POSSIBLE"));
             position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("DISABLE REFLECTIONS"), position, 1, MenuManager.GetToggleSetting(deferredReflVal), Loc.LS("REMOVES BAKED REFLECTIONS; VISIBLE CHANGE ON GLOSSY SURFACES"));
+            uie.SelectAndDrawStringOptionItem(Loc.LS("DISABLE REFLECTIONS"), position, 1, MenuManager.GetToggleSetting(deferredReflVal), Loc.LS("DISABLES THE DEFERRED REFLECTIONS RENDER PASS"));
             position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("COMBINE SHIP MESHES"), position, 2, MenuManager.GetToggleSetting(shipCombineVal), Loc.LS("MERGES OTHER SHIPS' HULL PARTS FOR FEWER DRAW CALLS; NO VISUAL CHANGE; APPLIES TO NEW SHIPS"));
+            uie.SelectAndDrawStringOptionItem(Loc.LS("COMBINE SHIP MESHES"), position, 2, MenuManager.GetToggleSetting(shipCombineVal), Loc.LS("MERGES SHIP COMPONENTS INTO ONE COMPLETE MESH"));
             // The separator, tooltip and page controls are placed relative to
             // the LAST item drawn, so a short page has to pin the cursor where
             // a full one would have ended.
