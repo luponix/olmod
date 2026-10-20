@@ -197,9 +197,11 @@ namespace GameMod.Core {
     [HarmonyPatch(typeof(LocalLANHost), "GetServerLocation")]
     class ServerLocationPatch
     {
+        private const string OLMOD_COMPATIBILITY_TOKEN = "OLMOD 0.5.14";
+
         private static bool Prefix(ref string __result)
         {
-            __result = OlmodVersion.FullVersionString.ToUpperInvariant();
+            __result = $"{OLMOD_COMPATIBILITY_TOKEN} ({OlmodVersion.FullVersionString.ToUpperInvariant()})";
             return false;
         }
     }
