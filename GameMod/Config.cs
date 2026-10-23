@@ -7,6 +7,10 @@ using UnityEngine;
 namespace GameMod {
     static class Config
     {
+        // olmodsettings.json is optional for a client -- it only has to exist for a
+        // server -- so the one key a client needs has to survive the file being absent.
+        private const string DEFAULT_TRACKER_BASE_URL = "https://tracker.otl.gg";
+
         public static string OLModDir;
         public static bool NoDownload;
         public static JObject Settings;
@@ -46,6 +50,8 @@ namespace GameMod {
             NoDownload = Core.GameMod.FindArg("-nodownload");
             Settings = new JObject();
             LoadSettings();
+            if (string.IsNullOrEmpty(Settings.Value<string>("trackerBaseUrl")))
+                Settings["trackerBaseUrl"] = DEFAULT_TRACKER_BASE_URL;
         }
     }
 }
