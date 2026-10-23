@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Xml.Schema;
+using GameMod.Updater;
 using GameMod.VersionHandling;
 using HarmonyLib;
 using Overload;
@@ -26,7 +27,6 @@ namespace GameMod.Core {
                 return;
             }
 
-            Modded = FindArg("-modded");
             VREnabled = FindArgVal("-vrmode", out var vrmode) && vrmode != "none";
 
             GameVersion = typeof(GameManager).Assembly.GetName().Version;
@@ -46,34 +46,7 @@ namespace GameMod.Core {
             }
             Debug.Log("Done initializing " + OlmodVersion.FullVersionString);
 
-            if (Modded && Config.OLModDir != null && Config.OLModDir != "")
-            {
-                Modded = false; // Modded mode was on, we turn it off here because we don't want to have it on if there aren't actually any mods.
-                try
-                {
-                    var files = Directory.GetFiles(Config.OLModDir, "Mod-*.dll");
-                    ModsLoaded = string.Join(",", files);
-
-                    foreach (var f in files)
-                    {
-                        Debug.Log("Loading mod " + f);
-                        var asm = Assembly.LoadFile(f);
-                        try
-                        {
-                            harmony.PatchAll(asm);
-                            Modded = true; // At this point we're sure we're modded, so set to true.
-                        }
-                        catch (Exception ex)
-                        {
-                            Debug.Log("Running mod " + f + ": " + ex.ToString());
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Debug.Log(ex);
-                }
-            }
+            Mods.LoadEnabled(harmony);
 
             if (Modded)
             {

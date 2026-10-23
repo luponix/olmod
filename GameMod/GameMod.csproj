@@ -115,6 +115,10 @@
     <Compile Include="MPColliderSwap.cs" />
     <Compile Include="MPPacketStatus.cs" />
     <Compile Include="Config.cs" />
+    <Compile Include="Updater\Mods.cs" />
+    <Compile Include="Updater\Menu.cs" />
+    <Compile Include="Updater\Catalog.cs" />
+    <Compile Include="Updater\Relaunch.cs" />
     <Compile Include="Console.cs" />
     <Compile Include="Controllers.cs" />
     <Compile Include="ControlsExt.cs" />
