@@ -308,6 +308,7 @@ namespace GameMod {
         public static bool mms_distinct_kill_sound = false;
         public static int mms_spawn_health = 100;
         public static int mms_mp_general_scroll_offset = 0;
+        public static int mms_taunt_scroll_offset = 0;
         public const int SCROLL_ELEMENT_PAGE_VISIBLE_ROWS = 10;
         public static bool mms_super_countdown = false;
     }
@@ -870,7 +871,8 @@ namespace GameMod {
                     position.y -= 52f;
 
                     if (mp_general_tab_rows.Count > Menus.SCROLL_ELEMENT_PAGE_VISIBLE_ROWS)
-                        DrawMPGeneralTabScrollbar(__instance, general_tab_first_row_y, general_tab_visible_rows, mp_general_tab_rows.Count, general_tab_max_scroll_offset);
+                        DrawScrollbar(__instance, ref Menus.mms_mp_general_scroll_offset, ref mp_general_tab_scrollbar_dragging,
+                            440f, general_tab_first_row_y, 52f, general_tab_visible_rows, mp_general_tab_rows.Count);
                     break;
                 case 1:
                     __instance.SelectAndDrawStringOptionItem(Loc.LS("TEAMMATE NAMES"), position, 0, MenuManager.GetMPTeammateNames(), string.Empty, 1.5f, false);
@@ -938,7 +940,11 @@ namespace GameMod {
 
                         position.x -= 175f;
                         position.y += 50f;
-                        for (int i = 0; i < MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT; i++)
+                        const float taunt_row_pitch = 64f;
+                        int taunt_visible_rows = Math.Min(MPAudioTaunts.TAUNTS_MAX_VISIBLE, MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT);
+                        Menus.mms_taunt_scroll_offset = Mathf.Clamp(Menus.mms_taunt_scroll_offset, 0, MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT - taunt_visible_rows);
+                        float taunt_first_row_y = position.y;
+                        for (int i = Menus.mms_taunt_scroll_offset; i < Menus.mms_taunt_scroll_offset + taunt_visible_rows; i++)
                         {
                             // Draws the Item slider for selecting an audio taunt
                             __instance.SelectAndDrawStringOptionItem("", position, 16 + i, MPAudioTaunts.AClient.local_taunts[i].name, string.Empty, 0.49f, false);
@@ -982,8 +988,15 @@ namespace GameMod {
 
                             position.x -= 290f;
                             position.x -= 165f;
-                            position.y += 71f;
+                            position.y += taunt_row_pitch;
                         }
+                        position.y -= taunt_row_pitch;
+
+                        if (MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT > taunt_visible_rows)
+                            DrawScrollbar(__instance, ref Menus.mms_taunt_scroll_offset, ref taunt_tab_scrollbar_dragging,
+                                378f, // the gap between the joystick column and this tab's own buttons at x = 500
+                                taunt_first_row_y, taunt_row_pitch, taunt_visible_rows, MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT);
+
                         position.x += 175f;
 
 
@@ -1032,34 +1045,35 @@ namespace GameMod {
         }
 
         private static bool mp_general_tab_scrollbar_dragging = false;
-        private static void DrawMPGeneralTabScrollbar(UIElement uie, float first_row_y, int visible_rows, int total_rows, int max_scroll_offset)
+        private static bool taunt_tab_scrollbar_dragging = false;
+        private static void DrawScrollbar(UIElement uie, ref int scroll_offset, ref bool dragging, float scrollbar_center_x, float first_row_y, float row_pitch, int visible_rows, int total_rows)
         {
-            const float scrollbar_center_x = 440f;
+            int max_scroll_offset = total_rows - visible_rows;
             float track_top_y = first_row_y - 10f;
-            float track_bottom_y = first_row_y + (visible_rows - 1) * 52f + 10f;
+            float track_bottom_y = first_row_y + (visible_rows - 1) * row_pitch + 10f;
             float track_height = track_bottom_y - track_top_y;
             float thumb_height = track_height * visible_rows / total_rows;
 
             bool mouse_on_track = Mathf.Abs(UIManager.m_mouse_pos.x - scrollbar_center_x) <= 14f
                 && UIManager.m_mouse_pos.y >= track_top_y - 6f && UIManager.m_mouse_pos.y <= track_bottom_y + 6f;
             if (Input.GetMouseButtonDown(0) && mouse_on_track)
-                mp_general_tab_scrollbar_dragging = true;
+                dragging = true;
             if (!Input.GetMouseButton(0))
-                mp_general_tab_scrollbar_dragging = false;
-            if (mp_general_tab_scrollbar_dragging)
+                dragging = false;
+            if (dragging)
             {
                 float drag_range = track_height - thumb_height;
                 float drag_fraction = drag_range > 0f ? Mathf.Clamp01((UIManager.m_mouse_pos.y - track_top_y - thumb_height * 0.5f) / drag_range) : 0f;
-                Menus.mms_mp_general_scroll_offset = Mathf.RoundToInt(drag_fraction * max_scroll_offset);
+                scroll_offset = Mathf.RoundToInt(drag_fraction * max_scroll_offset);
             }
 
             Vector2 track_center = new Vector2(scrollbar_center_x, (track_top_y + track_bottom_y) * 0.5f);
             UIManager.DrawQuadUI(track_center, 6f, track_height * 0.5f + 4f, UIManager.m_col_ub0, uie.m_alpha * 0.1f, 12);
             UIManager.DrawQuadUI(track_center, 1.2f, track_height * 0.5f, UIManager.m_col_ui0, uie.m_alpha * 0.5f, 12);
 
-            float thumb_top_y = track_top_y + Menus.mms_mp_general_scroll_offset * (track_height - thumb_height) / max_scroll_offset;
+            float thumb_top_y = track_top_y + scroll_offset * (track_height - thumb_height) / max_scroll_offset;
             Vector2 thumb_center = new Vector2(scrollbar_center_x, thumb_top_y + thumb_height * 0.5f);
-            Color thumb_color = (mp_general_tab_scrollbar_dragging || mouse_on_track)
+            Color thumb_color = (dragging || mouse_on_track)
                 ? Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.2f * UIElement.FLICKER))
                 : UIManager.m_col_ui2;
             UIManager.DrawQuadUIInner(thumb_center, 5f, thumb_height * 0.5f, thumb_color, uie.m_alpha, 11, 0.75f);
@@ -1198,7 +1212,47 @@ namespace GameMod {
                     SelectRow(row_ids[selected_row - 1]);
                 }
             }
-            previous_selection = UIManager.m_menu_selection;
+        }
+
+        private static readonly int[] taunt_column_bases = { 16, 1610, 1810, 2010 };
+
+        // A taunt row is four columns of one selection id per slot, so a selection
+        // splits into the column it belongs to and the slot it points at.
+        private static bool DecodeTauntSelection(int selection, out int column_base, out int slot)
+        {
+            foreach (int candidate_base in taunt_column_bases)
+                if (selection >= candidate_base && selection < candidate_base + MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT)
+                {
+                    column_base = candidate_base;
+                    slot = selection - candidate_base;
+                    return true;
+                }
+
+            column_base = -1;
+            slot = -1;
+            return false;
+        }
+
+        // Scrolls the audio taunt tab when UP/DOWN is pressed on the edge row of the
+        // visible window, so the keyboard can reach the off-screen slots.
+        private static void ScrollTauntTabWithSelection()
+        {
+            int column_base, slot;
+            if (!DecodeTauntSelection(previous_selection, out column_base, out slot) || !Controls.JustPressedMenuDirection())
+                return;
+
+            float menu_dir_y = Controls.MenuDirection().y;
+            int visible_rows = Math.Min(MPAudioTaunts.TAUNTS_MAX_VISIBLE, MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT);
+            if (menu_dir_y > 0.45f && slot == Menus.mms_taunt_scroll_offset + visible_rows - 1 && slot + 1 < MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT)
+            {
+                Menus.mms_taunt_scroll_offset++;
+                SelectRow(column_base + slot + 1);
+            }
+            else if (menu_dir_y < -0.45f && slot == Menus.mms_taunt_scroll_offset && Menus.mms_taunt_scroll_offset > 0)
+            {
+                Menus.mms_taunt_scroll_offset--;
+                SelectRow(column_base + slot - 1);
+            }
         }
 
         private static void SelectRow(int selection)
@@ -1221,7 +1275,7 @@ namespace GameMod {
             {
                 if (menu_sub_state == MenuSubState.ACTIVE)
                 {
-                    if(!(!UIManager.PushedSelect(100) & MenuManager.m_menu_micro_state == 3 & UIManager.m_menu_selection > 15 & UIManager.m_menu_selection < 22 ) 
+                    if(!(!UIManager.PushedSelect(100) & MenuManager.m_menu_micro_state == 3 & UIManager.m_menu_selection > 15 & UIManager.m_menu_selection < 16 + MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT ) 
                         | (!Input.inputString.ToUpper().Contains('W') & !Input.inputString.ToUpper().Contains('A') 
                           &!Input.inputString.ToUpper().Contains('S') & !Input.inputString.ToUpper().Contains('D')))
                         UIManager.ControllerMenu();
@@ -1415,14 +1469,12 @@ namespace GameMod {
                                 }
                                 break;
                             case 3:
+                                int taunt_column_base, taunt_slot;
+                                if (DecodeTauntSelection(menu_selection, out taunt_column_base, out taunt_slot))
+                                    menu_selection = taunt_column_base;
                                 switch (menu_selection)
                                 {
                                     case 16:
-                                    case 17:
-                                    case 18:
-                                    case 19:
-                                    case 20:
-                                    case 21:
                                         // these buttons handle changing the selected audio taunt
                                         if (MPAudioTaunts.AClient.initialized)
                                         {
@@ -1433,7 +1485,7 @@ namespace GameMod {
                                                 & NetworkMatch.GetMatchState() != MatchState.LOBBY_LOADING_SCENE
                                                 & NetworkMatch.GetMatchState() != MatchState.PREGAME)
                                             {
-                                                int index = MPAudioTaunts.AClient.taunts.IndexOf(MPAudioTaunts.AClient.local_taunts[menu_selection - 16]);
+                                                int index = MPAudioTaunts.AClient.taunts.IndexOf(MPAudioTaunts.AClient.local_taunts[taunt_slot]);
                                                 if (MPAudioTaunts.AClient.taunts.Count > 0)
                                                 {
                                                     int next_index;
@@ -1443,7 +1495,7 @@ namespace GameMod {
                                                     {
                                                         next_index = MPAudioTaunts.AClient.GetNextSelectableAudioTauntIndex(0, 1);
                                                         if (next_index == -1)
-                                                            MPAudioTaunts.AClient.local_taunts[menu_selection - 16] = new MPAudioTaunts.AudioTaunt
+                                                            MPAudioTaunts.AClient.local_taunts[taunt_slot] = new MPAudioTaunts.AudioTaunt
                                                             {
                                                                 hash = "EMPTY",
                                                                 name = "EMPTY",
@@ -1453,7 +1505,7 @@ namespace GameMod {
                                                     }
 
                                                     if (next_index != -1)
-                                                        MPAudioTaunts.AClient.local_taunts[menu_selection - 16] = MPAudioTaunts.AClient.taunts[next_index];
+                                                        MPAudioTaunts.AClient.local_taunts[taunt_slot] = MPAudioTaunts.AClient.taunts[next_index];
 
                                                     MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
                                                 }
@@ -1466,17 +1518,12 @@ namespace GameMod {
                                         }
                                         goto AVOID_INPUTMAPPING_DIALOG;
                                     case 1610:
-                                    case 1611:
-                                    case 1612:
-                                    case 1613:
-                                    case 1614:
-                                    case 1615:
                                         // audio taunt play selected buttons
                                         if (MPAudioTaunts.AClient.initialized)
                                         {
-                                            if(MPAudioTaunts.AClient.local_taunts[menu_selection - 1610].audioclip != null)
+                                            if(MPAudioTaunts.AClient.local_taunts[taunt_slot].audioclip != null)
                                             {
-                                                MPAudioTaunts.AClient.PlayAudioTauntFromAudioclip(MPAudioTaunts.AClient.local_taunts[menu_selection - 1610].audioclip, "");
+                                                MPAudioTaunts.AClient.PlayAudioTauntFromAudioclip(MPAudioTaunts.AClient.local_taunts[taunt_slot].audioclip, "");
                                                 MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
                                             }
                                             else
@@ -1484,12 +1531,7 @@ namespace GameMod {
                                         }
                                         goto AVOID_INPUTMAPPING_DIALOG;
                                     case 1810:
-                                    case 1811:
-                                    case 1812:
-                                    case 1813:
-                                    case 1814:
-                                    case 1815:
-                                        MPAudioTaunts.AClient.selected_audio_slot = menu_selection - 1810;
+                                        MPAudioTaunts.AClient.selected_audio_slot = taunt_slot;
                                         break;
                                     case 2000:
                                         MPAudioTaunts.AClient.active = !MPAudioTaunts.AClient.active;
@@ -1504,12 +1546,7 @@ namespace GameMod {
                                         MenuManager.PlaySelectSound(1f);
                                         goto AVOID_INPUTMAPPING_DIALOG;
                                     case 2010:
-                                    case 2011:
-                                    case 2012:
-                                    case 2013:
-                                    case 2014:
-                                    case 2015:
-                                        MPAudioTaunts.AClient.selected_audio_slot = menu_selection - 2010;
+                                        MPAudioTaunts.AClient.selected_audio_slot = taunt_slot;
                                         break;
                                     default:
                                         goto AVOID_INPUTMAPPING_DIALOG;
@@ -1533,18 +1570,17 @@ namespace GameMod {
                         switch (MenuManager.m_menu_micro_state)
                         {
                             case 3:
-                                switch (UIManager.m_menu_selection)
+                                int taunt_column_base, taunt_slot;
+                                int menu_selection = DecodeTauntSelection(UIManager.m_menu_selection, out taunt_column_base, out taunt_slot)
+                                    ? taunt_column_base
+                                    : UIManager.m_menu_selection;
+                                switch (menu_selection)
                                 {
                                     case 16:
-                                    case 17:
-                                    case 18:
-                                    case 19:
-                                    case 20:
-                                    case 21:
                                         if (MPAudioTaunts.AClient.initialized)
                                         {
                                             if (Input.GetKeyDown(KeyCode.Delete))
-                                                MPAudioTaunts.AClient.local_taunts[UIManager.m_menu_selection - 16] = new MPAudioTaunts.AudioTaunt
+                                                MPAudioTaunts.AClient.local_taunts[taunt_slot] = new MPAudioTaunts.AudioTaunt
                                                 {
                                                     hash = "EMPTY",
                                                     name = "EMPTY",
@@ -1560,13 +1596,13 @@ namespace GameMod {
                                                     & NetworkMatch.GetMatchState() != MatchState.LOBBY_LOADING_SCENE
                                                     & NetworkMatch.GetMatchState() != MatchState.PREGAME)
                                                 {
-                                                    int index = MPAudioTaunts.AClient.taunts.IndexOf(MPAudioTaunts.AClient.local_taunts[UIManager.m_menu_selection - 16]);
+                                                    int index = MPAudioTaunts.AClient.taunts.IndexOf(MPAudioTaunts.AClient.local_taunts[taunt_slot]);
                                                     if (MPAudioTaunts.AClient.taunts.Count > 0 & Input.inputString.Length > 0)
                                                     {
                                                         int next_index = MPAudioTaunts.AClient.GetNextIndexThatStartsWithStringSequence(0, index == -1 ? 0 : index, Input.inputString);
                                                         if (next_index != -1 & next_index != index)
                                                         {
-                                                            MPAudioTaunts.AClient.local_taunts[UIManager.m_menu_selection - 16] = MPAudioTaunts.AClient.taunts[next_index];
+                                                            MPAudioTaunts.AClient.local_taunts[taunt_slot] = MPAudioTaunts.AClient.taunts[next_index];
                                                             MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
                                                         }
                                                     }
@@ -1575,24 +1611,14 @@ namespace GameMod {
                                         }
                                         break;
                                     case 1810:
-                                    case 1811:
-                                    case 1812:
-                                    case 1813:
-                                    case 1814:
-                                    case 1815:
                                         if (Input.GetKeyDown(KeyCode.Delete) | Controls.JustPressed(CCInput.MENU_DELETE))
-                                            MPAudioTaunts.AClient.keybinds[UIManager.m_menu_selection - 1810] = -1;
+                                            MPAudioTaunts.AClient.keybinds[taunt_slot] = -1;
                                         break;
                                     case 2010:
-                                    case 2011:
-                                    case 2012:
-                                    case 2013:
-                                    case 2014:
-                                    case 2015:
                                         if (Input.GetKeyDown(KeyCode.Delete) | Controls.JustPressed(CCInput.MENU_DELETE))
                                         {
-                                            Controls.ResetControlJoy(UIManager.m_menu_selection - 1949, 0);
-                                            Controls.ResetControlJoy(UIManager.m_menu_selection - 1949, 1);
+                                            Controls.ResetControlJoy((int)CCInputExt.TAUNT_1 + taunt_slot, 0);
+                                            Controls.ResetControlJoy((int)CCInputExt.TAUNT_1 + taunt_slot, 1);
                                         }
                                         break;
                                 }
@@ -1607,6 +1633,15 @@ namespace GameMod {
                             Menus.mms_mp_general_scroll_offset = Math.Max(0, Menus.mms_mp_general_scroll_offset + (scroll_wheel_delta < 0f ? 1 : -1));
                         ScrollGeneralTabWithSelection();
                     }
+                    else if (MenuManager.m_menu_micro_state == 3 && MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT > MPAudioTaunts.TAUNTS_MAX_VISIBLE)
+                    {
+                        float scroll_wheel_delta = Input.GetAxis("Mouse ScrollWheel");
+                        if (scroll_wheel_delta != 0f)
+                            Menus.mms_taunt_scroll_offset = Mathf.Clamp(Menus.mms_taunt_scroll_offset + (scroll_wheel_delta < 0f ? 1 : -1),
+                                0, MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT - MPAudioTaunts.TAUNTS_MAX_VISIBLE);
+                        ScrollTauntTabWithSelection();
+                    }
+                    previous_selection = UIManager.m_menu_selection;
                 }
                 else if (menu_sub_state == MenuSubState.GET_INPUT)
                 {

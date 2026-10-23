@@ -28,7 +28,8 @@ namespace GameMod
 
         public const int AUDIO_TAUNT_SIZE_LIMIT = 131072;           // 128 kB, maximum allowed audio taunt file size in bytes
         public const int PACKET_PAYLOAD_SIZE = 800;                 // maximum payload size in bytes for packets that carry chunks of an audio taunt file
-        public const int AMOUNT_OF_TAUNTS_PER_CLIENT = 6;           // the amount of taunts a client is allowed to bring into a match
+        public const int AMOUNT_OF_TAUNTS_PER_CLIENT = 12;          // the amount of taunts a client is allowed to bring into a match
+        public const int TAUNTS_MAX_VISIBLE = 8;                    // amount of taunt slots the menu shows at once before it starts scrolling
         public const float DEFAULT_TAUNT_COOLDOWN = 4f;             // defines the minimum interval between sending taunts for the client
         public const float TAUNT_PLAYTIME = 3f;                     // defines the time in seconds that taunts are allowed to play till they get cutoff on the client
         public const float DEFAULT_SPECTRUM_UPDATE_COOLDOWN = 0.07f;
@@ -112,7 +113,7 @@ namespace GameMod
             public static string LocalAudioTauntDirectory = "";         // path towards the directory where the audiotaunts from the local installation are saved
             public static string ExternalAudioTauntDirectory = "";      // path towards the directory where the audiotaunts of other players get saved
             public static int[] keybinds = new int[AMOUNT_OF_TAUNTS_PER_CLIENT];                  // keybinds[i] holds the keycode that triggers the playing of local_taunts[i] 
-            public static int selected_audio_slot = 0;                  // temporary variable that is used in the menu code to differentiate between the 6 local taunt slots
+            public static int selected_audio_slot = 0;                  // temporary variable that is used in the menu code to differentiate between the local taunt slots
             public static int audio_taunt_volume = 50;                  // range: 0-100
             public static float remaining_cooldown = 0f;                // time in seconds till the client is allowed to send an audiotaunt
 
@@ -147,7 +148,7 @@ namespace GameMod
                             asc[i] = new AudioSourceContainer();
                         }
 
-                        for (int i = 0; i < 6; i++){
+                        for (int i = 0; i < AMOUNT_OF_TAUNTS_PER_CLIENT; i++){
                             local_taunts[i] = new AudioTaunt{
                                 hash = "EMPTY",
                                 name = "EMPTY",
@@ -253,7 +254,7 @@ namespace GameMod
                         AClient.asc[i] = new AudioSourceContainer();
 
 
-                    for (int i = 0; i < 6; i++){
+                    for (int i = 0; i < AMOUNT_OF_TAUNTS_PER_CLIENT; i++){
                         AClient.local_taunts[i] = new AudioTaunt
                         {
                             hash = "EMPTY",
@@ -637,12 +638,12 @@ namespace GameMod
             }
 
             // Splits the hashes that get stored as a single string in loaded_local_taunts and finds the corresponding taunts
-            // to populate the 6 audio taunt slots. '/' is used as the seperator of the slots
+            // to populate the audio taunt slots. '/' is used as the seperator of the slots
             public static void LoadLocalAudioTauntsFromPilotPrefs(){
                 string[] file_hashes = loaded_local_taunts.Split('/');
                 int index = 0;
                 foreach (string hash in file_hashes){
-                    if (index < 6){
+                    if (index < AMOUNT_OF_TAUNTS_PER_CLIENT){
                         AudioTaunt at = taunts.Find(t => t.hash.Equals(hash) && !t.is_external_taunt);
                         if (at == null){
                             at = new AudioTaunt{
@@ -938,7 +939,7 @@ namespace GameMod
                             if (remaining_cooldown > 0f)
                                 remaining_cooldown -= Time.unscaledDeltaTime;
 
-                            for (int i = 0; i < 6; i++)
+                            for (int i = 0; i < AMOUNT_OF_TAUNTS_PER_CLIENT; i++)
                             {
                                 if (remaining_cooldown <= 0f && keybinds[i] > 0 && (Input.GetKeyDown((KeyCode)keybinds[i]) && local_taunts[i].audioclip != null || Controls.JustPressed((CCInput)(61+i))))
                                 {
@@ -1517,29 +1518,32 @@ namespace GameMod
 
                         try
                         {
-                            string hashes = "";
-                            int count = 0;
-                            foreach (var t in match_taunts)
-                            {
-                                if (t.Value != null && t.Value.hash != null)
-                                {
-                                    hashes += t.Value.hash;
-                                    count++;
-                                    if (count < match_taunts.Count)
-                                        hashes += "/";
-                                }
-                                else
-                                {
-                                    Debug.Log("Server.OnShareAudiotaunts: encountered an empty element in the match taunts");
-                                }
-                            }
-
                             //Send the updated list of hashes to all connected clients that support audiotaunts
+                            var listeners = new List<NetworkConnection>();
                             foreach (NetworkConnection networkConnection in NetworkServer.connections)
                             {
                                 if (networkConnection != null && MPTweaks.ClientHasTweak(networkConnection.connectionId, "audiotaunts"))
-                                    networkConnection.Send(MessageTypes.MsgShareAudioTauntIdentifiers, new ShareAudioTauntIdentifiers { hashes = hashes });
+                                    listeners.Add(networkConnection);
                             }
+
+                            var batch = new List<string>();
+                            foreach (var t in match_taunts)
+                            {
+                                if (t.Value == null || t.Value.hash == null)
+                                {
+                                    Debug.Log("Server.OnShareAudiotaunts: encountered an empty element in the match taunts");
+                                    continue;
+                                }
+
+                                batch.Add(t.Value.hash);
+                                if (batch.Count == 24)      // 24 * 33 bytes leaves room inside the 1100 byte packet
+                                {
+                                    SendIdentifiers(listeners, batch);
+                                    batch.Clear();
+                                }
+                            }
+                            if (batch.Count > 0)
+                                SendIdentifiers(listeners, batch);
                         }
                         catch(Exception ex)
                         {
@@ -1559,6 +1563,17 @@ namespace GameMod
 
                 }
 
+
+                // Sends one batch of the match hash list to every listener. Channel 0 is
+                // ReliableSequenced with PacketSize 1100 and never fragments, so a long list
+                // goes out as several messages; both handlers merge hashes additively, which
+                // is what keeps the split invisible to a client that knows nothing about it.
+                private static void SendIdentifiers(List<NetworkConnection> listeners, List<string> hashes)
+                {
+                    var msg = new ShareAudioTauntIdentifiers { hashes = string.Join("/", hashes.ToArray()) };
+                    foreach (NetworkConnection networkConnection in listeners)
+                        networkConnection.Send(MessageTypes.MsgShareAudioTauntIdentifiers, msg);
+                }
 
                 private static void OnAudioTauntRequest(NetworkMessage rawMsg)
                 {
