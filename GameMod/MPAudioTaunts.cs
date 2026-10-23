@@ -1073,15 +1073,12 @@ namespace GameMod
                 {
                     if (!active) return;
 
-                    Debug.Log("[AudioTaunts]  Received AudioTauntIdentifiers from Server");
                     var msg = rawMsg.ReadMessage<ShareAudioTauntIdentifiers>();
                     List<string> file_hashes = msg.hashes.Split('/').ToList();
-                    foreach (string hash in file_hashes)
-                        Debug.Log(hash);
-
+                    int known_before = match_taunts.Count;
 
                     ImportAudioTaunts(ExternalAudioTauntDirectory, file_hashes);
-                    
+
                     foreach (string hash in file_hashes)
                     {
 
@@ -1125,6 +1122,13 @@ namespace GameMod
 
                         }
                     }
+
+                    // The server splits a long announcement over several messages, so a run of
+                    // these lines belongs to ONE roster change: their hash counts must add up to
+                    // the server's "announced N hashes", and "match total" must end at that N.
+                    Debug.Log("[AudioTaunts] announcement: " + file_hashes.Count + " hashes, "
+                        + msg.hashes.Length + " chars, " + (match_taunts.Count - known_before)
+                        + " new; match total " + match_taunts.Count);
                 }
 
                 private static void OnAudioTauntRequest(NetworkMessage rawMsg)
@@ -1432,8 +1436,6 @@ namespace GameMod
 
                     try
                     {
-                        // Read the message
-                        Debug.Log("[Audiotaunt] : Received AudioTauntIdentifiers from Client");
                         var msg = rawMsg.ReadMessage<ShareAudioTauntIdentifiers>();
 
 
@@ -1445,12 +1447,8 @@ namespace GameMod
 
                         // Split the string to retrieve the individual hashes
                         List<string> file_hashes = msg.hashes.Split('/').ToList();
-                        Debug.Log(file_hashes.Count);
-                        foreach (string hash in file_hashes)
-                        {
-                            Debug.Log(" hash:" + hash);
-                        }
-                        Debug.Log("");
+                        Debug.Log("[AudioTaunts] client " + rawMsg.conn.connectionId + " offers "
+                            + file_hashes.Count + " hashes, " + msg.hashes.Length + " chars");
 
                         // Update match_taunts
                         int index = 0;
@@ -1527,6 +1525,8 @@ namespace GameMod
                             }
 
                             var batch = new List<string>();
+                            int announced = 0;
+                            int messages = 0;
                             foreach (var t in match_taunts)
                             {
                                 if (t.Value == null || t.Value.hash == null)
@@ -1536,14 +1536,22 @@ namespace GameMod
                                 }
 
                                 batch.Add(t.Value.hash);
+                                announced++;
                                 if (batch.Count == 24)      // 24 * 33 bytes leaves room inside the 1100 byte packet
                                 {
                                     SendIdentifiers(listeners, batch);
+                                    messages++;
                                     batch.Clear();
                                 }
                             }
                             if (batch.Count > 0)
+                            {
                                 SendIdentifiers(listeners, batch);
+                                messages++;
+                            }
+
+                            Debug.Log("[AudioTaunts] announced " + announced + " hashes in "
+                                + messages + " message(s) to " + listeners.Count + " client(s)");
                         }
                         catch(Exception ex)
                         {
@@ -1573,6 +1581,11 @@ namespace GameMod
                     var msg = new ShareAudioTauntIdentifiers { hashes = string.Join("/", hashes.ToArray()) };
                     foreach (NetworkConnection networkConnection in listeners)
                         networkConnection.Send(MessageTypes.MsgShareAudioTauntIdentifiers, msg);
+
+                    // The char count is the check that matters: anything near 1100 means the
+                    // batch size is too generous and UNET will start dropping the send.
+                    Debug.Log("[AudioTaunts] announce batch: " + hashes.Count + " hashes, "
+                        + msg.hashes.Length + " chars");
                 }
 
                 private static void OnAudioTauntRequest(NetworkMessage rawMsg)
