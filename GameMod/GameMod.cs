@@ -5,7 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Xml.Schema;
-using GameMod.Updater;
+using GameMod.ModsHandler;
 using GameMod.VersionHandling;
 using HarmonyLib;
 using Overload;
@@ -34,6 +34,8 @@ namespace GameMod.Core {
             Debug.Log("Command line " + String.Join(" ", Environment.GetCommandLineArgs()));
             Config.Init();
             MPInternet.CheckInternetServer();
+            MainMenuRows.Add("DEMOS", Replay.DemosMenu.SEL_DEMOS_MAIN_MENU);
+            MainMenuRows.Add("MODS", ModsHandler.Menu.SEL_MAIN_MENU_MODS);
             Harmony.DEBUG = FindArg("-harmonydebug");
             var harmony = new Harmony("olmod.olmod");
             try

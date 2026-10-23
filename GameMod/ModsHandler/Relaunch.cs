@@ -3,7 +3,7 @@ using System.Diagnostics;
 using System.Text;
 using UnityEngine;
 
-namespace GameMod.Updater
+namespace GameMod.ModsHandler
 {
     static class Relaunch
     {

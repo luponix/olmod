@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using System.Reflection.Emit;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
@@ -394,97 +393,6 @@ namespace GameMod.Replay
                 return "--/--/----";
             return info.date.ToString(withTime ? "dd MM yyyy HH:mm" : "dd MM yyyy",
                 System.Globalization.CultureInfo.InvariantCulture);
-        }
-    }
-
-    [HarmonyPatch(typeof(UIElement), "DrawMainMenu")]
-    class DemosMenu_DrawMainMenu
-    {
-        internal static bool TranspilerApplied;
-
-        // 9 rows at 54 px span what the stock 8 rows at 62 px did, so the
-        // separators and the discord/music rows keep their vanilla positions.
-        private const float ROW_SPACING = 54f;
-
-        public static void DrawDemosMainMenuRow(UIElement ui, ref Vector2 pos)
-        {
-            ui.SelectAndDrawItem("DEMOS", pos, DemosMenu.SEL_DEMOS_MAIN_MENU, false);
-            pos.y += ROW_SPACING;
-        }
-
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var codes = new List<CodeInstruction>(instructions);
-
-            int seedIndex = -1;
-            for (int i = 0; i < codes.Count; i++)
-            {
-                if (codes[i].opcode == OpCodes.Ldc_R4 && codes[i].operand is float &&
-                    (float)codes[i].operand == -155f) // the stock menu stack's top y seeds the layout
-                {
-                    if (seedIndex >= 0) { seedIndex = -1; break; }
-                    seedIndex = i;
-                }
-            }
-
-            var outlineMethod = AccessTools.Method(typeof(UIElement), "SelectAndDrawItemOutline");
-            int storeIndex = -1;
-            CodeInstruction positionLoad = null;
-            for (int i = 0; i < codes.Count && storeIndex < 0; i++)
-            {
-                if (!(codes[i].opcode == OpCodes.Call || codes[i].opcode == OpCodes.Callvirt) ||
-                    !Equals(codes[i].operand, outlineMethod))
-                    continue;
-                bool isMultiplayerItem = false;
-                for (int j = Math.Max(0, i - 8); j < i; j++)
-                    if (codes[j].opcode == OpCodes.Ldc_I4_7)
-                        isMultiplayerItem = true;
-                if (!isMultiplayerItem)
-                    continue;
-                for (int j = i + 1; j < Math.Min(codes.Count, i + 14); j++)
-                {
-                    if (codes[j].opcode == OpCodes.Ldloca || codes[j].opcode == OpCodes.Ldloca_S)
-                        positionLoad = codes[j];
-                    bool isStore = codes[j].opcode == OpCodes.Stind_R4 ||
-                        (codes[j].opcode == OpCodes.Stfld && codes[j].operand is FieldInfo &&
-                         ((FieldInfo)codes[j].operand).Name == "y");
-                    if (isStore)
-                    {
-                        if (positionLoad != null)
-                            storeIndex = j;
-                        break;
-                    }
-                }
-                break;
-            }
-
-            if (seedIndex < 0 || storeIndex < 0)
-            {
-                Debug.LogWarning("REPLAY: DrawMainMenu anchors not found, DEMOS falls back to half-item");
-                TranspilerApplied = false;
-                return instructions;
-            }
-
-            foreach (var code in codes)
-                if (code.opcode == OpCodes.Ldc_R4 && code.operand is float && (float)code.operand == 62f)
-                    code.operand = ROW_SPACING;
-            codes.InsertRange(storeIndex + 1, new[]
-            {
-                new CodeInstruction(OpCodes.Ldarg_0),
-
-                new CodeInstruction(positionLoad.opcode, positionLoad.operand),
-                new CodeInstruction(OpCodes.Call,
-                    AccessTools.Method(typeof(DemosMenu_DrawMainMenu), nameof(DrawDemosMainMenuRow)))
-            });
-            TranspilerApplied = true;
-            return codes;
-        }
-
-        static void Postfix(UIElement __instance)
-        {
-            if (!TranspilerApplied)
-                __instance.SelectAndDrawHalfItem("DEMOS", new Vector2(500f, 217f),
-                    DemosMenu.SEL_DEMOS_MAIN_MENU, false);
         }
     }
 

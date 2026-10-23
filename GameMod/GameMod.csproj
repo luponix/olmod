@@ -105,6 +105,8 @@
     <Compile Include="AmbientUnload.cs" />
     <Compile Include="AxisCountFix.cs" />
     <Compile Include="MenuMusic.cs" />
+    <Compile Include="Hooks\UIElement.cs" />
+    <Compile Include="MainMenuRows.cs" />
     <Compile Include="MouseSlidingFix.cs" />
     <Compile Include="MPMatchInfo.cs" />
     <Compile Include="MPServerOptimization.cs" />
@@ -115,10 +117,11 @@
     <Compile Include="MPColliderSwap.cs" />
     <Compile Include="MPPacketStatus.cs" />
     <Compile Include="Config.cs" />
-    <Compile Include="Updater\Mods.cs" />
-    <Compile Include="Updater\Menu.cs" />
-    <Compile Include="Updater\Catalog.cs" />
-    <Compile Include="Updater\Relaunch.cs" />
+    <Compile Include="ModsHandler\Mods.cs" />
+    <Compile Include="ModsHandler\Menu.cs" />
+    <Compile Include="ModsHandler\Catalog.cs" />
+    <Compile Include="ModsHandler\Relaunch.cs" />
+    <Compile Include="ModsHandler\Library.cs" />
     <Compile Include="Console.cs" />
     <Compile Include="Controllers.cs" />
     <Compile Include="ControlsExt.cs" />

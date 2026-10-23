@@ -8,7 +8,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
-namespace GameMod.Updater
+namespace GameMod.ModsHandler
 {
     static class Mods
     {
