@@ -51,22 +51,33 @@ namespace GameMod.Replay
                     UIManager.ControllerMenu();
                     if (timer > 0.25f)
                     {
-                        checkPagingArgs[0] = MenuManager.m_list_items_first;
-                        checkPagingArgs[1] = MenuManager.m_list_items_last;
-                        checkPagingArgs[2] = MenuManager.m_list_items_total_count;
-                        checkPagingArgs[3] = ROWS_PER_PAGE;
-                        bool pagingChanged = (bool)checkPagingMethod.Invoke(null, checkPagingArgs);
-                        MenuManager.m_list_items_first = (int)checkPagingArgs[0];
-                        MenuManager.m_list_items_last = (int)checkPagingArgs[1];
-                        if (pagingChanged)
-                        {
-                            confirmDelete = false;
-                            break;
-                        }
-
+                        // The wheel is a stock second binding for MENU_PGUP/MENU_PGDN
+                        // (Controls.cs:584), so CheckPaging claims the same tick this menu
+                        // scrolls a single row on: the list jumps 1 or 9 rows depending on
+                        // frame timing, and CheckPaging's UIPulse flashes the whole screen
+                        // once per tick. The wheel is this menu's; the paging keys stay the
+                        // engine's.
                         float wheel = Input.GetAxis("Mouse ScrollWheel");
                         if (wheel != 0f)
+                        {
                             ScrollListTo(MenuManager.m_list_items_first + (wheel < 0f ? 1 : -1));
+                        }
+                        else
+                        {
+                            checkPagingArgs[0] = MenuManager.m_list_items_first;
+                            checkPagingArgs[1] = MenuManager.m_list_items_last;
+                            checkPagingArgs[2] = MenuManager.m_list_items_total_count;
+                            checkPagingArgs[3] = ROWS_PER_PAGE;
+                            bool pagingChanged = (bool)checkPagingMethod.Invoke(null, checkPagingArgs);
+                            MenuManager.m_list_items_first = (int)checkPagingArgs[0];
+                            MenuManager.m_list_items_last = (int)checkPagingArgs[1];
+                            if (pagingChanged)
+                            {
+                                confirmDelete = false;
+                                break;
+                            }
+                        }
+
                         ScrollListWithSelection();
 
                         if (!UIManager.PushedSelect(SEL_BACK))
