@@ -1109,6 +1109,16 @@ namespace GameMod
             }
 
             public static void Save(StreamWriter w){
+                // a running import leaves every slot EMPTY, and this runs on any pilot save --
+                // writing those would wipe the selection for good, so the snapshot the import
+                // is about to restore from goes out instead
+                if (MPAudioTaunts.AClient.ImportInProgress && !string.IsNullOrEmpty(MPAudioTaunts.AClient.loaded_local_taunts)){
+                    foreach (string hash in MPAudioTaunts.AClient.loaded_local_taunts.Split('/'))
+                        w.WriteLine("   " + hash);
+
+                    return;
+                }
+
                 for (int i = 0; i < MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT; i++)
                     if (MPAudioTaunts.AClient.local_taunts.Length > i && MPAudioTaunts.AClient.local_taunts[i] != null)
                         w.WriteLine("   " + MPAudioTaunts.AClient.local_taunts[i].hash);

@@ -253,6 +253,10 @@ namespace GameMod
                     for (int i = 0; i < AClient.asc.Length; i++)
                         AClient.asc[i] = new AudioSourceContainer();
 
+                    // the import resolves the slots from this string when it completes, and it
+                    // otherwise still holds the pilot-load snapshot -- every slot picked since
+                    // would be dropped by a reload
+                    AClient.loaded_local_taunts = AClient.ChainTogetherHashesOfLocalTaunts();
 
                     for (int i = 0; i < AMOUNT_OF_TAUNTS_PER_CLIENT; i++){
                         AClient.local_taunts[i] = new AudioTaunt
@@ -357,6 +361,11 @@ namespace GameMod
             private static readonly List<InflightClipLoad> import_inflight = new List<InflightClipLoad>();
             private static Stopwatch import_watch;
             private static int import_count;
+            private static int import_skipped;
+
+            // the taunt slots read EMPTY while this is true, so the pilot file must not be
+            // written from them
+            public static bool ImportInProgress { get { return import_watch != null; } }
 
             public static void StartAsyncImport()
             {
@@ -369,6 +378,7 @@ namespace GameMod
                 }
                 import_inflight.Clear();  // main thread only, stale entries are gen-checked anyway
                 import_count = 0;
+                import_skipped = 0;
                 import_watch = Stopwatch.StartNew();
 
                 // display names already produced -- mirrors the original import's dedup
@@ -430,6 +440,13 @@ namespace GameMod
                         {
                             displayName = diskName;
                             diskName = hash + "-" + file.Name;
+                            // same hash means a byte-identical twin this scan imports on its
+                            // own, and File.Move onto an existing target throws on Windows
+                            if (File.Exists(Path.Combine(directory, diskName)))
+                            {
+                                Interlocked.Increment(ref import_skipped);
+                                continue;
+                            }
                             File.Move(Path.Combine(directory, file.Name), Path.Combine(directory, diskName));
                         }
                         byte[] data = File.ReadAllBytes(Path.Combine(directory, diskName));
@@ -453,7 +470,9 @@ namespace GameMod
                     }
                     catch (Exception ex)
                     {
-                        // one unreadable/unmovable file must not abort the rest of the library
+                        // one unreadable/unmovable file must not abort the rest of the library,
+                        // but silent skips make a wholesale failure look like an empty folder
+                        Interlocked.Increment(ref import_skipped);
                         Debug.Log("Async taunt import: skipping " + file.Name + ": " + ex.Message);
                     }
                 }
@@ -524,8 +543,8 @@ namespace GameMod
                 if (done && import_inflight.Count == 0)
                 {
                     import_watch.Stop();
-                    Debug.Log(string.Format("Imported {0} audiotaunts asynchronously over {1:F2}s, total: {2}",
-                        import_count, import_watch.ElapsedMilliseconds / 1000f, taunts.Count));
+                    Debug.Log(string.Format("Imported {0} audiotaunts asynchronously over {1:F2}s, total: {2}, skipped: {3}",
+                        import_count, import_watch.ElapsedMilliseconds / 1000f, taunts.Count, import_skipped));
                     import_watch = null;
                     LoadLocalAudioTauntsFromPilotPrefs();
                     taunts.Sort((x, y) => x.name.CompareTo(y.name));
@@ -657,6 +676,16 @@ namespace GameMod
                     }
                     index++;
                 }
+            }
+
+            // the inverse of LoadLocalAudioTauntsFromPilotPrefs, EMPTY placeholders included
+            // so a hash keeps its slot across the round trip
+            public static string ChainTogetherHashesOfLocalTaunts(){
+                string[] hashes = new string[AMOUNT_OF_TAUNTS_PER_CLIENT];
+                for (int i = 0; i < AMOUNT_OF_TAUNTS_PER_CLIENT; i++)
+                    hashes[i] = local_taunts[i] != null && local_taunts[i].hash != null ? local_taunts[i].hash : "EMPTY";
+
+                return string.Join("/", hashes);
             }
 
             public static bool IsPlayerMuted(string player_name)
