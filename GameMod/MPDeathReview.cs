@@ -120,7 +120,7 @@ namespace GameMod {
     [HarmonyPatch(typeof(UIElement), "DrawMpMiniScoreboard")]
     class MPDeathReview_UIElement_DrawMpMiniScoreboard {
         static void Postfix(UIElement __instance) {
-            if (MPDeathReview.lastDeathReview == null)
+            if (MPDeathReview.lastDeathReview == null | MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP)
                 return;
 
             if (MPDeathReview.stickyDeathReview) {

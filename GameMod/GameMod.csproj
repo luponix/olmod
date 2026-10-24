@@ -120,6 +120,7 @@
     <Compile Include="MPSpawnExtension.cs" />
     <Compile Include="FramerateLimiter.cs" />
     <Compile Include="MPEnhancedFirePacket.cs" />
+    <Compile Include="MatchModeInstareap.cs" />
     <Compile Include="MPShips.cs" />
     <Compile Include="MPColliderSwap.cs" />
     <Compile Include="MPPacketStatus.cs" />

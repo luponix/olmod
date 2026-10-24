@@ -287,7 +287,7 @@ namespace GameMod {
             caps.Add("ModVersion", OlmodVersion.FullVersionString);
             caps.Add("Modded", Core.GameMod.Modded ? "1" : "0");
             caps.Add("ModsLoaded", Core.GameMod.ModsLoaded);
-            caps.Add("SupportsTweaks", "changeteam,deathreview,sniper,jip,nocompress_0_3_6,customloadouts,damagenumbers,ctfjoin,efirepacket,incompleteloadouts,cphysics,spawnhealth,destructiblemissiles" + (MPAudioTaunts.AClient.active ? ",audiotaunts":""));
+            caps.Add("SupportsTweaks", "changeteam,deathreview,sniper,jip,nocompress_0_3_6,customloadouts,damagenumbers,ctfjoin,efirepacket,incompleteloadouts,cphysics,spawnhealth,destructiblemissiles,instareap" + (MPAudioTaunts.AClient.active ? ",audiotaunts":""));
             caps.Add("ModPrivateData", "1");
             caps.Add("ClassicWeaponSpawns", "1");
             caps.Add("NetVersion", MPTweaks.NET_VERSION.ToString());
@@ -343,6 +343,12 @@ namespace GameMod {
             }
             if (!clientInfo.Capabilities.ContainsKey("ClassicWeaponSpawns") && (MPClassic.matchEnabled || MPModPrivateData.ClassicSpawnsEnabled)) {
                 NetworkServer.SendToClient(connId, 86, new StringMessage("This match has classic weapon spawns and requires OLMod 0.3.6 or greater."));
+                GameManager.m_gm.StartCoroutine(DisconnectCoroutine(connId));
+            }
+            // an instareap match is unplayable for a client without the mode: its normal fire
+            // path would stay live and the relayed massdriver packets are unknown messages to it
+            if (MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP && !MPTweaks.ClientHasTweak(connId, "instareap")) {
+                NetworkServer.SendToClient(connId, 86, new StringMessage("This match runs the INSTAREAP mode and requires an instareap-capable OLMod."));
                 GameManager.m_gm.StartCoroutine(DisconnectCoroutine(connId));
             }
             if (clientInfo.Capabilities.ContainsKey("ModPrivateData")) {
