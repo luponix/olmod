@@ -1564,6 +1564,23 @@ namespace GameMod
             }
         }
 
+        // The kill is applied with an overkill 999 so armour and charge scaling can never leave
+        // a victim alive, but the server broadcasts that raw number and RpcApplyDamageEffects
+        // feeds it unclamped into the camera shake's intensity AND its falloff time - a ~50x
+        // shake lasting tens of seconds. It is invisible while dead (the death camera is
+        // detached from the transform the shake is applied to) and lands whole on the respawn.
+        // 24 is the engine's own ceiling: it is where the two hit cues in the same method
+        // saturate.
+        [HarmonyPatch(typeof(PlayerShip), "RpcApplyDamageEffects")]
+        class MatchModeInstareap_PlayerShip_RpcApplyDamageEffects
+        {
+            static void Prefix(ref float damage)
+            {
+                if (IsActive)
+                    damage = Mathf.Min(damage, 24f);
+            }
+        }
+
         // Label the equipped weapon as a massdriver
         [HarmonyPatch(typeof(Player), "UpdateCurrentWeaponName")]
         class MatchModeInstareap_PlayerShip_UpdateCurrentWeaponName
@@ -1585,11 +1602,13 @@ namespace GameMod
         [HarmonyPatch(typeof(UIElement), "DrawHUDWeaponReticle")]
         class MatchModeInstareap_UIElement_DrawHUDWeaponReticle
         {
-            private const float STROKE_INNER_RADIUS = 18f;
+            private const float STROKE_INNER_RADIUS = 7f;
             private const float STROKE_OUTER_RADIUS = 46f;
 
-            // the driller's three mark angles, which this reticle is meant to read like
-            private static readonly float[] STROKE_ANGLES = { 2.6179938f, Mathf.PI, 3.6651917f };
+            // right, down, left - the engine's reticle convention, NOT the usual maths one:
+            // UI +y points down and outward is (sin a, -cos a), so 0 is UP and a runs
+            // CLOCKWISE. Up is left clear for the aim line.
+            private static readonly float[] STROKE_ANGLES = { 1.5707964f, 3.1415927f, 4.712389f };
 
             static void Prefix(ref WeaponType wt)
             {
@@ -1602,7 +1621,10 @@ namespace GameMod
                 if (!IsActive)
                     return;
 
-                float alpha = __instance.m_alpha * (1f - GameManager.m_player_ship.m_boost_ui_fade * 0.95f);
+                // the engine's weapon marks fade out with m_boost_ui_fade because no weapon
+                // can be fired while boosting; the massdriver can, so its cooldown has to stay
+                // readable through a boost. Global HUD fades still apply.
+                float alpha = __instance.m_alpha;
                 float charged = Mathf.Clamp01(1f - massdriver_refire_time / MD_COOLDOWN_TIME);
                 for (int i = 0; i < STROKE_ANGLES.Length; i++)
                 {
@@ -1618,8 +1640,19 @@ namespace GameMod
             {
                 Vector2 outward = new Vector2(Mathf.Sin(angle), 0f - Mathf.Cos(angle));
                 Vector2 middle = center + outward * ((from + to) * 0.5f);
-                UIManager.DrawQuadUIRotated(middle, (to - from) * 0.5f, 1.6f, angle + Mathf.PI * 0.5f,
-                    color, alpha, 21);
+                UIManager.DrawQuadUIRotated(middle, (to - from) * 0.5f, 2f, angle + Mathf.PI * 0.5f,
+                    color, alpha, 11);
+            }
+        }
+
+        // No missiles in instareap, so the diamonds the engine parks around the crosshair for
+        // the selected one have nothing to indicate.
+        [HarmonyPatch(typeof(UIElement), "DrawHUDMissileReticle")]
+        class MatchModeInstareap_UIElement_DrawHUDMissileReticle
+        {
+            static bool Prefix()
+            {
+                return !IsActive;
             }
         }
 
