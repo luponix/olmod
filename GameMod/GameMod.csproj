@@ -246,6 +246,7 @@
     <Compile Include="VersionHandling\OlmodVersion.cs" />
     <Compile Include="VersionHandling\PatchVersionInfo.cs" />
     <Compile Include="VersionHandling\SelfUpdate.cs" />
+    <Compile Include="VersionHandling\SignedIndex.cs" />
     <Compile Include="VersionHandling\UpdateMenu.cs" />
     <Compile Include="VRScale.cs" />
     <Compile Include="VSync.cs" />

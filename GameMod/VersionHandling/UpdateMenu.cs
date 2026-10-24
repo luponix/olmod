@@ -29,12 +29,23 @@ namespace GameMod.VersionHandling
         private static int firstLine;
         private static int selection = SEL_BACK;
         private static bool popupDrawn;
+        private static SelfUpdateState drawnState;
 
         public static bool PopupOpen { get; private set; }
 
-        private static bool CanInstall
+        // the right-hand popup button: install, or retry whatever failed; null when there is
+        // nothing to act on (a running download offers CANCEL through the BACK slot instead)
+        private static string ActionLabel
         {
-            get { return SelfUpdate.State == SelfUpdateState.Available && SelfUpdate.Latest != null; }
+            get
+            {
+                switch (SelfUpdate.State)
+                {
+                    case SelfUpdateState.Available: return "UPDATE";
+                    case SelfUpdateState.Failed: return "RETRY";
+                    default: return null;
+                }
+            }
         }
 
         public static void OpenPopup()
@@ -95,6 +106,13 @@ namespace GameMod.VersionHandling
 
         public static void DrawPopup(UIElement ui)
         {
+            // a state change (a finished re-check, a failed install) changes what there is to show
+            if (drawnState != SelfUpdate.State)
+            {
+                drawnState = SelfUpdate.State;
+                changelog = null;
+            }
+
             // the stock items drew first and registered themselves; nothing behind a modal
             // may be navigated to
             UIManager.ResetSelectionList();
@@ -153,19 +171,18 @@ namespace GameMod.VersionHandling
 
         private static void DrawPopupButtons(UIElement ui)
         {
-            // there is no way back out of a running download, so it offers no buttons at all
-            if (SelfUpdate.State == SelfUpdateState.Downloading)
-                return;
+            bool downloading = SelfUpdate.State == SelfUpdateState.Downloading;
+            string action = ActionLabel;
 
-            Vector2 back = new Vector2(CanInstall ? -150f : 0f, 180f);
+            Vector2 back = new Vector2(action == null ? 0f : -150f, 180f);
             ui.TestMouseInRect(back, 134.5f, 24f, SEL_BACK);
-            ui.DrawSmallItem("BACK", back, selection == SEL_BACK, false, 0.4f, 0.5f);
+            ui.DrawSmallItem(downloading ? "CANCEL" : "BACK", back, selection == SEL_BACK, false, 0.4f, 0.5f);
 
-            if (!CanInstall)
+            if (action == null)
                 return;
             Vector2 install = new Vector2(150f, 180f);
             ui.TestMouseInRect(install, 134.5f, 24f, SEL_INSTALL);
-            ui.DrawSmallItemOrange("UPDATE", install, selection == SEL_INSTALL, false, 0.4f, 0.5f);
+            ui.DrawSmallItemOrange(action, install, selection == SEL_INSTALL, false, 0.4f, 0.5f);
         }
 
         // ---- popup input, in place of the stock main menu handling ----
@@ -176,7 +193,7 @@ namespace GameMod.VersionHandling
             if (!popupDrawn)
                 return;
 
-            if (!CanInstall)
+            if (ActionLabel == null)
                 selection = SEL_BACK;
 
             UIManager.MouseSelectUpdate();
@@ -190,14 +207,19 @@ namespace GameMod.VersionHandling
 
             if (!UIManager.PushedSelect(SEL_BACK))
                 return;
-            if (UIManager.m_menu_selection == SEL_INSTALL && CanInstall)
+            if (UIManager.m_menu_selection == SEL_INSTALL && ActionLabel != null)
             {
-                SelfUpdate.StartInstall();
+                if (SelfUpdate.Latest != null)
+                    SelfUpdate.StartInstall();
+                else
+                    SelfUpdate.StartCheck(); // a failed check is retried rather than installed
                 MenuManager.PlaySelectSound();
                 selection = SEL_BACK;
             }
-            else if (SelfUpdate.State != SelfUpdateState.Downloading)
+            else
             {
+                if (SelfUpdate.State == SelfUpdateState.Downloading)
+                    SelfUpdate.CancelInstall();
                 ClosePopup();
             }
         }
