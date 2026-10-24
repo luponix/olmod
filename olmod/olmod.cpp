@@ -44,6 +44,8 @@ typedef char *(*mono_class_get_namespace)(MonoClass *);
 typedef char *(*mono_method_get_name)(MonoMethod *);
 //static MonoClass *(*mono_object_get_class)(MonoObject *);
 typedef MonoClass *(*mono_method_get_class)(MonoMethod *);
+typedef void *(*mono_dl_fallback_load) (const char *name, int flags, char **err, void *user_data);
+typedef void *(*mono_dl_fallback_register) (mono_dl_fallback_load load_func, void *symbol_func, void *close_func, void *user_data);
 
 static mono_image_open_from_data_with_name org_mono_image_open_from_data_with_name;
 static mono_image_close org_mono_image_close;
@@ -58,6 +60,8 @@ static mono_array_new org_mono_array_new;
 static mono_class_get_name org_mono_class_get_name;
 static mono_class_get_namespace org_mono_class_get_namespace;
 static mono_method_get_name org_mono_method_get_name;
+static mono_dl_fallback_register org_mono_dl_fallback_register;
+static mono_dl_fallback_load org_mono_dl_fallback_load;
 static mono_method_get_class org_mono_method_get_class;
 
 static MonoImage *gamemod_img = NULL;
@@ -220,6 +224,44 @@ static void *my_mono_image_open_from_data_with_name(char *data, int data_len, in
 	return org_mono_image_open_from_data_with_name(data, data_len, copy, st, ref, name);
 }
 
+// Mono looks for an AOT companion library of every assembly image, and an image
+// opened from memory is named after the address of its data, so the name it asks
+// the dl fallback handler for is "data-0x<pointer>.dll". No such file can exist,
+// but Unity's handler prints a "Fallback handler could not load library" line for
+// every miss -- 717 of the 797 such lines in a startup log measured on Linux
+// 2026-10-24. Skipping the handler leaves the load failing exactly as before,
+// just silently. Mirrors the same hook in linux/olmod.c.
+static bool is_aot_probe(const char *name)
+{
+	const char *base = name;
+
+	if (!name)
+		return false;
+	for (const char *p = name; *p; p++)
+		if (*p == '\\' || *p == '/')
+			base = p + 1;
+	for (const char *prefix = "data-0x"; *prefix; prefix++, base++)
+		if (*base != *prefix)
+			return false;
+	return true;
+}
+
+static void *my_mono_dl_fallback_load(const char *name, int flags, char **err, void *user_data)
+{
+	if (is_aot_probe(name))
+		return NULL;
+	return org_mono_dl_fallback_load(name, flags, err, user_data);
+}
+
+static void *my_mono_dl_fallback_register(mono_dl_fallback_load load_func, void *symbol_func, void *close_func, void *user_data)
+{
+	if (load_func && !org_mono_dl_fallback_load) {
+		org_mono_dl_fallback_load = load_func;
+		load_func = my_mono_dl_fallback_load;
+	}
+	return org_mono_dl_fallback_register(load_func, symbol_func, close_func, user_data);
+}
+
 static FARPROC MyGetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
 	FARPROC ret = GetProcAddress(hModule, lpProcName);
 	if (lpProcName[0] != 'm')
@@ -261,6 +303,10 @@ static FARPROC MyGetProcAddress(HMODULE hModule, LPCSTR lpProcName) {
 		lstrcmpA(lpProcName, "mono_assembly_load_from") == 0)
 		return (PROC)abort;
 	*/
+	if (lstrcmpA(lpProcName, "mono_dl_fallback_register") == 0) {
+		org_mono_dl_fallback_register = (mono_dl_fallback_register)ret;
+		return (PROC)my_mono_dl_fallback_register;
+	}
 	if (lstrcmpA(lpProcName, "mono_image_open_from_data_with_name") == 0) {
 		mono_lib = hModule;
 		org_mono_image_open_from_data_with_name = (mono_image_open_from_data_with_name)ret;

@@ -37,6 +37,8 @@ typedef char *(*mono_class_get_name_t)(MonoClass *);
 typedef char *(*mono_class_get_namespace_t)(MonoClass *);
 typedef char *(*mono_method_get_name_t)(MonoMethod *);
 typedef MonoClass *(*mono_method_get_class_t)(MonoMethod *);
+typedef void *(*mono_dl_fallback_load_t)(const char *name, int flags, char **err, void *user_data);
+typedef void *(*mono_dl_fallback_register_t)(mono_dl_fallback_load_t load_func, void *symbol_func, void *close_func, void *user_data);
 
 static mono_image_close_t org_mono_image_close;
 static mono_assembly_load_from_full_t org_mono_assembly_load_from_full;
@@ -52,6 +54,8 @@ static mono_method_get_name_t org_mono_method_get_name;
 static mono_method_get_class_t org_mono_method_get_class;
 static mono_image_open_from_data_with_name_t org_mono_image_open_from_data_with_name;
 static mono_runtime_invoke_t org_mono_runtime_invoke;
+static mono_dl_fallback_register_t org_mono_dl_fallback_register;
+static mono_dl_fallback_load_t org_mono_dl_fallback_load;
 
 static MonoImage *gamemod_img = NULL;
 
@@ -209,6 +213,38 @@ static void *my_mono_image_open_from_data_with_name(char *data, int data_len, in
 	return org_mono_image_open_from_data_with_name(data, data_len, copy, st, ref, name);
 }
 
+// Mono looks for an AOT companion library of every assembly image, and an image
+// opened from memory is named after the address of its data, so the name it asks
+// the dl fallback handler for is "data-0x<pointer>.so". No such file can exist,
+// but Unity's handler prints a "Fallback handler could not load library" line for
+// every miss: 717 of the 797 such lines in a startup log measured 2026-10-24.
+// Skipping the handler leaves the load failing exactly as before, just silently.
+static int is_aot_probe(const char *name)
+{
+	const char *base;
+
+	if (!name)
+		return 0;
+	base = strrchr(name, '/');
+	return strncmp(base ? base + 1 : name, "data-0x", 7) == 0;
+}
+
+static void *my_mono_dl_fallback_load(const char *name, int flags, char **err, void *user_data)
+{
+	if (is_aot_probe(name))
+		return NULL;
+	return org_mono_dl_fallback_load(name, flags, err, user_data);
+}
+
+static void *my_mono_dl_fallback_register(mono_dl_fallback_load_t load_func, void *symbol_func, void *close_func, void *user_data)
+{
+	if (load_func && !org_mono_dl_fallback_load) {
+		org_mono_dl_fallback_load = load_func;
+		load_func = my_mono_dl_fallback_load;
+	}
+	return org_mono_dl_fallback_register(load_func, symbol_func, close_func, user_data);
+}
+
 #ifdef __APPLE__
 #define original_dlsym dlsym
 #else
@@ -249,6 +285,10 @@ static void *mono_dlsym(void *lib, const char *sym) {
 		org_mono_class_get_namespace = (mono_class_get_namespace_t)ret;
 	if (strcmp(sym, "mono_method_get_name") == 0)
 		org_mono_method_get_name = (mono_method_get_name_t)ret;
+	if (strcmp(sym, "mono_dl_fallback_register") == 0) {
+		org_mono_dl_fallback_register = (mono_dl_fallback_register_t)ret;
+		return my_mono_dl_fallback_register;
+	}
 	if (strcmp(sym, "mono_image_open_from_data_with_name") == 0) {
 		org_mono_image_open_from_data_with_name = ret;
 		return my_mono_image_open_from_data_with_name;
