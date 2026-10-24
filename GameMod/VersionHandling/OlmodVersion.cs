@@ -1,18 +1,9 @@
-﻿using System;
-using System.Collections;
-using System.Linq;
-using System.Text.RegularExpressions;
-using Newtonsoft.Json.Linq;
-using Overload;
-using UnityEngine;
-using UnityEngine.Networking;
-using Version = System.Version;
+﻿using Version = System.Version;
 
 namespace GameMod.VersionHandling {
 
     public static class OlmodVersion
     {
-        public static Version LatestKnownVersion { get; set; }
         public static Version RunningVersion { get; set; }
 
         public static bool Modded { get; set; }
@@ -35,57 +26,9 @@ namespace GameMod.VersionHandling {
             }
         }
 
-        public const string NewVersionReleasesUrl = "https://github.com/overload-development-community/olmod/releases";
-
-        private const string NewVersionCheckUrl = "https://api.github.com/repos/overload-development-community/olmod/releases";
-
         public static void Setup()
         {
-            RunningVersion = LatestKnownVersion = typeof(OlmodVersion).Assembly.GetName().Version;
-        }
-        
-        public static void TryRefreshLatestKnownVersion() 
-        {
-            if (_fullVersionString == null) {
-                Setup();
-            }
-        }
-
-        static IEnumerator VersionRequest() 
-        {
-            UnityWebRequest request = UnityWebRequest.Get(NewVersionCheckUrl);
-            request.timeout = 10;
-            yield return request.SendWebRequest();
-
-            if (request.isNetworkError || request.isHttpError)
-            {
-                Debug.LogErrorFormat("[Version] github releases request failed: {0}", request.error);
-                yield break;
-            }
-            else
-            {
-                JArray releases;
-                try
-                {
-                    releases = JArray.Parse(request.downloadHandler.text);
-
-                    if (releases == null) {
-                        yield break;
-                    }
-                }
-                catch (Exception e)
-                {
-                    Debug.LogError($"[Version] cannot parse the github releases response: {e}");
-                    yield break;
-                }
-
-                Match versionMatch1 = Regex.Match(releases.First()["tag_name"].GetString(), @"\d+\.\d+\.\d+(\.\d+)?");
-                if (versionMatch1.Success)
-                {
-                    // store the latest known versions so we can alert players on the main menu screen if the running version is outdated
-                    LatestKnownVersion = new Version(versionMatch1.Value);
-                }
-            }
+            RunningVersion = typeof(OlmodVersion).Assembly.GetName().Version;
         }
     }
 }
