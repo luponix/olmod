@@ -680,7 +680,15 @@ namespace GameMod
 
         public class Instareap
         {
-            static FieldInfo m_alpha_Field = AccessTools.Field(typeof(UIElement), "m_alpha");
+            // the scoreboard draws every frame while visible, so the sort scratch and the
+            // comparison are allocated once
+            static readonly List<int> scoreOrder = new List<int>();
+            static readonly Comparison<int> byScoreThenDeaths = (a, b) =>
+            {
+                List<Player> players = NetworkManager.m_PlayersForScoreboard;
+                int byScore = (players[a].m_kills * 3 + players[a].m_assists).CompareTo(players[b].m_kills * 3 + players[b].m_assists);
+                return byScore != 0 ? byScore : players[b].m_deaths.CompareTo(players[a].m_deaths);
+            };
 
             public static void DrawMpScoreboardRaw(UIElement uie, ref Vector2 pos)
             {
@@ -698,7 +706,6 @@ namespace GameMod
 
             static void DrawScoreHeader(UIElement uie, Vector2 pos, float col1, float col2, float col3, float col4, float col5, bool score = false)
             {
-                float m_alpha = (float)m_alpha_Field.GetValue(uie);
                 uie.DrawStringSmall(Loc.LS("PLAYER"), pos + Vector2.right * col1, 0.4f, StringOffset.LEFT, UIManager.m_col_ui0, 1f, -1f);
                 if (!NetworkMatch.m_head_to_head && score)
                     uie.DrawStringSmall(Loc.LS("SCORE"), pos + Vector2.right * (col2 - 100f), 0.4f, StringOffset.CENTER, UIManager.m_col_hi0, 1f, 90f);
@@ -706,26 +713,26 @@ namespace GameMod
                 if (!NetworkMatch.m_head_to_head && MPModPrivateData.AssistScoring)
                     uie.DrawStringSmall(Loc.LS("ASSISTS"), pos + Vector2.right * col3, 0.4f, StringOffset.CENTER, UIManager.m_col_ui0, 1f, 85f);
                 uie.DrawStringSmall(Loc.LS("DEATHS"), pos + Vector2.right * col4, 0.4f, StringOffset.CENTER, UIManager.m_col_ui0, 1f, 85f);
-                UIManager.DrawSpriteUI(pos + Vector2.right * col5, 0.13f, 0.13f, UIManager.m_col_ui0, m_alpha, 204);
+                UIManager.DrawSpriteUI(pos + Vector2.right * col5, 0.13f, 0.13f, UIManager.m_col_ui0, uie.m_alpha, 204);
             }
 
             static void DrawScoresWithoutTeams(UIElement uie, Vector2 pos, float col1, float col2, float col3, float col4, float col5, bool score = false)
             {
-                float m_alpha = (float)m_alpha_Field.GetValue(uie);
+                float m_alpha = uie.m_alpha;
                 List<Player> players = NetworkManager.m_PlayersForScoreboard;
-                List<int> list = new List<int>();
+                scoreOrder.Clear();
                 for (int i = 0; i < players.Count; i++)
                 {
                     if (!players[i].m_spectator)
                     {
-                        list.Add(i);
+                        scoreOrder.Add(i);
                     }
                 }
-                list.Sort((int a, int b) => ((players[a].m_kills * 3 + players[a].m_assists).CompareTo(players[b].m_kills * 3 + players[b].m_assists) != 0) ? (players[a].m_kills * 3 + players[a].m_assists).CompareTo(players[b].m_kills * 3 + players[b].m_assists) : players[b].m_deaths.CompareTo(players[a].m_deaths));
-                list.Reverse();
-                for (int j = 0; j < list.Count; j++)
+                scoreOrder.Sort(byScoreThenDeaths);
+                scoreOrder.Reverse();
+                for (int j = 0; j < scoreOrder.Count; j++)
                 {
-                    Player player = players[list[j]];
+                    Player player = players[scoreOrder[j]];
                     if (player && !player.m_spectator)
                     {
                         float num = (!player.gameObject.activeInHierarchy) ? 0.3f : 1f;

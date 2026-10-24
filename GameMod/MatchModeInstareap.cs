@@ -14,6 +14,26 @@ namespace GameMod
     {
         private const float MD_COOLDOWN_TIME = 1.5f;            // the time in seconds that needs to pass after firing a shot to be able to fire again
         private const float MD_TIME_TILL_ZOOM_KICKS_IN = 0.5f;    // the time in seconds between pressing the fire button and the camera starting to zoom in
+        private const float MD_RANGE = 100f;                    // how far the beam reaches, in meters
+
+        private const float D3_SHIP_HALF_WIDTH = 4.563f;
+        private const float OVERLOAD_SHIP_RADIUS = 1.2f;
+        private const float D3_UNIT = OVERLOAD_SHIP_RADIUS / D3_SHIP_HALF_WIDTH;
+
+        private const float BEAM_LIFETIME = 1.5f;
+        private const float BEAM_PEAK_ALPHA = 0.5f;
+        private const float BEAM_CORE_RADIUS = 0.0625f * D3_UNIT;
+        private const float BEAM_GLOW_RADIUS = 0.25f * D3_UNIT;
+        private const float RING_SPACING = 3f * D3_UNIT;
+        private const float RING_RADIUS = 0.5f * D3_UNIT;
+        private const float RING_RADIUS_PULSE = 0.15f * D3_UNIT;
+        private const float RING_SPIN_TURNS_PER_SECOND = 4f;
+        private const float RING_PHASE_STEP_TURNS = 9000f / 65536f;
+        private const float TUBE_MESH_RADIUS = 0.2f;
+        private const float RING_MESH_RADIUS = 1.2577f;
+        private static readonly Color BEAM_CORE_COLOR = new Color(200f / 255f, 200f / 255f, 255f / 255f);
+        private static readonly Color BEAM_GLOW_COLOR = new Color(96f / 255f, 96f / 255f, 168f / 255f);
+
         private static float massdriver_refire_time = 0f;
         private static bool active_shot = false;
         private static bool has_the_zoom_sound_effect_been_played = false;
@@ -25,6 +45,15 @@ namespace GameMod
 
         static MassdriverProjectile localplayer_md_projectile = new MassdriverProjectile();
         static MassdriverProjectile[] md_projectile_pool = new MassdriverProjectile[15];
+        static readonly Dictionary<int, float> lastShotTimeByConnection = new Dictionary<int, float>();
+
+        // NetworkMatch's mode survives leaving multiplayer, so every client-side instareap gate
+        // must also require that a multiplayer match is actually running - the mode check alone
+        // would leak into singleplayer, challenge and the menus
+        public static bool IsActive
+        {
+            get { return MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP && GameplayManager.IsMultiplayerActive; }
+        }
 
         public static void AddProjectile(MassdriverProjectilePacket mpp)
         {
@@ -37,15 +66,14 @@ namespace GameMod
                 if(!md_projectile_pool[i].active)
                 {
                     md_projectile_pool[i].Fire(mpp.start, mpp.rot, mpp.forward, mpp.end);
+                    return;
                 }
             }
         }
 
         public class MassdriverProjectilePacket : MessageBase
         {
-            public string owner;
-            public string target;
-            public bool hit;
+            public uint victimNetId;    // 0 when the beam hit nobody; who fired is taken from the connection
             public Vector3 start;
             public Vector3 end;
             public Vector3 forward;
@@ -53,8 +81,7 @@ namespace GameMod
 
             public override void Serialize(NetworkWriter writer)
             {
-                writer.Write(owner.ToString() + "/" + target);
-                writer.Write(hit);
+                writer.Write(victimNetId);
                 writer.Write(start);
                 writer.Write(end);
                 writer.Write(forward);
@@ -62,22 +89,11 @@ namespace GameMod
             }
             public override void Deserialize(NetworkReader reader)
             {
-                try
-                {
-                    reader.SeekZero();
-                    var msg = reader.ReadString().Split('/');
-                    owner = msg[0];
-                    target = msg[1];
-                    hit = reader.ReadBoolean();
-                    start = reader.ReadVector3();
-                    end = reader.ReadVector3();
-                    forward = reader.ReadVector3();
-                    rot = reader.ReadQuaternion();
-                }
-                catch(Exception ex)
-                {
-                    Debug.Log("----------------> Still small <----------------");
-                }
+                victimNetId = reader.ReadUInt32();
+                start = reader.ReadVector3();
+                end = reader.ReadVector3();
+                forward = reader.ReadVector3();
+                rot = reader.ReadQuaternion();
             }
         }
 
@@ -110,62 +126,153 @@ namespace GameMod
 
             private static void OnMassdriverProjectilePacket(NetworkMessage rawMsg)
             {
-                try
+                // the handler is registered for every match, but the packet only means
+                // anything while an instareap match is being played
+                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP || NetworkMatch.GetMatchState() != MatchState.PLAYING)
+                    return;
+
+                MassdriverProjectilePacket shot = rawMsg.ReadMessage<MassdriverProjectilePacket>();
+                int connection_id = rawMsg.conn.connectionId;
+
+                // Step 1: the shooter is whoever sent the packet - the payload never says who fired
+                Player shooter = Server.FindPlayerByConnectionId(connection_id);
+                if (shooter == null)
                 {
-
-                    MassdriverProjectilePacket rs = rawMsg.ReadMessage<MassdriverProjectilePacket>();
-
-
-                    // distribute the information about the shot
-                    MassdriverProjectilePacket mpp = new MassdriverProjectilePacket
-                    {
-                        owner = rs.owner,
-                        target = rs.target,
-                        hit = rs.hit,
-                        start = rs.start,
-                        end = rs.end,
-                        forward = rs.forward,
-                        rot = rs.rot,
-                    };
-                    foreach (NetworkConnection networkConnection in NetworkServer.connections)
-                    {
-                        if (networkConnection != null & rawMsg.conn.connectionId != networkConnection.connectionId)
-                            networkConnection.SendByChannel(MessageTypes.MsgMassdriverProjectilePacket, mpp, 0);
-                    }
-
-                    // if this shot hit someone kill that player 
-                    if (rs.hit)
-                    {
-                        Player killer = null;
-                        Player victim = null;
-                        for (int i = 0; i < Overload.NetworkManager.m_Players.Count; i++)
-                        {
-                            if (Overload.NetworkManager.m_Players[i].m_mp_name.Equals(rs.owner))
-                                killer = Overload.NetworkManager.m_Players[i];
-                            if (Overload.NetworkManager.m_Players[i].m_mp_name.Equals(rs.target))
-                                victim = Overload.NetworkManager.m_Players[i];
-                        }
-
-                        if (killer != null & victim != null)
-                        {
-                            DamageInfo di = new DamageInfo
-                            {
-                                owner = killer.gameObject,
-                                damage = 999f,
-                                stun_multiplier = 0f,
-                                push_force = 0f,
-                                push_dir = Vector3.zero,
-                                pos = rs.end,
-                                type = DamageType.ENERGY,
-                            };
-                            victim.c_player_ship.ApplyDamage(di);
-                        }
-                    }
+                    Debug.LogFormat("INSTAREAP: shot from connection {0} without a player", connection_id);
+                    return;
                 }
-                catch(Exception ex)
+                if (shooter.m_spectator || !IsAlive(shooter))
                 {
-                    Debug.Log("----------------> Still ran into the exception <----------------");
+                    Debug.LogFormat("INSTAREAP {0}: shot while not alive in the match", shooter.m_mp_name);
+                    return;
                 }
+
+                // Step 2: drop shots arriving faster than the weapon can fire, leaving slack for jitter
+                float previousShotTime;
+                if (lastShotTimeByConnection.TryGetValue(connection_id, out previousShotTime)
+                    && Time.time - previousShotTime < MD_COOLDOWN_TIME * 0.9f)
+                {
+                    Debug.LogFormat("INSTAREAP {0}: shot {1:F2}s after the previous one, cooldown is {2}s",
+                        shooter.m_mp_name, Time.time - previousShotTime, MD_COOLDOWN_TIME);
+                    return;
+                }
+                lastShotTimeByConnection[connection_id] = Time.time;
+
+                // Step 3: nothing in the packet is trusted - garbage endpoints would be relayed
+                // into every other client's Fire, which sizes its allocations from them
+                if (!IsFinite(shot.start) || !IsFinite(shot.end) || !IsFinite(shot.forward) || !IsFinite(shot.rot)
+                    || (shot.end - shot.start).magnitude > MD_RANGE + 5f
+                    || Vector3.Distance(shot.start, shooter.c_player_ship.transform.position) > 30f) // generous: the ship keeps flying while the packet travels
+                {
+                    Debug.LogFormat("INSTAREAP {0}: rejected beam from {1} to {2}", shooter.m_mp_name, shot.start, shot.end);
+                    return;
+                }
+
+                // Step 4: everyone else draws the beam
+                foreach (NetworkConnection networkConnection in NetworkServer.connections)
+                {
+                    if (networkConnection != null && networkConnection.connectionId != connection_id)
+                        networkConnection.SendByChannel(MessageTypes.MsgMassdriverProjectilePacket, shot, 0);
+                }
+
+                // Step 5: a claimed kill only lands if the server can confirm it for itself
+                if (shot.victimNetId == 0)
+                    return;
+
+                Player victim = FindPlayerByNetId(shot.victimNetId);
+                if (victim == null || !CanShotKill(shooter, victim, shot))
+                    return;
+
+                victim.c_player_ship.ApplyDamage(new DamageInfo
+                {
+                    owner = shooter.gameObject,
+                    damage = 999f,
+                    stun_multiplier = 0f,
+                    push_force = 0f,
+                    push_dir = Vector3.zero,
+                    pos = shot.end,
+                    type = DamageType.ENERGY,
+                });
+            }
+
+            // The beam is traced on the shooter's machine, so the server re-checks everything it can
+            // see for itself: the victim fit to fight, the beam no longer than the weapon reaches,
+            // fired from the shooter's own ship, passing close to the victim, and not stopped by the
+            // level on the way. Player-to-player blocking stays the shooter's call - only the client
+            // knows where everyone stood when the trigger came up.
+            private static bool CanShotKill(Player shooter, Player victim, MassdriverProjectilePacket shot)
+            {
+                if (victim == shooter || !IsAlive(victim) || victim.m_invulnerable)
+                    return false;
+
+                Vector3 beam = shot.end - shot.start;
+                float beamLength = beam.magnitude;
+                if (beamLength < 0.01f || beamLength > MD_RANGE + 5f)
+                    return false;
+
+                Vector3 beamDirection = beam / beamLength;
+                // the muzzle sits 1.5m ahead of the ship, which keeps flying while the packet travels
+                if (Vector3.Distance(shot.start, shooter.c_player_ship.transform.position) > 15f)
+                    return false;
+
+                Vector3 victimPosition = victim.c_player_ship.transform.position;
+                float distanceAlongBeam = Mathf.Clamp(Vector3.Dot(victimPosition - shot.start, beamDirection), 0f, beamLength);
+                // generous: the server's view of the victim trails the shooter's by up to a round trip
+                if (Vector3.Distance(shot.start + beamDirection * distanceAlongBeam, victimPosition) > 8f)
+                    return false;
+
+                const int blockers = (1 << (int)UnityObjectLayers.LEVEL) | (1 << (int)UnityObjectLayers.DOOR) | (1 << (int)UnityObjectLayers.LAVA);
+                RaycastHit blockedAt;
+                return !Physics.Raycast(shot.start, beamDirection, out blockedAt, distanceAlongBeam, blockers, QueryTriggerInteraction.Ignore);
+            }
+
+            private static Player FindPlayerByNetId(uint netId)
+            {
+                foreach (Player player in Overload.NetworkManager.m_Players)
+                    if (player != null && player.netId.Value == netId)
+                        return player;
+
+                return null;
+            }
+
+            private static bool IsAlive(Player player)
+            {
+                return player.c_player_ship != null && !player.c_player_ship.m_dead && !player.c_player_ship.m_dying;
+            }
+
+            private static bool IsFinite(Vector3 v)
+            {
+                return IsFinite(v.x) && IsFinite(v.y) && IsFinite(v.z);
+            }
+
+            private static bool IsFinite(Quaternion q)
+            {
+                return IsFinite(q.x) && IsFinite(q.y) && IsFinite(q.z) && IsFinite(q.w);
+            }
+
+            private static bool IsFinite(float f)
+            {
+                return !float.IsNaN(f) && !float.IsInfinity(f);
+            }
+        }
+
+        // cooldown stamps are per match
+        [HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
+        class MatchModeInstareap_NetworkMatch_InitBeforeEachMatch
+        {
+            static void Postfix()
+            {
+                lastShotTimeByConnection.Clear();
+            }
+        }
+
+        // UNET reuses connection ids, so a new player must not inherit the previous occupant's cooldown stamp
+        [HarmonyPatch(typeof(Server), "OnDisconnect")]
+        class MatchModeInstareap_Server_OnDisconnect
+        {
+            static void Postfix(NetworkMessage msg)
+            {
+                lastShotTimeByConnection.Remove(msg.conn.connectionId);
             }
         }
 
@@ -175,14 +282,12 @@ namespace GameMod
         {
             static bool Prefix(CCInput cc_type)
             {
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP | GameplayManager.IsDedicatedServer())
+                if (!IsActive || GameplayManager.IsDedicatedServer())
                     return true;
 
                 if (cc_type == CCInput.FIRE_WEAPON & GameplayManager.m_gameplay_state == GameplayState.PLAYING)
                 {
-                    if (GameplayManager.m_game_type == GameType.MULTIPLAYER 
-                        && NetworkMatch.GetMatchState() == MatchState.PLAYING && massdriver_refire_time <= 0
-                        && (!GameManager.m_local_player.c_player_ship.m_dead | !GameManager.m_local_player.c_player_ship.m_dying))
+                    if (CanChargeShot() && massdriver_refire_time <= 0)
                     {
                         if(IsFiringInputPressed(KeyPressed(cc_type), Controls.JoyButtonPressed(cc_type)) )
                         {
@@ -216,8 +321,24 @@ namespace GameMod
             }
 
 
+            // a shot can only be charged while the local ship is alive in a running match
+            public static bool CanChargeShot()
+            {
+                PlayerShip ship = GameManager.m_local_player == null ? null : GameManager.m_local_player.c_player_ship;
+
+                return ship != null
+                    && GameplayManager.m_game_type == GameType.MULTIPLAYER
+                    && GameplayManager.m_gameplay_state == GameplayState.PLAYING
+                    && NetworkMatch.GetMatchState() == MatchState.PLAYING
+                    && !ship.m_dead
+                    && !ship.m_dying;
+            }
+
             public static void UpdateZoom()
             {
+                if (GameManager.m_viewer == null)
+                    return;
+
                 float time = Time.time - start_time;
                 if(time > MD_TIME_TILL_ZOOM_KICKS_IN)
                 {
@@ -233,7 +354,8 @@ namespace GameMod
 
             public static void ResetZoom()
             {
-                GameManager.m_viewer.c_camera.fieldOfView = DEFAULT_FOV[MenuManager.opt_fov];
+                if (GameManager.m_viewer != null)
+                    GameManager.m_viewer.c_camera.fieldOfView = DEFAULT_FOV[MenuManager.opt_fov];
             }
 
             static bool IsFiringInputPressed(bool joy, bool mouse)
@@ -243,13 +365,22 @@ namespace GameMod
 
             static void Fire()
             {
-                if (localplayer_md_projectile != null)
+                if (localplayer_md_projectile == null)
+                    return;
+
+                PlayerShip ship = GameManager.m_local_player.c_player_ship;
+                // the muzzle sits inside the ship's own hitbox, so it has to be out of the way for the
+                // trace - and back afterwards whatever happens, or this player can never be hit again
+                ship.c_mesh_collider.enabled = false;
+                try
                 {
-                    GameManager.m_local_player.c_player_ship.c_mesh_collider.enabled = false;
-                    localplayer_md_projectile.Fire(GameManager.m_local_player.c_player_ship.transform.position + GameManager.m_local_player.c_player_ship.transform.forward * 1.5f, GameManager.m_local_player.c_player_ship.transform.rotation, GameManager.m_local_player.c_player_ship.transform.forward, Vector3.zero, false);
-                    GameManager.m_local_player.c_player_ship.c_mesh_collider.enabled = true;
-                    massdriver_refire_time = MD_COOLDOWN_TIME;
+                    localplayer_md_projectile.Fire(ship.transform.position + ship.transform.forward * 1.5f, ship.transform.rotation, ship.transform.forward, Vector3.zero, false);
                 }
+                finally
+                {
+                    ship.c_mesh_collider.enabled = true;
+                }
+                massdriver_refire_time = MD_COOLDOWN_TIME;
             }
 
             private static bool KeyPressed(CCInput cc_type)
@@ -282,16 +413,31 @@ namespace GameMod
 
         }
 
-        // Reset relevant data here
+        // Prepare the client-side massdriver assets when a ship enters an instareap match
         [HarmonyPatch(typeof(PlayerShip), "Awake")]
         class MatchModeInstareap_PlayerShip_Awake
         {
-            static void Postfix(PlayerShip __instance)
+            static void Postfix()
             {
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
+                if (!IsActive)
                     return;
 
                 InitialiseMeshes();
+                EnsureSoundEffects();
+            }
+        }
+
+        // Start the match with a fresh cooldown. Hooked here rather than at the ship's Awake:
+        // isLocalPlayer is not assigned yet there, and resetting for ANY spawning ship let the
+        // local player fire early whenever someone respawned or joined.
+        [HarmonyPatch(typeof(Player), "OnStartLocalPlayer")]
+        class MatchModeInstareap_Player_OnStartLocalPlayer
+        {
+            static void Postfix()
+            {
+                if (!IsActive)
+                    return;
+
                 massdriver_refire_time = 0f;
             }
         }
@@ -301,11 +447,17 @@ namespace GameMod
         {
             static void Prefix()
             {
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP | GameplayManager.IsDedicatedServer())
+                if (!IsActive || GameplayManager.IsDedicatedServer())
                     return;
 
                 if (massdriver_refire_time >= 0f)
                     massdriver_refire_time -= Time.deltaTime;
+
+                if (active_shot && !MatchModeInstareap_Controls_UpdateKey.CanChargeShot())
+                {
+                    active_shot = false;
+                    MatchModeInstareap_Controls_UpdateKey.ResetZoom();
+                }
 
                 if (localplayer_md_projectile == null)
                     localplayer_md_projectile = new MassdriverProjectile();
@@ -327,6 +479,9 @@ namespace GameMod
 
         public static void InitialiseMeshes()
         {
+            if (MassdriverProjectile.mesh_beam != null)
+                return;
+
             // create beam mesh
             MassdriverProjectile.mesh_beam = MassdriverProjectile.GenerateBeamMesh();
             // create halo mesh
@@ -343,7 +498,6 @@ namespace GameMod
             public bool active;
             float start_time;
             float relative_time;
-            int tori_per_8m = 9;
             int number_of_tori;
             Matrix4x4 translation_matrix_beam;
             Matrix4x4 translation_matrix_halo;
@@ -378,8 +532,8 @@ namespace GameMod
                 position_delta = end_position - start_position;
 
 
-                // set number_of_tori by dividing the distance of the hit with the desired space per torus
-                number_of_tori = (int)((position_delta.magnitude / 8f) * tori_per_8m);
+                // a relayed packet chooses the endpoints, so never allocate more rings than MD_RANGE can produce
+                number_of_tori = Mathf.Min((int)(position_delta.magnitude / RING_SPACING), (int)(MD_RANGE / RING_SPACING));
                 this.translation_matrix_beam = new Matrix4x4();
                 this.translation_matrix_halo = new Matrix4x4();
                 this.translation_matrix_torus = new Matrix4x4[number_of_tori];
@@ -392,14 +546,8 @@ namespace GameMod
                     this.mat_torus = GenerateTorusMaterial();
                 }
 
-                mat_torus.SetColor("_Color", new Color(1f, 1f, 1f, 1f));
-                mat_halo.SetColor("_Color", new Color(0.6f, 0.6f, 0.6f, 0.8f));
-                mat_beam.SetColor("_Color", new Color(0.3f, 0f, 0.3f, 1.2f));//new Color(0.5f, 0f, 0.5f, 1.2f));
+                ApplyFade(0f);
 
-                for (int i = 0; i < 4; i++)
-                {
-                    GameManager.m_light_manager.CreateLightFlash(start_position + 0.1f * position_delta + (i * 0.2f * position_delta), Color.white * 0.8f, 3f, 10f, 0.9f, false);
-                }
                 GameManager.m_light_manager.CreateLightFlash(end_position, Color.white * 0.8f, 3f, 10f, 0.9f, false);
 
 
@@ -411,6 +559,9 @@ namespace GameMod
 
             public static void PlayClipAtPoint(AudioClip clip, Vector3 position, float volume, bool spatialize = true)
             {
+                if (clip == null)
+                    return;
+
                 GameObject gameObject = new GameObject("One shot audio");
                 gameObject.transform.position = position;
                 AudioSource audioSource = (AudioSource)gameObject.AddComponent(typeof(AudioSource));
@@ -425,112 +576,85 @@ namespace GameMod
             private void CalculateAndSetEndPosition()
             {
                 // Do a raycast in the scene to figure out at what position this shot should end
-                const int layerMask = (1 << (int)UnityObjectLayers.LEVEL) | (1 << (int)UnityObjectLayers.LAVA | (1 << (int)UnityObjectLayers.PLAYER_MESH));
+                const int layerMask = (1 << (int)UnityObjectLayers.LEVEL) | (1 << (int)UnityObjectLayers.DOOR) | (1 << (int)UnityObjectLayers.LAVA) | (1 << (int)UnityObjectLayers.PLAYER_MESH);
                 RaycastHit hitInfo;
-                if (Physics.Raycast(start_position, forward, out hitInfo, 100, layerMask, QueryTriggerInteraction.Ignore))
-                    end_position = hitInfo.point;
-                else
-                    end_position = start_position + forward * 100;
+                bool hitSomething = Physics.Raycast(start_position, forward, out hitInfo, MD_RANGE, layerMask, QueryTriggerInteraction.Ignore);
+                end_position = hitSomething ? hitInfo.point : start_position + forward * MD_RANGE;
 
+                // hitInfo is only filled in on a hit - reading its collider after a miss throws
+                PlayerMeshCollider pmc = hitSomething ? hitInfo.collider.GetComponentInParent<PlayerMeshCollider>() : null;
 
-
-                MassdriverProjectilePacket mpp = new MassdriverProjectilePacket{ 
-                    owner = GameManager.m_local_player.m_mp_name,
-                    target = "",
-                    hit = false,
+                // the server decides whether this counts as a kill; it only needs to know who was claimed
+                MassdriverProjectilePacket mpp = new MassdriverProjectilePacket
+                {
+                    victimNetId = pmc != null && pmc.c_player != null ? pmc.c_player.netId.Value : 0u,
                     start = start_position,
                     end = end_position,
                     forward = forward,
                     rot = rotation,
                 };
-
-                // If this shot hit a player then send a packet to the server to kill that player unless he is invulnerable
-                PlayerMeshCollider pmc = hitInfo.collider.GetComponentInParent<PlayerMeshCollider>();
-                if (pmc != null)
-                {
-                    mpp = new MassdriverProjectilePacket
-                    {
-                        owner = GameManager.m_local_player.m_mp_name,
-                        target = pmc.c_player.m_mp_name,
-                        hit = true,
-                        start = start_position,
-                        end = end_position,
-                        forward = forward,
-                        rot = rotation,
-                    };
-                    //mpp.target = pmc.c_player.m_mp_name;
-                    //mpp.hit = true;
-                }
                 Client.GetClient().SendByChannel(MessageTypes.MsgMassdriverProjectilePacket, mpp, 0);
             }
 
             public void Update()
             {
-                // update the time
                 relative_time = Time.time - start_time;
 
-
-                mat_torus.SetColor("_Color", new Color(1f, 1f, 1f, 1f - relative_time));
-                mat_halo.SetColor("_Color", new Color(0.6f, 0.6f, 0.6f, 0.8f - relative_time));
-                mat_beam.SetColor("_Color", new Color(0.3f, 0f, 0.3f, 1.2f - relative_time));//new Color(0.3f, 0f, 0.3f, 1.2f - relative_time));
-
+                ApplyFade(relative_time);
                 Draw();
-                // Disable the entity if the shot shouldnt be rendered anymore
-                if (relative_time >= 1.5f)
+
+                if (relative_time >= BEAM_LIFETIME)
                     active = false;
+            }
+
+            private void ApplyFade(float elapsed)
+            {
+                float alpha = BEAM_PEAK_ALPHA * Mathf.Clamp01(1f - elapsed / BEAM_LIFETIME);
+
+                mat_beam.SetColor("_Color", new Color(BEAM_CORE_COLOR.r, BEAM_CORE_COLOR.g, BEAM_CORE_COLOR.b, alpha));
+                mat_halo.SetColor("_Color", new Color(BEAM_GLOW_COLOR.r, BEAM_GLOW_COLOR.g, BEAM_GLOW_COLOR.b, alpha));
+                mat_torus.SetColor("_Color", new Color(BEAM_GLOW_COLOR.r, BEAM_GLOW_COLOR.g, BEAM_GLOW_COLOR.b, alpha));
             }
 
 
             private void Draw()
             {
-                float percentage_time_left = Mathf.Clamp((1f - relative_time) / 1f, 0f, 1f);
+                float beam_length = position_delta.magnitude;
+                Vector3 beam_center = start_position + (0.5f * position_delta);
 
-                // Draw Beam
-                if (relative_time < 1.4)
+                scaling_vector_beam.x = BEAM_CORE_RADIUS / TUBE_MESH_RADIUS;
+                scaling_vector_beam.y = scaling_vector_beam.x;
+                scaling_vector_beam.z = beam_length;
+                translation_matrix_beam.SetTRS(beam_center, rotation, scaling_vector_beam);
+                Graphics.DrawMesh(mesh_beam, translation_matrix_beam, mat_beam, 0, GameManager.m_viewer.c_camera);
+
+                scaling_vector_halo.x = BEAM_GLOW_RADIUS / TUBE_MESH_RADIUS;
+                scaling_vector_halo.y = scaling_vector_halo.x;
+                scaling_vector_halo.z = beam_length;
+                translation_matrix_halo.SetTRS(beam_center, rotation, scaling_vector_halo);
+                Graphics.DrawMesh(mesh_halo, translation_matrix_halo, mat_halo, 0, GameManager.m_viewer.c_camera);
+
+                float spin = relative_time * RING_SPIN_TURNS_PER_SECOND * 2f * Mathf.PI;
+                Vector3 ring_step = (RING_SPACING / beam_length) * position_delta;
+                for (int i = 1; i < number_of_tori; i++)
                 {
-                    scaling_vector_beam.x = 0.15f;
-                    scaling_vector_beam.y = 0.15f;
-                    scaling_vector_beam.z = position_delta.magnitude;
-                    translation_matrix_beam.SetTRS(start_position + (0.5f * position_delta), rotation, scaling_vector_beam);
-                    Graphics.DrawMesh(mesh_beam, translation_matrix_beam, mat_beam, 0, GameManager.m_viewer.c_camera);
+                    float pulse = Mathf.Sin(spin + i * RING_PHASE_STEP_TURNS * 2f * Mathf.PI);
+                    float ring_scale = (RING_RADIUS + pulse * RING_RADIUS_PULSE) / RING_MESH_RADIUS;
+                    scaling_vectors_torus[i].x = ring_scale;
+                    scaling_vectors_torus[i].y = ring_scale;
+                    scaling_vectors_torus[i].z = ring_scale;
+                    translation_matrix_torus[i].SetTRS(start_position + i * ring_step, rotation, scaling_vectors_torus[i]);
+                    Graphics.DrawMesh(mesh_torus, translation_matrix_torus[i], mat_torus, 0, GameManager.m_viewer.c_camera);
                 }
-
-                // Draw Halo
-                if (relative_time < 1.2)
-                {
-                    scaling_vector_halo.x = 0.2f + percentage_time_left * 0.5f;
-                    scaling_vector_halo.y = 0.2f + percentage_time_left * 0.5f;
-                    scaling_vector_halo.z = position_delta.magnitude;
-                    translation_matrix_halo.SetTRS(start_position + (0.5f * position_delta), rotation, scaling_vector_halo);
-                    Graphics.DrawMesh(mesh_halo, translation_matrix_halo, mat_halo, 0, GameManager.m_viewer.c_camera);
-                }
-
-                // Draw Tori
-                if (relative_time < 0.9f)
-                {
-                    for (int i = 0; i < number_of_tori; i++)
-                    {
-                        if (i == 0)
-                            continue;
-
-                        float scalar = Mathf.Sin((6.28319f / 8f * (i % 8)) + (relative_time / 0.32f) * 6.28319f);
-                        scaling_vectors_torus[i].x = 0.15f + (percentage_time_left * 0.3f) + scalar * (0.03f + (0.12f * percentage_time_left));
-                        scaling_vectors_torus[i].y = 0.15f + (percentage_time_left * 0.3f) + scalar * (0.03f + (0.12f * percentage_time_left));
-                        scaling_vectors_torus[i].z = 0.1f +  (percentage_time_left * 0.3f) + scalar * 0.05f;
-                        translation_matrix_torus[i].SetTRS(start_position + ((i * (1f / number_of_tori)) * position_delta), rotation, scaling_vectors_torus[i]);
-                        Graphics.DrawMesh(mesh_torus, translation_matrix_torus[i], mat_torus, 0, GameManager.m_viewer.c_camera);
-                    }
-                }
-
             }
 
             private Material GenerateTorusMaterial()
             {
                 Material material = new Material(Shader.Find("Standard"));//"Transparent/Diffuse"));
-                material.color = new Color(1f, 1f, 1f, 0.3f);
+                material.color = new Color(BEAM_GLOW_COLOR.r, BEAM_GLOW_COLOR.g, BEAM_GLOW_COLOR.b, BEAM_PEAK_ALPHA);
                 material.SetFloat("_Mode", 3);
                 material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
-                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
                 material.SetInt("_ZWrite", 0);
                 material.DisableKeyword("_ALPHATEST_ON");
                 material.DisableKeyword("_ALPHABLEND_ON");
@@ -542,10 +666,10 @@ namespace GameMod
             private Material GenerateBeamMaterial()
             {
                 Material material = new Material(Shader.Find("Standard"));
-                material.color = new Color(0.3f, 0f, 0.3f, 1.2f);
+                material.color = new Color(BEAM_CORE_COLOR.r, BEAM_CORE_COLOR.g, BEAM_CORE_COLOR.b, BEAM_PEAK_ALPHA);
                 material.SetFloat("_Mode", 3);
                 material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
-                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
                 material.SetInt("_ZWrite", 0);
                 material.DisableKeyword("_ALPHATEST_ON");
                 material.DisableKeyword("_ALPHABLEND_ON");
@@ -556,10 +680,10 @@ namespace GameMod
             private Material GenerateHaloMaterial()
             {
                 Material material = new Material(Shader.Find("Standard"));
-                material.color = new Color(0.5f, 0f, 0.5f, 0.3f);
+                material.color = new Color(BEAM_GLOW_COLOR.r, BEAM_GLOW_COLOR.g, BEAM_GLOW_COLOR.b, BEAM_PEAK_ALPHA);
                 material.SetFloat("_Mode", 3);
                 material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
-                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
                 material.SetInt("_ZWrite", 0);
                 material.DisableKeyword("_ALPHATEST_ON");
                 material.DisableKeyword("_ALPHABLEND_ON");
@@ -1241,75 +1365,123 @@ namespace GameMod
             static void Postfix()
             {
                 if (speaker_mode != AudioSettings.speakerMode)
-                    MatchModeInstareap_GameManager_Awake.LoadSoundEffects();
+                    ReloadSoundEffects();
             }
         }
 
-        [HarmonyPatch(typeof(GameManager), "Awake")]
-        public class MatchModeInstareap_GameManager_Awake
+        private static string sound_effect_directory = "";
+        private static bool sound_effects_loaded = false;
+
+        // the clips load the first time an instareap match needs them - never at startup
+        public static void EnsureSoundEffects()
         {
-            public static string SoundEffectDirectory = "";
-
-            static void Postfix()
+            if (!sound_effects_loaded)
             {
-                LoadSoundEffects();
+                sound_effects_loaded = true;
+                ReloadSoundEffects();
             }
+        }
 
+        // recreates already-loaded clips, so a speaker mode change or audio reset can rebuild
+        // them; a player who never entered an instareap match keeps an untouched disk
+        public static void ReloadSoundEffects()
+        {
+            if (!sound_effects_loaded || GameplayManager.IsDedicatedServer())
+                return;
 
-            public static void LoadSoundEffects()
+            try
             {
-                if (String.IsNullOrEmpty(SoundEffectDirectory))
+                if (String.IsNullOrEmpty(sound_effect_directory))
                 {
-                    SoundEffectDirectory = Path.Combine(Application.persistentDataPath, "SoundEffects");
-                    if (!Directory.Exists(SoundEffectDirectory))
+                    sound_effect_directory = Path.Combine(Application.persistentDataPath, "SoundEffects");
+                    if (!Directory.Exists(sound_effect_directory))
                     {
-                        Debug.Log("Did not find a directory for soundeffects, creating one at: " + SoundEffectDirectory);
-                        Directory.CreateDirectory(SoundEffectDirectory);
+                        Debug.Log("Did not find a directory for soundeffects, creating one at: " + sound_effect_directory);
+                        Directory.CreateDirectory(sound_effect_directory);
                     }
-
-
-                    string MDFirePath = Path.Combine(SoundEffectDirectory, "MDfireB.wav");
-                    if (!File.Exists(MDFirePath))
-                    {
-                        File.WriteAllBytes(MDFirePath, GetMDFireAudioAsBytes());
-                    }
-                    md_fire_audio = LoadAsAudioClip("MDfireB.wav", SoundEffectDirectory);
-
-                    string MDZoomPath = Path.Combine(SoundEffectDirectory, "MDzoomtestB.wav");
-                    if (!File.Exists(MDZoomPath))
-                    {
-                        File.WriteAllBytes(MDZoomPath, GetMDZoomAudioAsBytes());
-                    }
-                    md_zoom_audio = LoadAsAudioClip("MDzoomtestB.wav", SoundEffectDirectory);
-
-                    string MDindicatorPath = Path.Combine(SoundEffectDirectory, "MDindicator.wav");
-                    if (!File.Exists(MDindicatorPath))
-                    {
-                        File.WriteAllBytes(MDindicatorPath, GetMDindicatorAudioAsBytes());
-                    }
-                    md_indicator_audio = LoadAsAudioClip("MDindicator.wav", SoundEffectDirectory);
-
                 }
+
+                md_fire_audio = LoadSoundEffect("MDfireB.wav", GetMDFireAudioAsBytes());
+                md_zoom_audio = LoadSoundEffect("MDzoomtestB.wav", GetMDZoomAudioAsBytes());
+                md_indicator_audio = LoadSoundEffect("MDindicator.wav", GetMDindicatorAudioAsBytes());
             }
-
-
-            private static AudioClip LoadAsAudioClip(string filename, string directory_path)
+            catch (IOException ex)
             {
-                //Debug.Log("  Attempting to load file as audio clip: " + filename);
-                string path = Path.Combine(directory_path, filename);
-                if (path != null)
-                {
-                    WWW www = new WWW("file:///" + path);
-                    while (!www.isDone) { }
-                    if (string.IsNullOrEmpty(www.error))
-                    {
-                        return www.GetAudioClip(true, false);
-                    }
-                    else Debug.Log("Error in 'LoadAsAudioClip': " + www.error + " : " + filename + " : " + directory_path);
-                }
+                Debug.LogFormat("INSTAREAP: cannot read or write sound effects in {0}: {1}", sound_effect_directory, ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Debug.LogFormat("INSTAREAP: no permission for sound effects in {0}: {1}", sound_effect_directory, ex.Message);
+            }
+        }
+
+        // writes the bundled default on first run, then reads back whatever is on disk, so a
+        // player can swap in their own file
+        private static AudioClip LoadSoundEffect(string filename, byte[] bundledDefault)
+        {
+            string path = Path.Combine(sound_effect_directory, filename);
+            if (!File.Exists(path))
+                File.WriteAllBytes(path, bundledDefault);
+
+            return DecodeWav(File.ReadAllBytes(path), filename);
+        }
+
+        // decodes a 16 bit pcm riff/wave file; returns null and logs if the bytes are not one.
+        // WWW would also read ogg, but it only reports completion per frame and the one caller
+        // runs outside the frame loop, which left the old code spinning the main thread.
+        private static AudioClip DecodeWav(byte[] wav, string name)
+        {
+            if (wav.Length < 12 || Encoding.ASCII.GetString(wav, 0, 4) != "RIFF" || Encoding.ASCII.GetString(wav, 8, 4) != "WAVE")
+            {
+                Debug.LogFormat("INSTAREAP {0}: not a riff/wave file", name);
                 return null;
             }
 
+            int channels = 0;
+            int sampleRate = 0;
+            int bitsPerSample = 0;
+            int chunkStart = 12;
+            while (chunkStart + 8 <= wav.Length)
+            {
+                string chunkId = Encoding.ASCII.GetString(wav, chunkStart, 4);
+                int chunkSize = BitConverter.ToInt32(wav, chunkStart + 4);
+                int body = chunkStart + 8;
+                // the file is user-swappable: a bad size must not stall or overrun the scan
+                if (chunkSize <= 0 || chunkSize > wav.Length - body)
+                {
+                    Debug.LogFormat("INSTAREAP {0}: chunk {1} with size {2} does not fit the file", name, chunkId, chunkSize);
+                    return null;
+                }
+
+                if (chunkId == "fmt " && body + 16 <= wav.Length)
+                {
+                    channels = BitConverter.ToInt16(wav, body + 2);
+                    sampleRate = BitConverter.ToInt32(wav, body + 4);
+                    bitsPerSample = BitConverter.ToInt16(wav, body + 14);
+                }
+                else if (chunkId == "data")
+                {
+                    if (bitsPerSample != 16 || channels < 1)
+                    {
+                        Debug.LogFormat("INSTAREAP {0}: expected 16 bit pcm, got {1} bit over {2} channels", name, bitsPerSample, channels);
+                        return null;
+                    }
+
+                    int sampleCount = chunkSize / 2;
+                    float[] samples = new float[sampleCount];
+                    for (int i = 0; i < sampleCount; i++)
+                        samples[i] = BitConverter.ToInt16(wav, body + i * 2) / 32768f;
+
+                    AudioClip clip = AudioClip.Create(name, sampleCount / channels, channels, sampleRate, false);
+                    clip.SetData(samples, 0);
+                    return clip;
+                }
+
+                chunkStart = body + chunkSize + (chunkSize & 1);    // chunks are word aligned
+            }
+
+            Debug.LogFormat("INSTAREAP {0}: no data chunk", name);
+            return null;
         }
 
         // Enable screenshake
@@ -1320,7 +1492,7 @@ namespace GameMod
 
             static void Prefix()
             {
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
+                if (!IsActive)
                     return;
 
                 option_screenshake = MenuManager.opt_hud_shake;
@@ -1329,7 +1501,7 @@ namespace GameMod
 
             static void Postfix()
             {
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
+                if (!IsActive)
                     return;
 
                 MenuManager.opt_hud_shake = option_screenshake;
@@ -1343,7 +1515,7 @@ namespace GameMod
 
             static void Postfix(Player __instance)
             {
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP)
+                if (!IsActive)
                     return;
 
                 __instance.CurrentWeaponName = "MASSDRIVER";

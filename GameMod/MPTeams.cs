@@ -99,8 +99,8 @@ namespace GameMod
 
         public static string TeamName(MpTeam team)
         {
-            if (MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP)
-                return "EMPTY";
+            if (MatchModeInstareap.IsActive)
+                return ""; // the mode has no teams, so any team label renders blank
 
             var c = MenuManager.mpc_decal_color;
             var cIdx = colorIdx[TeamNum(team)];
