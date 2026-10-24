@@ -1998,6 +1998,7 @@ namespace GameMod {
             {
                 MPSpawnHealth.CycleMenuOption();
             }
+            MenuManager.UnReverseOption(); // the engine always pairs these around a selection dispatch
         }
 
         static void InitializeMenu()

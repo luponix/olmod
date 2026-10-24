@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
@@ -63,13 +62,12 @@ namespace GameMod.Replay
                         }
                         else
                         {
-                            checkPagingArgs[0] = MenuManager.m_list_items_first;
-                            checkPagingArgs[1] = MenuManager.m_list_items_last;
-                            checkPagingArgs[2] = MenuManager.m_list_items_total_count;
-                            checkPagingArgs[3] = ROWS_PER_PAGE;
-                            bool pagingChanged = (bool)checkPagingMethod.Invoke(null, checkPagingArgs);
-                            MenuManager.m_list_items_first = (int)checkPagingArgs[0];
-                            MenuManager.m_list_items_last = (int)checkPagingArgs[1];
+                            int first = MenuManager.m_list_items_first;
+                            int last = MenuManager.m_list_items_last;
+                            bool pagingChanged = checkPaging(ref first, ref last,
+                                MenuManager.m_list_items_total_count, ROWS_PER_PAGE);
+                            MenuManager.m_list_items_first = first;
+                            MenuManager.m_list_items_last = last;
                             if (pagingChanged)
                             {
                                 confirmDelete = false;
@@ -104,10 +102,17 @@ namespace GameMod.Replay
                         {
                             if (selectedIndex >= 0 && selectedIndex < replays.Count)
                             {
-                                MenuManager.PlaySelectSound(1f);
-                                timer = 0f;
-                                UIManager.DestroyAll(false);
-                                Benchmark.Start(replays[selectedIndex].path, 0, 45f);
+                                if (!replays[selectedIndex].IsPlayable)
+                                {
+                                    MenuManager.PlayCycleSound(1f, -1f);
+                                }
+                                else
+                                {
+                                    MenuManager.PlaySelectSound(1f);
+                                    timer = 0f;
+                                    UIManager.DestroyAll(false);
+                                    Benchmark.Start(replays[selectedIndex].path, 0, 45f);
+                                }
                             }
                         }
                         else if (selection == SEL_DELETE)
@@ -133,8 +138,15 @@ namespace GameMod.Replay
             }
         }
 
+        // an unplayable demo must never reach UIManager.DestroyAll: Playback.Start aborts
+        // and msDemos would be left with no UI and no way out
         private static void StartPlayback(ref float timer)
         {
+            if (!replays[selectedIndex].IsPlayable)
+            {
+                MenuManager.PlayCycleSound(1f, -1f);
+                return;
+            }
             MenuManager.PlaySelectSound(1f);
             timer = 0f;
             UIManager.DestroyAll(false);
@@ -164,10 +176,12 @@ namespace GameMod.Replay
             RefreshList();
         }
 
-        private static readonly MethodInfo checkPagingMethod =
-            AccessTools.Method(typeof(MenuManager), "CheckPaging");
+        private delegate bool CheckPagingCall(ref int firstItem, ref int lastItem,
+            int numItems, int numItemsPerPage);
 
-        private static readonly object[] checkPagingArgs = new object[4];
+        private static readonly CheckPagingCall checkPaging =
+            (CheckPagingCall)Delegate.CreateDelegate(typeof(CheckPagingCall),
+                AccessTools.Method(typeof(MenuManager), "CheckPaging"));
 
         private struct DemoRow
         {
@@ -363,10 +377,11 @@ namespace GameMod.Replay
                 }
 
                 bool buttonsDisabled = selectedIndex < 0;
+                bool playDisabled = buttonsDisabled || !replays[selectedIndex].IsPlayable;
                 ui.SelectAndDrawItem("PLAY", new Vector2(detailX, actionY - 52f),
-                    SEL_PLAY, buttonsDisabled, itemScale, itemTextSize);
+                    SEL_PLAY, playDisabled, itemScale, itemTextSize);
                 ui.SelectAndDrawItem("BENCHMARK", new Vector2(detailX, actionY),
-                    SEL_BENCHMARK, buttonsDisabled, itemScale, itemTextSize);
+                    SEL_BENCHMARK, playDisabled, itemScale, itemTextSize);
                 ui.SelectAndDrawItem(confirmDelete ? "CONFIRM DELETE" : "DELETE",
                     new Vector2(detailX, actionY + 52f), SEL_DELETE, buttonsDisabled,
                     itemScale, itemTextSize);

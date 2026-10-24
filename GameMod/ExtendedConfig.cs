@@ -155,7 +155,16 @@ namespace GameMod
                     {
                         if (!current_section_id.Equals("unknown"))
                         {
-                            PassSectionToFunction(current_section, current_section_id);
+                            // a broken section must not abort the whole load; the sections
+                            // after it would be rewritten from stale memory on the next save
+                            try
+                            {
+                                PassSectionToFunction(current_section, current_section_id);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.LogErrorFormat("[Config] failed to load section {0}, keeping its defaults: {1}", current_section_id, ex.Message);
+                            }
                             completed.Add(current_section_id);
                             current_section_id = "unknown";
                             current_section.Clear();
@@ -1089,12 +1098,13 @@ namespace GameMod
                     string[] res = l.Split(':');
                     if (res.Length == 2)
                     {
-                        settings.Add(res[0], res[1]);
+                        settings[res[0]] = res[1]; // a hand-edited duplicate line must not throw
                     }
                     else
                     {
                         Debug.LogWarningFormat("[Config] Hotkeys: unexpected line \"{0}\", using defaults", line);
                         Set();
+                        ApplySettings(); // the file gets rewritten from settings, so the live binds must match it
                         return;
                     }
                 }
@@ -1133,20 +1143,22 @@ namespace GameMod
                 {
                     return;
                 }
+                // hotkeys the config file does not mention fall back to their default
+                // binding and get included on the next save. Filling from the live
+                // bindings instead would carry the previous pilot's binds over, and
+                // filling after the apply loop would leave them unapplied
+                foreach (Hotkeys.Hotkey h in Hotkeys.hotkeys)
+                {
+                    if (!settings.ContainsKey(h.name))
+                    {
+                        settings.Add(h.name, h.defaultBinding);
+                    }
+                }
                 foreach (var setting in settings)
                 {
                     if (!Hotkeys.SetBinding(setting.Key, setting.Value))
                     {
                         Debug.LogWarningFormat("[Config] Hotkeys: ignoring config entry '{0}: {1}'", setting.Key, setting.Value);
-                    }
-                }
-                // hotkeys added after the config file was written keep their default
-                // binding and get included on the next save
-                foreach (Hotkeys.Hotkey h in Hotkeys.hotkeys)
-                {
-                    if (!settings.ContainsKey(h.name))
-                    {
-                        settings.Add(h.name, Hotkeys.FormatBinding(h.keys));
                     }
                 }
             }

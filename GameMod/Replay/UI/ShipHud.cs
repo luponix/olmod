@@ -43,7 +43,7 @@ namespace GameMod.Replay
             Vector2 at = new Vector2(0f, BlockY);
             DrawArmor(ui, at, state, team, teamMatch, maxHitpoints);
             at.y += 35f;
-            DrawEnergyAmmo(ui, at, state, maxHitpoints);
+            DrawEnergyAmmo(ui, at, state, 120f); // MP MAX_ENERGY (Player.cs:1027); header maxHitpoints can differ on modded servers
             at.y += 70f;
             if (state.HasOverdrive)
             {
@@ -111,7 +111,7 @@ namespace GameMod.Replay
                 }
                 else
                 {
-                    ui.DrawStringSmall(MPTeams.TeamName(team) + " " + Loc.LS("TEAM"), bannerAt,
+                    ui.DrawStringSmall(TeamBannerLabel(team), bannerAt,
                         0.6f, StringOffset.CENTER, digits, 1f, BANNER_WIDTH);
                 }
                 pos.y += BANNER_STEP;
@@ -284,7 +284,6 @@ namespace GameMod.Replay
             Color nameColor = Color.Lerp(UIManager.m_col_hi4, UIManager.m_col_hi5,
                 UnityEngine.Random.value * UIElement.FLICKER);
             var weapon = (WeaponType)state.weapon;
-            WeaponUnlock weaponLevel = state.WeaponLevel(state.weapon);
 
             line.a = ui.m_alpha;
             pos.y += WeaponPanelDrop;
@@ -296,23 +295,27 @@ namespace GameMod.Replay
                 WEAPON_PANEL_HALF_WIDTH * 2f + 5f, line, SPRITE_BRACKET);
             UIManager.DrawQuadBarHorizontal(pos, 12f, 12f, WEAPON_BAR_WIDTH, line, 8);
 
-            Vector2 labelAt = new Vector2(pos.x - WEAPON_BAR_WIDTH * 0.5f, pos.y);
-            UIManager.DrawSpriteUI(labelAt, 0.18f, 0.18f, nameColor, ui.m_alpha,
-                SPRITE_WEAPON_ICONS + (int)weapon);
-            labelAt.x += 12f;
-            ui.DrawStringSmall(WeaponNameForLevel(weapon, weaponLevel), labelAt, 0.5f,
-                StringOffset.LEFT, nameColor, 1f, 145f);
-
-            if (weaponLevel > WeaponUnlock.LEVEL_1)
+            if ((int)weapon < LOADOUT_SLOTS)
             {
-                Color tagBox = selectedColor;
-                tagBox.a = ui.m_alpha;
-                labelAt.x = pos.x + (WEAPON_BAR_WIDTH * 0.5f - 4f);
-                labelAt.y = pos.y;
-                UIManager.DrawQuadBarHorizontal(labelAt, 9f, 9f, 8f, tagBox, 13);
-                labelAt.x -= 1f;
-                ui.DrawStringSmall(WeaponTagFor(weapon, weaponLevel), labelAt, 0.45f,
-                    StringOffset.CENTER, UIManager.m_col_ub3, 1f);
+                WeaponUnlock weaponLevel = state.WeaponLevel(state.weapon);
+                Vector2 labelAt = new Vector2(pos.x - WEAPON_BAR_WIDTH * 0.5f, pos.y);
+                UIManager.DrawSpriteUI(labelAt, 0.18f, 0.18f, nameColor, ui.m_alpha,
+                    SPRITE_WEAPON_ICONS + (int)weapon);
+                labelAt.x += 12f;
+                ui.DrawStringSmall(WeaponNameForLevel(weapon, weaponLevel), labelAt, 0.5f,
+                    StringOffset.LEFT, nameColor, 1f, 145f);
+
+                if (weaponLevel > WeaponUnlock.LEVEL_1)
+                {
+                    Color tagBox = selectedColor;
+                    tagBox.a = ui.m_alpha;
+                    labelAt.x = pos.x + (WEAPON_BAR_WIDTH * 0.5f - 4f);
+                    labelAt.y = pos.y;
+                    UIManager.DrawQuadBarHorizontal(labelAt, 9f, 9f, 8f, tagBox, 13);
+                    labelAt.x -= 1f;
+                    ui.DrawStringSmall(WeaponTagFor(weapon, weaponLevel), labelAt, 0.45f,
+                        StringOffset.CENTER, UIManager.m_col_ub3, 1f);
+                }
             }
 
             DrawPanelCorners(ui, pos, frame);
@@ -347,7 +350,6 @@ namespace GameMod.Replay
             Color nameColor = Color.Lerp(UIManager.m_col_hi4, UIManager.m_col_hi5,
                 UnityEngine.Random.value * UIElement.FLICKER);
             var missile = (MissileType)state.missile;
-            WeaponUnlock missileLevel = state.MissileLevel(state.missile);
 
             line.a = ui.m_alpha;
             pos.y += WeaponPanelDrop;
@@ -361,6 +363,7 @@ namespace GameMod.Replay
 
             if ((int)missile < LOADOUT_SLOTS)
             {
+                WeaponUnlock missileLevel = state.MissileLevel(state.missile);
                 Vector2 labelAt = new Vector2(pos.x - WEAPON_BAR_WIDTH * 0.5f, pos.y);
                 UIManager.DrawSpriteUI(labelAt, 0.18f, 0.18f, nameColor, ui.m_alpha,
                     SPRITE_MISSILE_ICONS + (int)missile);
@@ -455,26 +458,56 @@ namespace GameMod.Replay
                 digits, ui.m_alpha);
         }
 
+        // the name labels are rebuilt only when the shown weapon or its level changes,
+        // so an unchanged frame allocates nothing
+        private static string weaponNameLabel = "";
+        private static int weaponNameKey = -1;
+        private static string missileNameLabel = "";
+        private static int missileNameKey = -1;
+
         private static string WeaponNameForLevel(WeaponType weapon, WeaponUnlock level)
         {
-            if (weapon == WeaponType.NUM)
-                return "-";
-            if (level == WeaponUnlock.LEVEL_1)
-                return Player.WeaponNames[weapon] + "+";
-            if (level > WeaponUnlock.LEVEL_1)
-                return Player.WeaponNames[weapon] + "++";
-            return Player.WeaponNames[weapon];
+            int key = ((int)weapon << 3) | (int)level;
+            if (key != weaponNameKey)
+            {
+                weaponNameKey = key;
+                if (level == WeaponUnlock.LEVEL_1)
+                    weaponNameLabel = Player.WeaponNames[weapon] + "+";
+                else if (level > WeaponUnlock.LEVEL_1)
+                    weaponNameLabel = Player.WeaponNames[weapon] + "++";
+                else
+                    weaponNameLabel = Player.WeaponNames[weapon];
+            }
+            return weaponNameLabel;
         }
 
         private static string MissileNameForLevel(MissileType missile, WeaponUnlock level)
         {
-            if (missile == MissileType.NUM)
-                return "-";
-            if (level == WeaponUnlock.LEVEL_1)
-                return Player.MissileNames[missile] + "+";
-            if (level > WeaponUnlock.LEVEL_1)
-                return Player.MissileNames[missile] + "++";
-            return Player.MissileNames[missile];
+            int key = ((int)missile << 3) | (int)level;
+            if (key != missileNameKey)
+            {
+                missileNameKey = key;
+                if (level == WeaponUnlock.LEVEL_1)
+                    missileNameLabel = Player.MissileNames[missile] + "+";
+                else if (level > WeaponUnlock.LEVEL_1)
+                    missileNameLabel = Player.MissileNames[missile] + "++";
+                else
+                    missileNameLabel = Player.MissileNames[missile];
+            }
+            return missileNameLabel;
+        }
+
+        private static string teamBannerLabel = "";
+        private static int teamBannerTeam = -1;
+
+        private static string TeamBannerLabel(MpTeam team)
+        {
+            if ((int)team != teamBannerTeam)
+            {
+                teamBannerTeam = (int)team;
+                teamBannerLabel = MPTeams.TeamName(team) + " " + Loc.LS("TEAM");
+            }
+            return teamBannerLabel;
         }
 
         private static string WeaponTagFor(WeaponType weapon, WeaponUnlock level)

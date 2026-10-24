@@ -255,8 +255,10 @@ namespace GameMod
 
                     // the import resolves the slots from this string when it completes, and it
                     // otherwise still holds the pilot-load snapshot -- every slot picked since
-                    // would be dropped by a reload
-                    AClient.loaded_local_taunts = AClient.ChainTogetherHashesOfLocalTaunts();
+                    // would be dropped by a reload. While an import is still running the
+                    // slots read EMPTY, so snapshotting then would wipe the pilot's selection
+                    if (!AClient.ImportInProgress)
+                        AClient.loaded_local_taunts = AClient.ChainTogetherHashesOfLocalTaunts();
 
                     for (int i = 0; i < AMOUNT_OF_TAUNTS_PER_CLIENT; i++){
                         AClient.local_taunts[i] = new AudioTaunt
@@ -1470,6 +1472,15 @@ namespace GameMod
                         Debug.Log("[AudioTaunts] client " + rawMsg.conn.connectionId + " offers "
                             + file_hashes.Count + " hashes, " + msg.hashes.Length + " chars");
 
+                        // each unknown hash costs a 128 kB buffer, so a client only gets to
+                        // provide as many taunts as it has slots; the count is derived from
+                        // match_taunts so it survives split announcements and resets with it
+                        int accepted = 0;
+                        foreach (var t in match_taunts.Values)
+                            if (t.providing_clients != null && t.providing_clients.Contains(rawMsg.conn.connectionId))
+                                accepted++;
+                        int ignored = 0;
+
                         // Update match_taunts
                         int index = 0;
                         foreach (string hash in file_hashes)
@@ -1495,10 +1506,22 @@ namespace GameMod
                                         }
                                         if(!match_taunts[hash].providing_clients.Contains(rawMsg.conn.connectionId))
                                         {
-                                            match_taunts[hash].providing_clients.Add(rawMsg.conn.connectionId);
-                                        } 
+                                            if (accepted >= AMOUNT_OF_TAUNTS_PER_CLIENT)
+                                            {
+                                                ignored++;
+                                            }
+                                            else
+                                            {
+                                                match_taunts[hash].providing_clients.Add(rawMsg.conn.connectionId);
+                                                accepted++;
+                                            }
+                                        }
                                     }
                                     // this taunt doesnt exist, add it
+                                    else if (accepted >= AMOUNT_OF_TAUNTS_PER_CLIENT)
+                                    {
+                                        ignored++;
+                                    }
                                     else
                                     {
                                         AudioTaunt taunt = new AudioTaunt
@@ -1517,6 +1540,7 @@ namespace GameMod
                                         };
                                         taunt.providing_clients.Add(rawMsg.conn.connectionId);
                                         match_taunts.Add(hash, taunt);
+                                        accepted++;
                                     }
                                 }
                                 catch (Exception ex)
@@ -1531,6 +1555,10 @@ namespace GameMod
                             }
                             index++;
                         }
+
+                        if (ignored > 0)
+                            Debug.LogFormat("[AudioTaunts] client {0} offered more than {1} taunts, ignored {2} hashes",
+                                rawMsg.conn.connectionId, AMOUNT_OF_TAUNTS_PER_CLIENT, ignored);
 
                         try
                         {

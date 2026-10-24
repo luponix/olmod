@@ -27,9 +27,10 @@ namespace GameMod
         public const string KEY_REFL_OFF = "GFX_PERF_REFL_OFF";
         public const string KEY_SHIP_COMBINE = "GFX_PERF_SHIP_COMBINE";
 
-        public static int idleFxVal = 1;
+        // all default OFF: a release must not silently change anyone's rendering
+        public static int idleFxVal = 0;
         public static int deferredReflVal = 0;
-        public static int shipCombineVal = 1;
+        public static int shipCombineVal = 0;
 
         public static void LoadPrefs()
         {
@@ -387,6 +388,7 @@ namespace GameMod
 
         static void Postfix()
         {
+            if (GameplayManager.IsDedicatedServer()) return;
             IdleFxSkip.Tick();
             TickShipCombine();
         }
@@ -395,7 +397,6 @@ namespace GameMod
         {
             if (++frame % 60 != 0) return;
             if (!ShipMeshCombine.Enabled) return;
-            if (GameplayManager.IsDedicatedServer()) return;
             if (GameplayManager.m_gameplay_state != GameplayState.PLAYING) return;
             if (combined.Count > 256) combined.Clear();
 

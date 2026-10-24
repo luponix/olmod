@@ -29,7 +29,11 @@ namespace GameMod.ModsHandler
 
             ProcessStartInfo start = new ProcessStartInfo(commandLine[0], arguments.ToString());
             start.UseShellExecute = false;
-            start.WorkingDirectory = Environment.CurrentDirectory;
+            // On Linux the inherited LD_PRELOAD=./olmod.so only resolves from the olmod
+            // directory, so the current directory -- which anything may have changed --
+            // is not good enough.
+            start.WorkingDirectory = string.IsNullOrEmpty(Config.OLModDir)
+                ? Environment.CurrentDirectory : Config.OLModDir;
 
             UnityEngine.Debug.Log("[Mods] relaunch: starting " + start.FileName + " " + start.Arguments);
             try

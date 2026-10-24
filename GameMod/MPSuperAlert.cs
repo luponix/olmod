@@ -25,8 +25,9 @@ namespace GameMod{
         [HarmonyPatch(typeof(UIElement), "DrawHUD")]
         class MPSuperAlert_UIElement_DrawHUD{
             static void Postfix(UIElement __instance){
-                if (!Menus.mms_super_countdown || !MPSuperAlert.active_countdown 
+                if (!Menus.mms_super_countdown || !MPSuperAlert.active_countdown
                 || GameManager.m_local_player == null || GameManager.m_local_player.m_spectator
+                || GameManager.m_player_ship == null
                 || (bool)GameManager.m_player_ship.m_dying || (bool)GameManager.m_player_ship.m_dead)
                     return;
 

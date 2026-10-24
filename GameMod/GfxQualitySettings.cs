@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
@@ -53,6 +54,39 @@ namespace GameMod
             if (shadowCascadeIdx >= 0) QualitySettings.shadowCascades = ShadowCascadeValues[shadowCascadeIdx];
             if (shadowProjectionIdx >= 0) QualitySettings.shadowProjection = (ShadowProjection)shadowProjectionIdx;
             if (shadowNearPlaneIdx >= 0) QualitySettings.shadowNearPlaneOffset = ShadowNearPlaneValues[shadowNearPlaneIdx];
+            ApplyConsoleValues();
+        }
+
+        // qs_set writes land here instead of on QualitySettings directly, so the
+        // re-apply above repeats the console value on the next level load instead
+        // of reverting it; cycling the same field in the menu takes ownership back
+        private static readonly Dictionary<string, float> consoleValues = new Dictionary<string, float>();
+
+        public static void SetFromConsole(string field, float value)
+        {
+            consoleValues[field] = value;
+            ApplyConsoleValues();
+        }
+
+        private static void ApplyConsoleValues()
+        {
+            foreach (var entry in consoleValues)
+            {
+                float v = entry.Value;
+                switch (entry.Key)
+                {
+                    case "maxqueuedframes": QualitySettings.maxQueuedFrames = (int)v; break;
+                    case "softparticles": QualitySettings.softParticles = v != 0f; break;
+                    case "realtimereflectionprobes": QualitySettings.realtimeReflectionProbes = v != 0f; break;
+                    case "particleraycastbudget": QualitySettings.particleRaycastBudget = (int)v; break;
+                    case "shadows": QualitySettings.shadows = (ShadowQuality)(int)v; break;
+                    case "shadowdistance": QualitySettings.shadowDistance = v; break;
+                    case "shadowresolution": QualitySettings.shadowResolution = (ShadowResolution)(int)v; break;
+                    case "shadowcascades": QualitySettings.shadowCascades = (int)v; break;
+                    case "shadowprojection": QualitySettings.shadowProjection = (ShadowProjection)(int)v; break;
+                    case "shadownearplaneoffset": QualitySettings.shadowNearPlaneOffset = v; break;
+                }
+            }
         }
 
         private const string DEFAULT = "DEFAULT";
@@ -145,6 +179,13 @@ namespace GameMod
 
         // Every item cycles through its own values plus a DEFAULT step, which
         // is what the -1 means.
+        // the menu item order on the page; cycling an item takes the field back
+        // from any qs_set console override
+        private static readonly string[] ConsoleFieldBySelection = {
+            "maxqueuedframes", "softparticles", "realtimereflectionprobes", "particleraycastbudget",
+            "shadows", "shadowdistance", "shadowresolution", "shadowcascades", "shadowprojection",
+            "shadownearplaneoffset" };
+
         public static void HandleSelection(int selection)
         {
             int dir = UIManager.m_select_dir;
@@ -162,6 +203,7 @@ namespace GameMod
                 case 9: shadowNearPlaneIdx = CycleDefault(shadowNearPlaneIdx, dir, ShadowNearPlaneValues.Length); break;
                 default: return;
             }
+            consoleValues.Remove(ConsoleFieldBySelection[selection]);
             MenuManager.PlayCycleSound(1f, dir);
             ApplyQualitySettings();
         }

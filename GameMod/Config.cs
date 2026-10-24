@@ -19,7 +19,7 @@ namespace GameMod {
         {
             if (string.IsNullOrEmpty(OLModDir))
             {
-                Debug.Log("[Init] olmod directory unknown " + Environment.GetEnvironmentVariable("OLMODDIR") + " path " + Environment.GetEnvironmentVariable("PATH"));
+                Debug.Log("[Init] olmod directory unknown, OLMODDIR " + (Environment.GetEnvironmentVariable("OLMODDIR") ?? "(unset)"));
                 return;
             }
             string settingsFilename = "olmodsettings.json";

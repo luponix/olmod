@@ -31,6 +31,8 @@ namespace GameMod.ModsHandler
 
         private static readonly List<Row> rows = new List<Row>();
         private static int seenChanges;
+        private static int firstRow;
+        private static int previousSelection = -1;
 
         public static void ModsUpdate(ref float timer)
         {
@@ -41,6 +43,7 @@ namespace GameMod.ModsHandler
                     if (timer > 0.25f)
                     {
                         seenChanges = Library.Changes;
+                        firstRow = 0;
                         RefreshRows();
                         UIManager.CreateUIElement(UIManager.SCREEN_CENTER, 7000, uiMods);
                         MenuManager.m_menu_sub_state = MenuSubState.ACTIVE;
@@ -56,6 +59,14 @@ namespace GameMod.ModsHandler
                     {
                         seenChanges = Library.Changes;
                         RefreshRows();
+                    }
+
+                    if (timer > 0.25f)
+                    {
+                        float wheel = Input.GetAxis("Mouse ScrollWheel");
+                        if (wheel != 0f)
+                            ScrollTo(firstRow + (wheel < 0f ? 1 : -1));
+                        ScrollWithSelection();
                     }
 
                     if (timer > 0.25f && UIManager.PushedSelect(SEL_BACK))
@@ -89,6 +100,43 @@ namespace GameMod.ModsHandler
             }
         }
 
+        private static void ScrollTo(int first)
+        {
+            firstRow = Mathf.Clamp(first, 0, Math.Max(0, rows.Count - ROWS_SHOWN));
+        }
+
+        // Scrolls the list when UP/DOWN is pressed on the edge row of the visible
+        // window, so the keyboard can reach the off-screen rows.
+        private static void ScrollWithSelection()
+        {
+            int button = previousSelection - SEL_LIST_BASE;
+            int row = button / 2;
+            if (button >= 0 && row < rows.Count && Controls.JustPressedMenuDirection())
+            {
+                float menuDirY = Controls.MenuDirection().y;
+                if (menuDirY > 0.45f && row == firstRow + ROWS_SHOWN - 1 && row + 1 < rows.Count)
+                {
+                    ScrollTo(firstRow + 1);
+                    SelectButton(previousSelection + 2);
+                }
+                else if (menuDirY < -0.45f && row == firstRow && row > 0)
+                {
+                    ScrollTo(firstRow - 1);
+                    SelectButton(previousSelection - 2);
+                }
+            }
+            previousSelection = UIManager.m_menu_selection;
+        }
+
+        private static void SelectButton(int selection)
+        {
+            bool engineAlreadyMoved = UIManager.m_menu_selection != previousSelection;
+            UIManager.m_menu_selection = selection;
+            UIManager.m_sl_prev_valid = false;
+            if (!engineAlreadyMoved)
+                MenuManager.PlayMoveSound();
+        }
+
         public static void DrawMods(UIElement ui)
         {
             ui.m_alpha = 1f;
@@ -109,14 +157,15 @@ namespace GameMod.ModsHandler
             }
             else
             {
-                for (int i = 0; i < rows.Count && i < ROWS_SHOWN; i++)
+                for (int i = firstRow; i < rows.Count && i < firstRow + ROWS_SHOWN; i++)
                 {
                     DrawRow(ui, rows[i], i, y);
                     y += 62f;
                 }
                 if (rows.Count > ROWS_SHOWN)
                     ui.DrawLabelSmall(new Vector2(0f, y),
-                        string.Format(Loc.LS("{0} MORE NOT SHOWN"), rows.Count - ROWS_SHOWN), 500f);
+                        string.Format(Loc.LS("{0} - {1} OF {2}"), firstRow + 1,
+                            Math.Min(firstRow + ROWS_SHOWN, rows.Count), rows.Count), 500f);
             }
 
             Vector2 position = new Vector2(0f, UIManager.UI_BOTTOM - 150f);
@@ -232,6 +281,7 @@ namespace GameMod.ModsHandler
             foreach (string file in Catalog.NotInstalled())
                 if (!rows.Exists(row => string.Equals(row.File, file, StringComparison.OrdinalIgnoreCase)))
                     rows.Add(RowFor(file, false));
+            ScrollTo(firstRow);
         }
 
         private static Row RowFor(string file, bool installed)

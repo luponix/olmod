@@ -265,6 +265,8 @@ namespace GameMod.Replay
             ItemLifetime lifetime;
             if (pickerIndex < 0 || !lifetimeById.TryGetValue(pickup.iA, out lifetime))
                 return;
+            if (GameManager.m_audio == null)
+                return;
             int cue = (int)Item.GetPickupSoundEffect(lifetime.type, lifetime.super);
             if (pickerIndex == Viewpoint.Watching)
             {
@@ -337,7 +339,8 @@ namespace GameMod.Replay
 
         public static void PlayGoalFx(Vector3 pos, Quaternion rot)
         {
-            ParticleManager.psm[3].StartParticleInstant(49, pos, rot); // sub-manager 3, particle 49: the goal burst
+            if (ParticleManager.psm[3] != null)
+                ParticleManager.psm[3].StartParticleInstant(49, pos, rot); // sub-manager 3, particle 49: the goal burst
             SFXCueManager.PlayRawSoundEffect2D(SoundEffect.hud_notify_message1, 1f, 0f, 0f, true);
         }
 

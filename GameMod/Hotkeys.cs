@@ -14,7 +14,7 @@ namespace GameMod
     {
         static Hotkeys()
         {
-            Register("test", "p+o+s", "For testing different scenarios with clear and harmless output", Test);
+            Register("test", "none", "For testing different scenarios with clear and harmless output", Test);
             Register("fullscreen", "alt+f", "Toggles between fullscreen and windowed mode", ToggleFullscreen);
         }
 
@@ -261,7 +261,10 @@ namespace GameMod
     {
         static void Postfix()
         {
-            if (!Input.anyKeyDown || GameplayManager.IsDedicatedServer() || uConsole.IsOn() || PlayerShip.m_typing_in_chat)
+            // m_disable_menu_letter_keys is the engine's "a menu text field is being
+            // typed into" state (pilot name, password, gameon code)
+            if (!Input.anyKeyDown || GameplayManager.IsDedicatedServer() || uConsole.IsOn()
+                || PlayerShip.m_typing_in_chat || Controls.m_disable_menu_letter_keys)
                 return;
 
             foreach (Hotkeys.Hotkey h in Hotkeys.hotkeys)

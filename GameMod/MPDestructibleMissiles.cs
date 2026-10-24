@@ -1,10 +1,12 @@
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using Overload;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.Networking.NetworkSystem;
 
 namespace GameMod
 {
@@ -183,9 +185,28 @@ namespace GameMod
             }
         }
 
+        private static bool collisionMatrixApplied;
+
+        // layer 27 (rp ignore) collides with nothing by default; opening it up is only
+        // needed where re-layered missiles exist, so installs that never enable the
+        // feature keep the stock matrix
+        public static void ApplyCollisionMatrix()
+        {
+            if (collisionMatrixApplied)
+                return;
+            collisionMatrixApplied = true;
+            // 11 robots, 13 projectiles, 14 level, 16 ships, 17 doors,
+            // 18 destroyables, 23 solid, 24 area effects, 26 lava, 31 monsterball
+            int[] relevantLayers = { 11, 13, 14, 16, 17, 18, 23, 24, 26, 31 };
+            Physics.IgnoreLayerCollision(MISSILE_LAYER, MISSILE_LAYER, false);
+            foreach (int layer in relevantLayers)
+                Physics.IgnoreLayerCollision(MISSILE_LAYER, layer, false);
+        }
+
         // server relayers the missile and tracks its hp
         public static void SetupServer(Projectile proj, int idx)
         {
+            ApplyCollisionMatrix();
             GameObject holder = proj.c_collider != null ? proj.c_collider.gameObject : proj.c_go;
             holder.layer = MISSILE_LAYER;
             proj.c_go.layer = MISSILE_LAYER;
@@ -312,25 +333,35 @@ namespace GameMod
     [HarmonyPatch(typeof(GameManager), "Awake")]
     class MPDestructibleMissiles_GameManager_Awake
     {
-        // 11 robots 
-        // 13 projectiles 
-        // 14 level 
-        // 16 ships 
-        // 17 doors 
-        // 18 destroyables 
-        // 23 solid 
-        // 24 area effects 
-        // 26 lava 
-        // 31 monsterball
-        static readonly int[] RelevantLayers = { 11, 13, 14, 16, 17, 18, 23, 24, 26, 31 };
-
         static void Postfix()
         {
-            Physics.IgnoreLayerCollision(MPDestructibleMissiles.MISSILE_LAYER, MPDestructibleMissiles.MISSILE_LAYER, false);
-            foreach (int layer in RelevantLayers)
-                Physics.IgnoreLayerCollision(MPDestructibleMissiles.MISSILE_LAYER, layer, false);
-
             MPDestructibleMissiles.ApplyServerOverrides();
+        }
+    }
+
+    // a client without the tweak never learns a missile was shot down (the ghost
+    // keeps flying until pool reuse), so a destructible-missiles match cannot
+    // contain one -- same handling as classic weapon spawns in MPTweaks
+    [HarmonyPatch(typeof(Server), "OnLoadoutDataMessage")]
+    class MPDestructibleMissiles_Server_OnLoadoutDataMessage
+    {
+        static void Postfix(NetworkMessage msg)
+        {
+            int connId = msg.conn.connectionId;
+            if (connId == 0) // ignore local connection
+                return;
+            if (!MPDestructibleMissiles.Enabled || MPTweaks.ClientHasTweak(connId, "destructiblemissiles"))
+                return;
+            NetworkServer.SendToClient(connId, 86, new StringMessage("This match has destructible missiles and requires a newer OLMod."));
+            GameManager.m_gm.StartCoroutine(DisconnectCoroutine(connId));
+        }
+
+        private static IEnumerator DisconnectCoroutine(int connectionId)
+        {
+            yield return new WaitForSecondsRealtime(5);
+            var conn = NetworkServer.connections[connectionId];
+            if (conn != null)
+                conn.Disconnect();
         }
     }
 

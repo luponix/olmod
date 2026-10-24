@@ -57,7 +57,17 @@ namespace GameMod.ModsHandler
                 }
                 JArray selection = startup["mods"] as JArray;
                 if (selection != null)
-                    Enabled.AddRange(selection.Values<string>().Where(name => !string.IsNullOrEmpty(name)));
+                {
+                    foreach (string name in selection.Values<string>())
+                    {
+                        if (!Catalog.IsPlainModFileName(name))
+                        {
+                            Debug.Log("[Mods] ignoring startup entry " + (name ?? "(none)") + " -- not a plain Mod-*.dll name");
+                            continue;
+                        }
+                        Enabled.Add(name);
+                    }
+                }
             }
             else
             {

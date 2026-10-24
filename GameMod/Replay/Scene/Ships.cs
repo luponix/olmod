@@ -71,6 +71,22 @@ namespace GameMod.Replay
 
         public static void Destroy()
         {
+            // hullMaterials holds the per-renderer copies the renderer.materials getter
+            // instantiated in SetCloaked; destroying the clone does not destroy them
+            if (renderStates != null)
+                foreach (var renderState in renderStates)
+                {
+                    if (renderState == null || renderState.hullMaterials == null)
+                        continue;
+                    foreach (var slotMaterials in renderState.hullMaterials)
+                    {
+                        if (slotMaterials == null)
+                            continue;
+                        foreach (var material in slotMaterials)
+                            if (material != null)
+                                UnityEngine.Object.Destroy(material);
+                    }
+                }
             if (clones != null)
                 foreach (var clone in clones)
                     if (clone != null)

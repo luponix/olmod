@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using Overload;
@@ -51,48 +50,48 @@ namespace GameMod.ModsHandler
         }
 
         // The hash the catalog publishes is what tells the file the site serves from one
-        // that merely took its name. Null when the file is gone or unreadable.
+        // that merely took its name. Read fresh every call -- a cache keyed on size and
+        // mtime would keep calling an in-place swap "published". Null when the file is
+        // gone or unreadable.
         public static string HashOf(string file)
         {
             FileInfo info = new FileInfo(Path.Combine(Config.OLModDir, file));
             if (!info.Exists)
                 return null;
-
-            Known known;
-            if (hashes.TryGetValue(file, out known) &&
-                known.Length == info.Length && known.Written == info.LastWriteTimeUtc)
-                return known.Hex;
-
-            string hex;
             try
             {
                 using (SHA256 sha = SHA256.Create())
                 using (FileStream contents = info.OpenRead())
-                    hex = Hex(sha.ComputeHash(contents));
+                    return Hex(sha.ComputeHash(contents));
             }
             catch (Exception ex)
             {
                 Debug.Log("[Mods] cannot hash " + info.FullName + " -- " + ex.Message);
                 return null;
             }
-            hashes[file] = new Known { Length = info.Length, Written = info.LastWriteTimeUtc, Hex = hex };
-            return hex;
         }
 
-        private class Known
-        {
-            public long Length;
-            public DateTime Written;
-            public string Hex;
-        }
-
-        private static readonly Dictionary<string, Known> hashes = new Dictionary<string, Known>();
+        private const ulong DOWNLOAD_BYTES_MAX = 64 * 1024 * 1024;
 
         private static IEnumerator Fetch(Catalog.Entry entry)
         {
+            ulong sizeLimit = entry.Size > 0 && (ulong)entry.Size < DOWNLOAD_BYTES_MAX
+                ? (ulong)entry.Size : DOWNLOAD_BYTES_MAX;
             using (UnityWebRequest request = UnityWebRequest.Get(entry.Url))
             {
-                yield return request.SendWebRequest();
+                request.timeout = 10;
+                UnityWebRequestAsyncOperation sending = request.SendWebRequest();
+                while (!sending.isDone)
+                {
+                    if (request.downloadedBytes > sizeLimit)
+                        request.Abort();
+                    yield return null;
+                }
+                if (request.downloadedBytes > sizeLimit)
+                {
+                    Fail(entry.File, "the download is larger than published");
+                    yield break;
+                }
                 if (request.isNetworkError || request.isHttpError)
                 {
                     Fail(entry.File, request.error);
@@ -121,11 +120,18 @@ namespace GameMod.ModsHandler
             Debug.Log("[Mods] downloaded " + entry.File + " from " + entry.Url);
         }
 
+        // Temp file + rename, so a crash mid-write cannot leave a truncated DLL under
+        // the final name that the next start would try to load.
         private static string Write(string file, byte[] payload)
         {
+            string path = Path.Combine(Config.OLModDir, file);
             try
             {
-                File.WriteAllBytes(Path.Combine(Config.OLModDir, file), payload);
+                string temporary = path + ".tmp";
+                File.WriteAllBytes(temporary, payload);
+                if (File.Exists(path))
+                    File.Delete(path);
+                File.Move(temporary, path);
                 return null;
             }
             catch (Exception ex)

@@ -60,6 +60,7 @@ printf '\n1 24 "olmod.manifest"\n' >> "$BUILD"/olmod.rc
     -o "$OUT" \
     "$SRC"/olmod.cpp "$SRC"/stdafx.cpp "$BUILD"/olmod.res \
     -mwindows -static -static-libgcc -static-libstdc++ \
+    -Wl,--dynamicbase,--nxcompat,--high-entropy-va \
     -ldbghelp -lshell32 -ladvapi32 -luser32 -lkernel32
 
 x86_64-w64-mingw32-strip "$OUT" 2>/dev/null || true

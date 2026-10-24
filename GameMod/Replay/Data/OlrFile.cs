@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
 using Ionic.Zlib;
 using UnityEngine;
 
@@ -106,7 +107,7 @@ namespace GameMod.Replay
                 float storedDuration;
                 var replay = ReadHeader(reader, out storedDuration);
 
-                int frameCount = reader.ReadInt32();
+                int frameCount = ReadCount(reader, 2000000, "frame"); // ~9 h at 60 Hz
                 for (int i = 0; i < frameCount; i++)
                 {
                     var frame = new Frame();
@@ -119,11 +120,11 @@ namespace GameMod.Replay
                     replay.frames.Add(frame);
                 }
 
-                int eventCount = reader.ReadInt32();
+                int eventCount = ReadCount(reader, 1000000, "event");
                 for (int i = 0; i < eventCount; i++)
-                    replay.events.Add(ReadEvent(reader));
+                    replay.events.Add(ReadEvent(reader, replay.players.Count));
 
-                int chatCount = reader.ReadInt32();
+                int chatCount = ReadCount(reader, 1000000, "chat");
                 for (int i = 0; i < chatCount; i++)
                     replay.chat.Add(ReadChat(reader));
 
@@ -139,6 +140,43 @@ namespace GameMod.Replay
                 throw new IOException("unsupported .olr version " + version +
                                       " (expected " + VERSION + ")");
             return new BinaryReader(new ZlibStream(stream, CompressionMode.Decompress));
+        }
+
+        // every count in the stream is attacker-controlled: a crafted or corrupt .olr must
+        // fail here with a clean IOException, before anything allocates by the count
+        private static int ReadCount(BinaryReader reader, int max, string what)
+        {
+            int count = reader.ReadInt32();
+            if (count < 0 || count > max)
+                throw new IOException("corrupt .olr: " + what + " count " + count);
+            return count;
+        }
+
+        private const int MAX_STRING_BYTES = 4096;
+
+        // replaces BinaryReader.ReadString (same wire format: 7-bit length prefix + UTF-8
+        // bytes, what BinaryWriter.Write(string) emits) so the length is capped before the
+        // bytes are allocated
+        private static string ReadString(BinaryReader reader)
+        {
+            int byteCount = 0, shift = 0;
+            byte part;
+            do
+            {
+                if (shift > 28)
+                    throw new IOException("corrupt .olr: unterminated string length prefix");
+                part = reader.ReadByte();
+                byteCount |= (part & 0x7F) << shift;
+                shift += 7;
+            } while ((part & 0x80) != 0);
+            if (byteCount < 0 || byteCount > MAX_STRING_BYTES)
+                throw new IOException("corrupt .olr: string length " + byteCount);
+            if (byteCount == 0)
+                return "";
+            byte[] utf8 = reader.ReadBytes(byteCount);
+            if (utf8.Length != byteCount)
+                throw new EndOfStreamException();
+            return Encoding.UTF8.GetString(utf8);
         }
 
         public static OlrInfo ReadInfo(string path)
@@ -164,21 +202,25 @@ namespace GameMod.Replay
                     stream.Position = 0;
 
                     float duration;
-                    var replay = ReadHeader(OpenPayload(stream), out duration);
-                    info.sceneName = replay.sceneName;
-                    info.matchMode = replay.matchMode;
-                    info.durationSeconds = duration;
-                    info.playerCount = replay.players.Count;
-                    info.playerNames = new string[replay.players.Count];
-                    for (int i = 0; i < replay.players.Count; i++)
-                        info.playerNames[i] = replay.players[i].name;
+                    using (var reader = OpenPayload(stream))
+                    {
+                        var replay = ReadHeader(reader, out duration);
+                        info.sceneName = replay.sceneName;
+                        info.matchMode = replay.matchMode;
+                        info.durationSeconds = duration;
+                        info.playerCount = replay.players.Count;
+                        info.playerNames = new string[replay.players.Count];
+                        for (int i = 0; i < replay.players.Count; i++)
+                            info.playerNames[i] = replay.players[i].name;
 
-                    if (replay.recordedUtcBinary != 0)
-                        info.date = DateTime.FromBinary(replay.recordedUtcBinary).ToLocalTime();
+                        if (replay.recordedUtcBinary != 0)
+                            info.date = DateTime.FromBinary(replay.recordedUtcBinary).ToLocalTime();
+                    }
                 }
             }
             catch (Exception e)
             {
+                info.formatVersion = 0; // lists as UNREADABLE, so the Demos menu refuses to play it
                 Debug.LogErrorFormat("[Replay] ReadInfo failed for {0}: {1}", path, e);
             }
             return info;
@@ -209,8 +251,8 @@ namespace GameMod.Replay
         private static Recording ReadHeader(BinaryReader reader, out float storedDuration)
         {
             var replay = new Recording();
-            replay.sceneName = reader.ReadString();
-            replay.levelIdHash = reader.ReadString();
+            replay.sceneName = ReadString(reader);
+            replay.levelIdHash = ReadString(reader);
             replay.matchMode = reader.ReadInt32();
             storedDuration = reader.ReadSingle();
             replay.maxHitpoints = reader.ReadSingle();
@@ -219,12 +261,12 @@ namespace GameMod.Replay
             replay.recorderSlot = reader.ReadInt32();
             replay.recordedUtcBinary = reader.ReadInt64();
 
-            int playerCount = reader.ReadInt32();
+            int playerCount = ReadCount(reader, 64, "player");
             for (int i = 0; i < playerCount; i++)
             {
                 replay.players.Add(new RosterEntry
                 {
-                    name = reader.ReadString(),
+                    name = ReadString(reader),
                     team = reader.ReadInt32(),
                     color = new Color(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), 1f)
                 });
@@ -339,6 +381,9 @@ namespace GameMod.Replay
             ship.rot = UnpackRotation(reader.ReadUInt32());
             ship.weapon = reader.ReadByte();
             ship.missile = reader.ReadByte();
+            if (ship.weapon > 8 || ship.missile > 8) // 8 = the NUM/NONE sentinel of both enums
+                throw new IOException("corrupt .olr: weapon " + ship.weapon +
+                                      " missile " + ship.missile);
             ship.health = reader.ReadByte();
             ship.vel = ReadHalfVector(reader);
             ship.vrot = ReadHalfVector(reader);
@@ -414,7 +459,7 @@ namespace GameMod.Replay
             writer.Write(ev.nameB ?? "");
         }
 
-        private static MatchEvent ReadEvent(BinaryReader reader)
+        private static MatchEvent ReadEvent(BinaryReader reader, int playerCount)
         {
             var ev = new MatchEvent();
             ev.t = reader.ReadSingle();
@@ -426,9 +471,43 @@ namespace GameMod.Replay
             ev.pos = ReadVector(reader);
             ev.rot = new Quaternion(reader.ReadSingle(), reader.ReadSingle(),
                                     reader.ReadSingle(), reader.ReadSingle());
-            ev.nameA = reader.ReadString();
-            ev.nameB = reader.ReadString();
+            ev.nameA = ReadString(reader);
+            ev.nameB = ReadString(reader);
+            if (!RosterIndicesValid(ev, playerCount))
+                throw new IOException("corrupt .olr: event " + ev.type +
+                                      " roster index out of range");
             return ev;
+        }
+
+        // the slot layout per event type is set by the Recorder construction sites;
+        // -1 is a legitimate "unknown player" in every roster slot
+        private static bool RosterIndicesValid(MatchEvent ev, int playerCount)
+        {
+            switch (ev.type)
+            {
+                case MatchEventType.Fire:
+                case MatchEventType.Damage:
+                case MatchEventType.Death:
+                case MatchEventType.Respawn:
+                case MatchEventType.Assist:
+                case MatchEventType.TeamChange:
+                case MatchEventType.DamageImpact:
+                    return InRoster(ev.iA, playerCount);
+                case MatchEventType.Kill:
+                    return InRoster(ev.iA, playerCount) && InRoster(ev.iB, playerCount);
+                case MatchEventType.ItemPickup:
+                case MatchEventType.MonsterballGoal:
+                    return InRoster(ev.iB, playerCount);
+                case MatchEventType.FlagState:
+                    return InRoster(ev.iC, playerCount);
+                default:
+                    return true;
+            }
+        }
+
+        private static bool InRoster(int rosterIndex, int playerCount)
+        {
+            return rosterIndex >= -1 && rosterIndex < playerCount;
         }
 
         private static void WriteChat(BinaryWriter writer, ChatLine message)
@@ -446,8 +525,8 @@ namespace GameMod.Replay
             message.t = reader.ReadSingle();
             message.sender = reader.ReadInt32();
             message.team = reader.ReadInt32();
-            message.senderName = reader.ReadString();
-            message.message = reader.ReadString();
+            message.senderName = ReadString(reader);
+            message.message = ReadString(reader);
             return message;
         }
 

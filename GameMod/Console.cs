@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Reflection.Emit;
 using HarmonyLib;
@@ -10,7 +11,7 @@ namespace GameMod {
     {
         public static bool KeyEnabled;
         public static int CustomUIColor;
-        public static string[] ActivationChars = { "`", "~", "ö" };
+        public static string[] ActivationChars = { "`", "~" };
 
         private static MethodInfo _GameManager_InitializeMissionList_Method = typeof(GameManager).GetMethod("InitializeMissionList", AccessTools.all);
         public static void CmdReloadMissions()
@@ -248,9 +249,13 @@ namespace GameMod {
             return false;
         }
 
-        static bool RequireFloat(string usage)
+        // uConsole.GetFloat parses under the current culture and the tokenizer splits
+        // on commas, so on a German locale no fractional value can be typed at all --
+        // read the raw token and parse it invariantly instead
+        static bool RequireFloat(string usage, out float value)
         {
-            if (uConsole.NextParameterIsFloat()) return true;
+            if (float.TryParse(uConsole.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+                return true;
             uConsole.Log("qs_set " + usage + " <float>");
             return false;
         }
@@ -283,19 +288,19 @@ namespace GameMod {
                     break;
                 case "softparticles":
                     if (!RequireInt("softparticles (0|1)")) return;
-                    QualitySettings.softParticles = uConsole.GetInt() != 0;
+                    GfxQualitySettings.SetFromConsole("softparticles", uConsole.GetInt());
                     break;
                 case "realtimereflectionprobes":
                     if (!RequireInt("realtimereflectionprobes (0|1)")) return;
-                    QualitySettings.realtimeReflectionProbes = uConsole.GetInt() != 0;
+                    GfxQualitySettings.SetFromConsole("realtimereflectionprobes", uConsole.GetInt());
                     break;
                 case "particleraycastbudget":
                     if (!RequireInt("particleraycastbudget")) return;
-                    QualitySettings.particleRaycastBudget = uConsole.GetInt();
+                    GfxQualitySettings.SetFromConsole("particleraycastbudget", uConsole.GetInt());
                     break;
                 case "maxqueuedframes":
                     if (!RequireInt("maxqueuedframes")) return;
-                    QualitySettings.maxQueuedFrames = uConsole.GetInt();
+                    GfxQualitySettings.SetFromConsole("maxqueuedframes", uConsole.GetInt());
                     break;
                 case "vsynccount":
                     if (!RequireInt("vsynccount (0,1,2,3,4)")) return;
@@ -306,8 +311,8 @@ namespace GameMod {
                     QualitySettings.blendWeights = (BlendWeights)uConsole.GetInt();
                     break;
                 case "lodbias":
-                    if (!RequireFloat("lodbias")) return;
-                    QualitySettings.lodBias = uConsole.GetFloat();
+                    if (!RequireFloat("lodbias", out float lodBias)) return;
+                    QualitySettings.lodBias = lodBias;
                     break;
                 case "maximumlodlevel":
                     if (!RequireInt("maximumlodlevel")) return;
@@ -315,27 +320,27 @@ namespace GameMod {
                     break;
                 case "shadows":
                     if (!RequireInt("shadows (0=off,1=hard,2=all)")) return;
-                    QualitySettings.shadows = (ShadowQuality)uConsole.GetInt();
+                    GfxQualitySettings.SetFromConsole("shadows", uConsole.GetInt());
                     break;
                 case "shadowresolution":
                     if (!RequireInt("shadowresolution (0=low,1=medium,2=high,3=veryhigh)")) return;
-                    QualitySettings.shadowResolution = (ShadowResolution)uConsole.GetInt();
+                    GfxQualitySettings.SetFromConsole("shadowresolution", uConsole.GetInt());
                     break;
                 case "shadowprojection":
                     if (!RequireInt("shadowprojection (0=closefit,1=stablefit)")) return;
-                    QualitySettings.shadowProjection = (ShadowProjection)uConsole.GetInt();
+                    GfxQualitySettings.SetFromConsole("shadowprojection", uConsole.GetInt());
                     break;
                 case "shadowcascades":
                     if (!RequireInt("shadowcascades (0,1,2,4)")) return;
-                    QualitySettings.shadowCascades = uConsole.GetInt();
+                    GfxQualitySettings.SetFromConsole("shadowcascades", uConsole.GetInt());
                     break;
                 case "shadowdistance":
-                    if (!RequireFloat("shadowdistance")) return;
-                    QualitySettings.shadowDistance = uConsole.GetFloat();
+                    if (!RequireFloat("shadowdistance", out float shadowDistance)) return;
+                    GfxQualitySettings.SetFromConsole("shadowdistance", shadowDistance);
                     break;
                 case "shadownearplaneoffset":
-                    if (!RequireFloat("shadownearplaneoffset")) return;
-                    QualitySettings.shadowNearPlaneOffset = uConsole.GetFloat();
+                    if (!RequireFloat("shadownearplaneoffset", out float shadowNearPlane)) return;
+                    GfxQualitySettings.SetFromConsole("shadownearplaneoffset", shadowNearPlane);
                     break;
                 default:
                      uConsole.Log("qs_set: unknown field '" + name + "'");
@@ -476,28 +481,43 @@ namespace GameMod {
     class ConsoleEnablePatch
     {
         private static bool lastFramePresent = false;
+        private static string toggleChar;
+        private static int toggleCharFrames;
 
-        private static bool ActivationCharTyped()
+        private static string TypedActivationChar()
         {
             string s = Input.inputString;
-            if (string.IsNullOrEmpty(s)) return false;
+            if (string.IsNullOrEmpty(s)) return null;
             foreach (string c in Console.ActivationChars)
                 if (!string.IsNullOrEmpty(c) && s.Contains(c))
-                    return true;
-            return false;
+                    return c;
+            return null;
         }
 
         private static bool Prefix()
         {
-            bool down = ActivationCharTyped() && !lastFramePresent;
-            bool up = !ActivationCharTyped() && lastFramePresent;
-            lastFramePresent = ActivationCharTyped();
+            // an activation char typed into chat or a menu text field (pilot name,
+            // password, gameon code) is text, not a console toggle
+            if (PlayerShip.m_typing_in_chat || Controls.m_disable_menu_letter_keys)
+            {
+                lastFramePresent = false;
+                return false;
+            }
+
+            string typed = TypedActivationChar();
+            bool down = typed != null && !lastFramePresent;
+            bool up = typed == null && lastFramePresent;
+            lastFramePresent = typed != null;
 
             if (!(Console.KeyEnabled || uConsole.IsOn()))
                 return false;
 
             if (down)
             {
+                // the keystroke also lands in the input field, possibly a frame
+                // later -- remember it so the postfix can take it back out
+                toggleChar = typed;
+                toggleCharFrames = 3;
                 if (!uConsole.IsOn())
                 {
                     uConsole.TurnOn();
@@ -518,18 +538,23 @@ namespace GameMod {
             return false;
         }
 
-        // remove the activation character from the input field
+        // remove only the keystroke that just toggled the console from the input
+        // field; typed command text may legitimately contain the activation chars
         private static void Postfix()
         {
+            if (toggleChar == null) return;
+            if (--toggleCharFrames <= 0)
+            {
+                toggleChar = null;
+                return;
+            }
+
             string text = uConsole.m_GUI.InputFieldGetText();
             if (string.IsNullOrEmpty(text)) return;
-
-            string stripped = text;
-            foreach (string c in Console.ActivationChars)
-                if (!string.IsNullOrEmpty(c))
-                    stripped = stripped.Replace(c, "");
-
-            if (stripped == text) return;
+            int idx = text.LastIndexOf(toggleChar);
+            if (idx < 0) return;
+            string stripped = text.Remove(idx, toggleChar.Length);
+            toggleChar = null;
             if (stripped.Length == 0)
                 uConsole.m_GUI.InputFieldClearText();
             else

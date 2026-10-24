@@ -20,15 +20,21 @@ namespace GameMod
 
         public static int GetDisplayedHealth(Player player) => LastSpawnHealthByPlayer.TryGetValue(player, out int health) ? health : MAX_HEALTH;
 
-        public static void SetDisplayedHealth(Player player, int health) => LastSpawnHealthByPlayer[player] = health;
+        // recomputed on table writes; the scoreboard reads it every frame
+        public static bool AnyPlayerHasReducedHealth { get; private set; }
 
-        public static bool AnyPlayerHasReducedHealth => LastSpawnHealthByPlayer.Any(entry => entry.Key && entry.Value < MAX_HEALTH);
+        public static void SetDisplayedHealth(Player player, int health)
+        {
+            LastSpawnHealthByPlayer[player] = health;
+            AnyPlayerHasReducedHealth = LastSpawnHealthByPlayer.Any(entry => entry.Key && entry.Value < MAX_HEALTH);
+        }
 
         public static int ClampToValidHealth(int health) => Mathf.Clamp(health, MIN_HEALTH, MAX_HEALTH);
 
         public static void Reset(){
             SpawnHealthByConnectionId.Clear();
             LastSpawnHealthByPlayer.Clear();
+            AnyPlayerHasReducedHealth = false;
         }
 
         // Server
@@ -195,6 +201,16 @@ namespace GameMod
         }
     }
 
+    // a disconnected client's entry would otherwise linger until the next match
+    [HarmonyPatch(typeof(Server), "OnDisconnect")]
+    class MPSpawnHealth_Server_OnDisconnect
+    {
+        static void Postfix(NetworkMessage msg)
+        {
+            MPSpawnHealth.SpawnHealthByConnectionId.Remove(msg.conn.connectionId);
+        }
+    }
+
     // decode and apply received spawn health packets from clients
     [HarmonyPatch(typeof(Server), "RegisterHandlers")]
     class MPSpawnHealth_Server_RegisterHandlers
@@ -206,6 +222,10 @@ namespace GameMod
         static void OnServerReceivedSpawnHealth(NetworkMessage rawMessage)
         {
             var message = rawMessage.ReadMessage<MPSpawnHealth.SpawnHealthMessage>();
+            // the client-sent lobby_id is untrusted (any client could set another
+            // player's health with it) -- key and rebroadcast by the sender's own
+            // connection id, which is what the engine uses as the lobby id
+            message.lobby_id = rawMessage.conn.connectionId;
             message.health = MPSpawnHealth.ClampToValidHealth(message.health);
             MPSpawnHealth.SpawnHealthByConnectionId[message.lobby_id] = message.health;
             MPSpawnHealth.SendToSupportingClients(message);

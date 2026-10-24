@@ -132,6 +132,7 @@ namespace GameMod.Replay
                 GameManager.m_shake_manager.KillAllShakes();
 
             Hud.Init(Replay);
+            Reticle.Style = MenuManager.opt_hud_reticle;
             World.Begin(Replay);
             Shots.Begin();
             DamageFlash.Begin(Replay);
@@ -199,6 +200,7 @@ namespace GameMod.Replay
             seekPending = false;
             JustSeeked = false;
             smoothedFps = 0f;
+            Playback_GameManager_Update.faultsReported = 0;
             Viewpoint.Reset();
             ControlBar.Reset();
         }
@@ -447,10 +449,15 @@ namespace GameMod.Replay
             if (victimIndex == Viewpoint.Watching && GameManager.m_shake_manager != null)
             {
                 float shake = damage * 0.05f;
+                shakingFromImpactFx = true;
                 GameManager.m_shake_manager.PlayCameraShake(CameraShakeType.PLAYER_DAMAGE,
                     0.25f + shake, 0.5f + shake);
+                shakingFromImpactFx = false;
             }
         }
+
+        // lets the shake above through Playback_PlayCameraShake's blanket suppression
+        internal static bool shakingFromImpactFx;
 
         public static void TogglePause()
         {
@@ -594,7 +601,7 @@ namespace GameMod.Replay
         [HarmonyPatch(typeof(GameManager), "Update")]
         class Playback_GameManager_Update
         {
-            private static int faultsReported;
+            internal static int faultsReported; // reset by ResetTransport, so every playback logs its first faults
 
             static void Postfix()
             {
@@ -716,7 +723,7 @@ namespace GameMod.Replay
     {
         static bool Prefix()
         {
-            return Session.Mode != SessionMode.Playback;
+            return Session.Mode != SessionMode.Playback || Playback.shakingFromImpactFx;
         }
     }
 

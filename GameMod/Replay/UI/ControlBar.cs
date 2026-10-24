@@ -56,12 +56,25 @@ namespace GameMod.Replay
 
         private static BarButton hovered;
 
+        // Draw runs every HUD frame: each readout keeps its formatted string until the
+        // displayed value changes, so an unchanged frame allocates nothing
+        private static string povLabel = "";
+        private static int povLabelPov = int.MinValue;
+        private static bool povLabelPaused;
+        private static string clockLabel = "";
+        private static int clockLabelSecond = -1;
+        private static string durationLabel = "";
+        private static float durationLabelSeconds = -1f;
+        private static string speedLabel = "";
+        private static float speedLabelSpeed = -1f;
+
         public static void Reset()
         {
             Shown = true;
             DraggingSlider = false;
             pendingSeekSeconds = appliedSeekSeconds = -1f;
             hovered = BarButton.None;
+            povLabelPov = int.MinValue;
         }
 
         public static void SetShown(bool on)
@@ -214,10 +227,14 @@ namespace GameMod.Replay
             if (replay == null)
                 return;
 
-            string povLabel = (Playback.Paused ? "[PAUSED]  " : "") +
-                              (Viewpoint.IsFree || Viewpoint.Watching < 0
-                                  ? "FREE CAMERA"
-                                  : Playback.PlayerName(Viewpoint.Watching));
+            int pov = Viewpoint.IsFree || Viewpoint.Watching < 0 ? -1 : Viewpoint.Watching;
+            if (pov != povLabelPov || Playback.Paused != povLabelPaused)
+            {
+                povLabelPov = pov;
+                povLabelPaused = Playback.Paused;
+                povLabel = (povLabelPaused ? "[PAUSED]  " : "") +
+                           (pov < 0 ? "FREE CAMERA" : Playback.PlayerName(pov));
+            }
             if (!Shown)
             {
                 ui.DrawStringSmall("N: replay controls",
@@ -247,11 +264,22 @@ namespace GameMod.Replay
                     Hud.TEXTURE_SOLID, Hud.SOLID_INNER);
             UIManager.DrawQuadUI(new Vector2(handleX, sliderY), 3f, 11f, hot, 1f, 11); // the slider handle
 
+            int clockSecond = Mathf.FloorToInt(clock);
+            if (clockSecond != clockLabelSecond)
+            {
+                clockLabelSecond = clockSecond;
+                clockLabel = Session.FormatTime(clock);
+            }
+            if (duration != durationLabelSeconds)
+            {
+                durationLabelSeconds = duration;
+                durationLabel = Session.FormatTime(duration);
+            }
             ui.DrawStringSmall(
-                DraggingSlider ? Session.FormatTimeTenths(clock) : Session.FormatTime(clock),
+                DraggingSlider ? Session.FormatTimeTenths(clock) : clockLabel,
                 new Vector2(SLIDER_X_MIN - TIME_LABEL_GAP, sliderY),
                 0.4f, StringOffset.RIGHT, dim, 1f, -1f);
-            ui.DrawStringSmall(Session.FormatTime(duration),
+            ui.DrawStringSmall(durationLabel,
                 new Vector2(SLIDER_X_MAX + TIME_LABEL_GAP, sliderY),
                 0.4f, StringOffset.LEFT, dim, 1f, -1f);
 
@@ -272,7 +300,12 @@ namespace GameMod.Replay
             ui.DrawSmallItem(Viewpoint.ModeLabel, new Vector2(CAMERA_MODE_X, buttonRowY),
                 hovered == BarButton.CameraMode, false, CAMERA_MODE_HALF_WIDTH / SMALL_ITEM_HALF_WIDTH, BUTTON_TEXT_SIZE);
 
-            ui.DrawStringSmall(Playback.Speed.ToString("0.##") + "x",
+            if (Playback.Speed != speedLabelSpeed)
+            {
+                speedLabelSpeed = Playback.Speed;
+                speedLabel = speedLabelSpeed.ToString("0.##") + "x";
+            }
+            ui.DrawStringSmall(speedLabel,
                 new Vector2(SPEED_READOUT_X, buttonRowY), BUTTON_TEXT_SIZE,
                 StringOffset.CENTER, UIManager.m_col_ui2, 1f, SPEED_READOUT_HALF_WIDTH * 2f);
 

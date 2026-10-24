@@ -427,6 +427,7 @@ namespace GameMod.Replay
 
         private static bool blackoutActive;
         private static Camera disabledFlareCamera;
+        private static bool flareCameraSearched;
         private static float savedOverlayOrthoSize;
 
         private static void EnforceInfoBlackout()
@@ -437,14 +438,20 @@ namespace GameMod.Replay
             if (GameManager.m_viewer != null)
                 GameManager.m_viewer.MaybeUpdateHighlight(0f);
 
-            if (disabledFlareCamera == null && GameManager.m_player_ship != null
+            if (!flareCameraSearched && GameManager.m_player_ship != null
                 && GameManager.m_player_ship.c_camera != null)
             {
-                var flare = GameManager.m_player_ship.c_camera.GetComponentInChildren<Camera>();
-                if (flare != null && flare != GameManager.m_player_ship.c_camera && flare.enabled)
+                flareCameraSearched = true;
+                var shipCamera = GameManager.m_player_ship.c_camera;
+                // GetComponentInChildren searches self-first and would return c_camera itself;
+                // the flare camera is the child camera next to it
+                foreach (var camera in shipCamera.GetComponentsInChildren<Camera>())
                 {
-                    flare.enabled = false;
-                    disabledFlareCamera = flare;
+                    if (camera == shipCamera || !camera.enabled)
+                        continue;
+                    camera.enabled = false;
+                    disabledFlareCamera = camera;
+                    break;
                 }
             }
 
@@ -464,6 +471,7 @@ namespace GameMod.Replay
             if (!blackoutActive)
                 return;
             blackoutActive = false;
+            flareCameraSearched = false;
 
             if (disabledFlareCamera != null)
             {

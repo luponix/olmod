@@ -190,6 +190,7 @@ static void *my_mono_image_open_from_data_with_name(char *data, int data_len, in
 		char* ret = getenv("OLMODDIR");
 		if (ret) {
 			strncpy(buf, ret, sizeof(buf) - 1);
+			buf[sizeof(buf) - 1] = 0; /* strncpy does not terminate when src fills the buffer */
 		} else {
 			print("OLMODDIR environment variable missing");
 			abort();

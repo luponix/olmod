@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Text;
+using GameMod.VersionHandling;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using Overload;
@@ -58,28 +60,75 @@ namespace GameMod.ModsHandler
                     yield return entry.File;
         }
 
+        private const ulong CATALOG_BYTES_MAX = 1024 * 1024;
+
         private static IEnumerator Fetch()
         {
             string url = Mods.CatalogUrl;
+            if (!url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            {
+                Status = "not https";
+                Debug.Log("[Mods] catalog: refusing non-https url " + url);
+                yield break;
+            }
+
+            byte[] catalogBytes;
             using (UnityWebRequest request = UnityWebRequest.Get(url))
             {
-                yield return request.SendWebRequest();
+                request.timeout = 10;
+                UnityWebRequestAsyncOperation sending = request.SendWebRequest();
+                while (!sending.isDone)
+                {
+                    if (request.downloadedBytes > CATALOG_BYTES_MAX)
+                        request.Abort();
+                    yield return null;
+                }
+                if (request.downloadedBytes > CATALOG_BYTES_MAX)
+                {
+                    Status = "too large";
+                    Debug.Log("[Mods] catalog: " + url + " exceeds " + CATALOG_BYTES_MAX + " bytes");
+                    yield break;
+                }
                 if (request.isNetworkError || request.isHttpError)
                 {
                     Status = "unreachable";
                     Debug.Log("[Mods] catalog: " + url + " -- " + request.error);
                     yield break;
                 }
-                try
+                catalogBytes = request.downloadHandler.data;
+            }
+
+            // UnityWebRequest on this engine validates no TLS certificate, so the
+            // detached signature is what makes the catalog trustworthy, not https.
+            string signature;
+            using (UnityWebRequest request = UnityWebRequest.Get(url + ".sig"))
+            {
+                request.timeout = 10;
+                yield return request.SendWebRequest();
+                if (request.isNetworkError || request.isHttpError)
                 {
-                    Read(request.downloadHandler.text, url);
-                }
-                catch (Exception ex)
-                {
-                    Status = "unreadable";
-                    Debug.Log("[Mods] catalog: " + url + " is not a readable catalog -- " + ex.Message);
+                    Status = "signature missing";
+                    Debug.Log("[Mods] catalog: " + url + ".sig -- " + request.error);
                     yield break;
                 }
+                signature = request.downloadHandler.text;
+            }
+            if (!SignedIndex.Verify(catalogBytes, signature))
+            {
+                Status = "signature invalid";
+                Debug.Log("[Mods] catalog: " + url + " does not match its signature, ignoring it");
+                yield break;
+            }
+
+            try
+            {
+                Read(Encoding.UTF8.GetString(catalogBytes), url);
+            }
+            catch (Exception ex)
+            {
+                Status = "unreadable";
+                Debug.Log("[Mods] catalog: " + url + " is not a readable catalog -- " + ex.Message);
+                yield break;
             }
             Loaded = true;
             Status = Entries.Count + " listed";
@@ -113,9 +162,9 @@ namespace GameMod.ModsHandler
             }
         }
 
-        // The catalog names the file olmod writes into its own directory, so anything but
-        // a bare Mod-*.dll is refused rather than resolved.
-        private static bool IsPlainModFileName(string file)
+        // The catalog and olmodstartup.json name files in olmod's own directory, so
+        // anything but a bare Mod-*.dll is refused rather than resolved.
+        internal static bool IsPlainModFileName(string file)
         {
             return !string.IsNullOrEmpty(file) &&
                 file == System.IO.Path.GetFileName(file) &&
@@ -129,7 +178,7 @@ namespace GameMod.ModsHandler
                 return null;
             Uri resolved;
             if (!Uri.TryCreate(new Uri(catalogUrl), address, out resolved) ||
-                (resolved.Scheme != Uri.UriSchemeHttp && resolved.Scheme != Uri.UriSchemeHttps))
+                resolved.Scheme != Uri.UriSchemeHttps)
                 return null;
             return resolved.AbsoluteUri;
         }
