@@ -714,6 +714,20 @@ namespace GameMod
                 return byScore != 0 ? byScore : players[b].m_deaths.CompareTo(players[a].m_deaths);
             };
 
+            // the engine's SortAnarchyPlayerList returns early on any mode but ANARCHY, so
+            // m_sorted_anarchy_idx is empty here and every instareap panel ranks for itself
+            static List<int> PlayersByScore()
+            {
+                List<Player> players = NetworkManager.m_PlayersForScoreboard;
+                scoreOrder.Clear();
+                for (int i = 0; i < players.Count; i++)
+                    if (!players[i].m_spectator)
+                        scoreOrder.Add(i);
+                scoreOrder.Sort(byScoreThenDeaths);
+                scoreOrder.Reverse();
+                return scoreOrder;
+            }
+
             public static void DrawMpScoreboardRaw(UIElement uie, ref Vector2 pos)
             {
                 float col1 = -330f; // Player
@@ -744,19 +758,10 @@ namespace GameMod
             {
                 float m_alpha = uie.m_alpha;
                 List<Player> players = NetworkManager.m_PlayersForScoreboard;
-                scoreOrder.Clear();
-                for (int i = 0; i < players.Count; i++)
+                List<int> order = PlayersByScore();
+                for (int j = 0; j < order.Count; j++)
                 {
-                    if (!players[i].m_spectator)
-                    {
-                        scoreOrder.Add(i);
-                    }
-                }
-                scoreOrder.Sort(byScoreThenDeaths);
-                scoreOrder.Reverse();
-                for (int j = 0; j < scoreOrder.Count; j++)
-                {
-                    Player player = players[scoreOrder[j]];
+                    Player player = players[order[j]];
                     if (player && !player.m_spectator)
                     {
                         float num = (!player.gameObject.activeInHierarchy) ? 0.3f : 1f;
@@ -821,7 +826,22 @@ namespace GameMod
                 pos.y += 10f;
                 temp_pos.x = pos.x;
                 temp_pos.x = temp_pos.x + 90f;
-
+                List<Player> players = NetworkManager.m_PlayersForScoreboard;
+                List<int> order = PlayersByScore();
+                for (int i = 0; i < order.Count; i++)
+                {
+                    temp_pos.y = pos.y;
+                    Player player = players[order[i]];
+                    if (!player)
+                        continue;
+                    Color color = player.isLocalPlayer ? UIManager.m_col_hi3 : UIManager.m_col_ui1;
+                    float num4 = (!player.gameObject.activeInHierarchy) ? 0.3f : 1f;
+                    uie.DrawDigitsVariable(temp_pos, player.m_kills, 0.4f, StringOffset.RIGHT, color, uie.m_alpha * num4);
+                    temp_pos.x = temp_pos.x - 35f;
+                    uie.DrawStringSmall(player.m_mp_name, temp_pos, 0.35f, StringOffset.RIGHT, color, num4, -1f);
+                    temp_pos.x = temp_pos.x + 35f;
+                    pos.y += 16f;
+                }
                 pos.y -= 6f;
                 UIManager.DrawQuadUI(pos, 100f, 1.2f, UIManager.m_col_ub1, uie.m_alpha, 21);
                 pos.x -= 6f;
@@ -844,6 +864,47 @@ namespace GameMod
                 }
 
                 return false;
+            }
+
+            // the death screen's top-right panel. The engine picks its team layout on
+            // GetMode() != ANARCHY, which instareap is - and summed both players into one
+            // team row; this is the anarchy layout with instareap's own ranking.
+            public static void DrawMpMiniScoreboard(UIElement uie, ref Vector2 pos)
+            {
+                int match_time_remaining = NetworkMatch.m_match_time_remaining;
+                int match_time = (int)NetworkMatch.m_match_elapsed_seconds;
+                pos.y -= 15f;
+                uie.DrawDigitsTime(pos + Vector2.right * 95f, (float)match_time_remaining, 0.45f,
+                    (match_time <= 10 || match_time_remaining >= 10) ? UIManager.m_col_ui2 : UIManager.m_col_em5,
+                    uie.m_alpha, false);
+                pos.y += 25f;
+
+                pos.y -= 12f;
+                pos.x += 6f;
+                UIManager.DrawQuadUI(pos, 100f, 1.2f, UIManager.m_col_ui0, uie.m_alpha, 21);
+                pos.y += 10f;
+                Vector2 row = pos;
+                row.x = pos.x + 90f;
+                List<Player> players = NetworkManager.m_PlayersForScoreboard;
+                List<int> order = PlayersByScore();
+                for (int i = 0; i < order.Count; i++)
+                {
+                    row.y = pos.y;
+                    Player player = players[order[i]];
+                    if (!player)
+                        continue;
+                    Color color = player.isLocalPlayer ? UIManager.m_col_hi4 : UIManager.m_col_ui2;
+                    float num = (!player.gameObject.activeInHierarchy) ? 0.3f : 1f;
+                    uie.DrawDigitsVariable(row, player.m_kills, 0.4f, StringOffset.RIGHT, color, uie.m_alpha * num);
+                    row.x = row.x - 40f;
+                    uie.DrawStringSmall(player.m_mp_name, row, 0.35f, StringOffset.RIGHT, color, num, -1f);
+                    row.x = row.x + 40f;
+                    pos.y += 16f;
+                }
+                pos.y -= 6f;
+                UIManager.DrawQuadUI(pos, 100f, 1.2f, UIManager.m_col_ui0, uie.m_alpha, 21);
+                pos.x -= 6f;
+                pos.y -= 6f;
             }
         }
 

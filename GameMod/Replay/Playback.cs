@@ -389,6 +389,10 @@ namespace GameMod.Replay
                     if (allowFx)
                         Shots.Inject(ev);
                     break;
+                case MatchEventType.MassdriverShot:
+                    if (allowFx)
+                        Shots.InjectBeam(ev);
+                    break;
                 case MatchEventType.ProjDespawn:
                     Shots.Terminate(ev.iA, ev.iB != 0, ev.pos);
                     break;

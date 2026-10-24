@@ -55,20 +55,59 @@ namespace GameMod
             get { return MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP && GameplayManager.IsMultiplayerActive; }
         }
 
+        public static bool IsActiveServer
+        {
+            get { return IsActive && Overload.NetworkManager.IsServer(); }
+        }
+
         public static void AddProjectile(MassdriverProjectilePacket mpp)
+        {
+            MassdriverProjectile beam = FreeBeam();
+            if (beam != null)
+                beam.Fire(mpp.start, mpp.rot, mpp.forward, mpp.end);
+        }
+
+        // null once every slot is busy: a beam lives BEAM_LIFETIME and the cooldown caps how
+        // many a full server can have in the air, so dropping one beats growing the pool
+        private static MassdriverProjectile FreeBeam()
         {
             for (int i = 0; i < md_projectile_pool.Length; i++)
             {
-                if(md_projectile_pool[i] == null)
-                {
+                if (md_projectile_pool[i] == null)
                     md_projectile_pool[i] = new MassdriverProjectile();
-                }
-                if(!md_projectile_pool[i].active)
-                {
-                    md_projectile_pool[i].Fire(mpp.start, mpp.rot, mpp.forward, mpp.end);
-                    return;
-                }
+                if (!md_projectile_pool[i].active)
+                    return md_projectile_pool[i];
             }
+            return null;
+        }
+
+        public static void UpdateBeams()
+        {
+            for (int i = 0; i < md_projectile_pool.Length; i++)
+                if (md_projectile_pool[i] != null && md_projectile_pool[i].active)
+                    md_projectile_pool[i].Update();
+        }
+
+        // Replay playback runs a local mission, so IsActive is false and none of the mode's
+        // own hooks fire - the replay calls ShowBeam/UpdateBeams/ClearBeams for itself.
+        // A recorded beam carries its length rather than its end point: both ends and the
+        // direction are a rotation and a distance apart.
+        public static void ShowBeam(Vector3 start, Quaternion rotation, float length)
+        {
+            InitialiseMeshes();
+            EnsureSoundEffects();
+            MassdriverProjectile beam = FreeBeam();
+            if (beam == null)
+                return;
+            Vector3 forward = rotation * Vector3.forward;
+            beam.Fire(start, rotation, forward, start + forward * length);
+        }
+
+        public static void ClearBeams()
+        {
+            for (int i = 0; i < md_projectile_pool.Length; i++)
+                if (md_projectile_pool[i] != null)
+                    md_projectile_pool[i].active = false;
         }
 
         public class MassdriverProjectilePacket : MessageBase
@@ -442,6 +481,31 @@ namespace GameMod
             }
         }
 
+        // Nothing to pick up in instareap: every ship carries the same massdriver and one hit
+        // kills, so map powerups and death spew would be noise. Item.Spew is the chokepoint
+        // every runtime item passes through - the match-start burst, the respawn nodes, the
+        // super powerups and PlayerShip.SpewItemsOnDeath all end up here.
+        [HarmonyPatch(typeof(Item), "Spew")]
+        class MatchModeInstareap_Item_Spew
+        {
+            static bool Prefix()
+            {
+                return !IsActiveServer;
+            }
+        }
+
+        // ...and the timer that drives most of them, because SpawnSuperPowerup reports success
+        // whether or not an item was created: left running it would announce supers to the
+        // whole match that nothing ever spawns.
+        [HarmonyPatch(typeof(NetworkMatch), "MaybeSpawnPowerup")]
+        class MatchModeInstareap_NetworkMatch_MaybeSpawnPowerup
+        {
+            static bool Prefix()
+            {
+                return !IsActiveServer;
+            }
+        }
+
         [HarmonyPatch(typeof(GameManager), "Update")]
         class MatchModeInstareap_GameManager_Update
         {
@@ -465,15 +529,7 @@ namespace GameMod
                 if (localplayer_md_projectile.active)
                     localplayer_md_projectile.Update();
 
-                for (int i = 0; i < md_projectile_pool.Length; i++)
-                {
-                    if (md_projectile_pool[i] == null)
-                        md_projectile_pool[i] = new MassdriverProjectile();
-                    if (md_projectile_pool[i].active)
-                    {
-                        md_projectile_pool[i].Update();
-                    }
-                }
+                UpdateBeams();
             }
         }
 
@@ -1519,6 +1575,51 @@ namespace GameMod
                     return;
 
                 __instance.CurrentWeaponName = "MASSDRIVER";
+            }
+        }
+
+        // The massdriver is not one of the eight weapons, so the engine's marks are suppressed
+        // (WeaponType.NUM hits no case in its switch) and replaced by three strokes that fill
+        // from their outer ends inwards as the cooldown runs out - the same two colours every
+        // other refire indicator uses, the dim one giving way to the bright one.
+        [HarmonyPatch(typeof(UIElement), "DrawHUDWeaponReticle")]
+        class MatchModeInstareap_UIElement_DrawHUDWeaponReticle
+        {
+            private const float STROKE_INNER_RADIUS = 18f;
+            private const float STROKE_OUTER_RADIUS = 46f;
+
+            // the driller's three mark angles, which this reticle is meant to read like
+            private static readonly float[] STROKE_ANGLES = { 2.6179938f, Mathf.PI, 3.6651917f };
+
+            static void Prefix(ref WeaponType wt)
+            {
+                if (IsActive)
+                    wt = WeaponType.NUM;
+            }
+
+            static void Postfix(UIElement __instance, Vector2 pos)
+            {
+                if (!IsActive)
+                    return;
+
+                float alpha = __instance.m_alpha * (1f - GameManager.m_player_ship.m_boost_ui_fade * 0.95f);
+                float charged = Mathf.Clamp01(1f - massdriver_refire_time / MD_COOLDOWN_TIME);
+                for (int i = 0; i < STROKE_ANGLES.Length; i++)
+                {
+                    float angle = STROKE_ANGLES[i];
+                    DrawStroke(pos, angle, STROKE_INNER_RADIUS, STROKE_OUTER_RADIUS, UIManager.m_col_ub1, alpha);
+                    DrawStroke(pos, angle, Mathf.Lerp(STROKE_OUTER_RADIUS, STROKE_INNER_RADIUS, charged),
+                        STROKE_OUTER_RADIUS, UIManager.m_col_ui0, alpha);
+                }
+            }
+
+            // one radial segment of the fan, from radius to radius along the angle
+            static void DrawStroke(Vector2 center, float angle, float from, float to, Color color, float alpha)
+            {
+                Vector2 outward = new Vector2(Mathf.Sin(angle), 0f - Mathf.Cos(angle));
+                Vector2 middle = center + outward * ((from + to) * 0.5f);
+                UIManager.DrawQuadUIRotated(middle, (to - from) * 0.5f, 1.6f, angle + Mathf.PI * 0.5f,
+                    color, alpha, 21);
             }
         }
 

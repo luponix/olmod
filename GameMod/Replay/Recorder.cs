@@ -454,6 +454,25 @@ namespace GameMod.Replay
             return false;
         }
 
+        // The instareap massdriver is not a Projectile, so the fire hook above never sees it.
+        // Both the local shot and a relayed one reach this method, and only it knows where the
+        // beam ended -- a local shot arrives with the end still unresolved. The shooter is not
+        // recorded: a relayed packet does not name one, so no client could supply it.
+        [HarmonyPatch(typeof(MatchModeInstareap.MassdriverProjectile), "Fire")]
+        class Recorder_MassdriverProjectile_Fire
+        {
+            static void Postfix(Vector3 pos, Quaternion rot, Vector3 ___end_position)
+            {
+                if (!CanRecord)
+                    return;
+                Recording.events.Add(new MatchEvent
+                {
+                    t = CurrentTime, type = MatchEventType.MassdriverShot,
+                    iA = -1, fA = (___end_position - pos).magnitude, pos = pos, rot = rot
+                });
+            }
+        }
+
         private static void RecordDespawn(Projectile proj, bool exploded)
         {
             if (!CanRecord || proj == null)

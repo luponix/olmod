@@ -508,8 +508,13 @@ namespace GameMod
                 Race.DrawMpMiniScoreboard(ref pos, __instance);
                 return false;
             }
+            if (MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP)
+            {
+                MPScoreboards.Instareap.DrawMpMiniScoreboard(__instance, ref pos);
+                return false;
+            }
 
-            if (NetworkMatch.GetMode() == MatchMode.ANARCHY || MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP || MPTeams.NetworkMatchTeamCount == 2)
+            if (NetworkMatch.GetMode() == MatchMode.ANARCHY || MPTeams.NetworkMatchTeamCount == 2)
                 return true;
 
             int match_time_remaining = NetworkMatch.m_match_time_remaining;

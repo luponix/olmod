@@ -146,6 +146,7 @@ namespace GameMod.Replay
         TeamScore = 15,
         MonsterballGoal = 16,
         FlagState = 17,
+        MassdriverShot = 18,
     }
 
     public class MatchEvent
