@@ -48,7 +48,7 @@ namespace GameMod
             if (MPModPrivateData.ColliderScale != 1f)
             {
                 __instance.c_mesh_collider_trans.localScale = new Vector3(MPModPrivateData.ColliderScale, MPModPrivateData.ColliderScale, MPModPrivateData.ColliderScale);
-                Debug.Log("Ship colliders scaled to " + (int)(MPModPrivateData.ColliderScale * 100) + "%");
+                Debug.Log("[Ships] colliders scaled to " + (int)(MPModPrivateData.ColliderScale * 100) + "%");
             }
         }
     }

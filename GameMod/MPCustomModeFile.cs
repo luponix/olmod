@@ -24,7 +24,7 @@ namespace GameMod {
                 string filename = "multi_mode_" + level.FileName;
                 string filepath = Path.Combine(Path.GetDirectoryName(level.FilePath), filename);
                 string ext = null;
-                Debug.Log("DoReadMultiplayerModeFile check custom " + filepath);
+                Debug.Log("[CustomMode] DoReadMultiplayerModeFile check custom " + filepath);
                 byte[] data = Mission.LoadAddonData(level.ZipPath, filepath, ref ext, new [] { ".txt" });
                 if (data != null)
                     return Encoding.UTF8.GetString(data);
@@ -35,7 +35,7 @@ namespace GameMod {
         private static void Prefix()
         {
             MPCustomModeFile.PickupCheck = false;
-            Debug.Log("reset PickupCheck to false");
+            Debug.Log("[CustomMode] reset PickupCheck to false");
         }
 
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
@@ -74,7 +74,7 @@ namespace GameMod {
             if (___m_loaded_language != Loc.CurrentLanguageCode &&
                 __instance.Mission.Type == MissionType.MULTIPLAYER) {
                 _LevelInfo_ReadChallengeModeText_Method.Invoke(__instance, null);
-                Debug.Log("CheckReloadStory: did MP file, music is " + __instance.MusicTrack);
+                Debug.Log("[CustomMode] CheckReloadStory: did MP file, music is " + __instance.MusicTrack);
                 ___m_loaded_language = Loc.CurrentLanguageCode;
                 return false;
             }
@@ -88,7 +88,7 @@ namespace GameMod {
     {
         public static void DoReadModeFile(LevelInfo level, Action<string> tag_parser)
         {
-            Debug.Log("DoReadModeFile " + level.IsAddOn + " " + level.FileName);
+            Debug.Log("[CustomMode] DoReadModeFile " + level.IsAddOn + " " + level.FileName);
             if (level.Mission.Type == MissionType.CHALLENGE)
                 RobotManager.DoReadChallengeModeFile(level, tag_parser);
             else if (level.Mission.Type == MissionType.MULTIPLAYER)
@@ -116,9 +116,9 @@ namespace GameMod {
             string word = words[0];
             if (word == "$pickup_check") {
                 if (words.Length != 2 || !bool.TryParse(words[1], out MPCustomModeFile.PickupCheck))
-                    Debug.Log("Invalid argument to pickup_check in multi_mode file. Must be true or false.");
+                    Debug.LogWarning("[CustomMode] invalid pickup_check argument, must be true or false");
                 else
-                    Debug.Log("pickup_check changed to " + MPCustomModeFile.PickupCheck);
+                    Debug.Log("[CustomMode] pickup_check changed to " + MPCustomModeFile.PickupCheck);
                 return false;
             }
             //Debug.Log("Multi tag: " + word);

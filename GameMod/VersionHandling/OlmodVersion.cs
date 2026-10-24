@@ -59,7 +59,7 @@ namespace GameMod.VersionHandling {
 
             if (request.isNetworkError || request.isHttpError)
             {
-                Debug.Log(request.error);
+                Debug.LogErrorFormat("[Version] github releases request failed: {0}", request.error);
                 yield break;
             }
             else
@@ -75,7 +75,7 @@ namespace GameMod.VersionHandling {
                 }
                 catch (Exception e)
                 {
-                    Debug.Log($"Unable to parse github releases response: {e}");
+                    Debug.LogError($"[Version] cannot parse the github releases response: {e}");
                     yield break;
                 }
 

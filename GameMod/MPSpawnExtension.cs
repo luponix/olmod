@@ -46,7 +46,7 @@ namespace GameMod
             string[] split = name.Split(':');
             if (split == null)
             {
-                Debug.Log("Invalid level name in CheckExtraSpawnpoints, skipping.");
+                Debug.LogWarning("[Spawns] invalid level name in CheckExtraSpawnpoints, skipping");
                 return;
             }
 
@@ -72,7 +72,7 @@ namespace GameMod
 
             if (www.isNetworkError)
             {
-                Debug.Log(www.error);
+                Debug.LogErrorFormat("[Spawns] spawnpoint request failed: {0}", www.error);
                 DownloadBusy = false;
                 yield break;
             }
@@ -81,11 +81,11 @@ namespace GameMod
                 try
                 {
                     spawnpoints = JsonConvert.DeserializeObject<List<LevelData.SpawnPoint>>(www.downloadHandler.text);
-                    Debug.Log($"{spawnpoints.Count} additional spawnpoints parsed from the current level's online json file");
+                    Debug.Log($"[Spawns] {spawnpoints.Count} additional spawnpoints parsed from the level's online json file");
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError("WARNING: Unable to parse additional player spawns, continuing with originals (error message: " + e.Message + ")");
+                    Debug.LogError("[Spawns] cannot parse the additional player spawns, continuing with the originals: " + e.Message + ")");
                     spawnpoints.Clear();
                 }
             }
@@ -216,12 +216,12 @@ namespace GameMod
                 {
                     payload.Add(spv.spawnpoint);
                 }
-                Debug.Log("Exported spawnpoints to filepath: " + filepath);
+                Debug.Log("[Spawns] exported spawnpoints to " + filepath);
                 File.AppendAllText(filepath, JsonConvert.SerializeObject(payload, Formatting.Indented, new JsonSerializerSettings { ReferenceLoopHandling = ReferenceLoopHandling.Ignore }));
             }
             else
             {
-                Debug.Log("No additional spawnpoints, nothing to export!");
+                Debug.Log("[Spawns] no additional spawnpoints, nothing to export");
             }
         }
     }

@@ -69,7 +69,7 @@ namespace GameMod
             {
                 if (!MPSuddenDeath.InOvertime)
                 {
-                    Debug.Log("Sudden Death!");
+                    Debug.Log("[Match] sudden death");
                     MPSuddenDeath.InOvertime = true;
                     MPHUDMessage.SendToAll("Sudden Death!");
 

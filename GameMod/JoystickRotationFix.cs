@@ -163,7 +163,7 @@ namespace GameMod
                 if (GameplayManager.IsDedicatedServer()) return;
                 if (Client.GetClient() == null)
                 {
-                    Debug.Log("JoystickRamping_SendPlayerLoadoutToServer: no client?");
+                    Debug.Log("[Controls] ramping: SendPlayerLoadoutToServer has no client");
                     return;
                 }
                 Client.GetClient().Send(MessageTypes.MsgSetTurnRampMode,
@@ -202,7 +202,7 @@ namespace GameMod
                 if (!server_support && !GameplayManager.IsMultiplayerActive && NetworkMatch.GetMatchState() != MatchState.LOBBY)
                 {
                     server_support = true;
-                    Debug.Log("JoystickRamping.server_support didnt reset properly");
+                    Debug.Log("[Controls] ramping: server_support did not reset properly");
                 }
                 position.y += 55f;
                 uie.SelectAndDrawStringOptionItem(Loc.LS("MAX TURN RAMP MODE"), position, 0, alt_turn_ramp_mode ? "LINEAR" : "DEFAULT", "LINEAR ADDS THE MAX TURN RAMPING SPEED LINEARLY ALONG THE INPUT [KB/JOYSTICK ONLY]", 1.5f, !server_support);
@@ -241,7 +241,7 @@ namespace GameMod
                 {
                     if (Client.GetClient() == null)
                     {
-                        Debug.Log("JoystickRamping_ControlsOptionsUpdate: no client?");
+                        Debug.Log("[Controls] ramping: ControlsOptionsUpdate has no client");
                         return;
                     }
                     Client.GetClient().Send(MessageTypes.MsgSetTurnRampMode, new SetTurnRampModeMessage { mode = alt_turn_ramp_mode ? 1 : 0, netId = GameManager.m_local_player.netId.Value });

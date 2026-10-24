@@ -61,7 +61,7 @@ namespace GameMod
                         }
                         else
                         {
-                            Debug.Log("No percent set for powerup " + words[1] + ", setting to 50%");
+                            Debug.LogWarning("[Tags] no percent set for powerup " + words[1] + ", setting to 50%");
                         }
                         MPTags.m_multiplayer_spawnable_powerups.Add(item);
                     }
@@ -73,7 +73,7 @@ namespace GameMod
                     }
                     else
                     {
-                        Debug.Log("Invalid number of arguments to powerup_frequency.  Must be 1, is " + (words.Length - 1));
+                        Debug.LogWarning("[Tags] powerup_frequency takes 1 argument, got " + (words.Length - 1));
                     }
                     return;
             }
@@ -160,7 +160,7 @@ namespace GameMod
                         }
                         num3 += array[l];
                     }
-                    Debug.Log("We had valid powerups, but couldn't choose one when spawning it");
+                    Debug.LogWarning("[Tags] valid powerups exist but none could be chosen when spawning");
                     return ItemPrefab.num;
                 }
             }

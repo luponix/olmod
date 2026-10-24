@@ -49,7 +49,7 @@ namespace GameMod
 
                 if (GameplayManager.IsDedicatedServer())
                 {
-                    Debug.Log("ExtendedConfig_PilotManager_Select called on the server");
+                    Debug.Log("[Config] PilotManager.Select called on the server");
                     return;
                 }
 
@@ -70,7 +70,7 @@ namespace GameMod
                     // Attempt to use autoselect from pre 0.4.1.
                     if (File.Exists(textFile))
                     {
-                        Debug.Log("Extended config does not exist for pilot, attempting to load pre-0.4.1 autoselect.");
+                        Debug.Log("[Config] no extendedconfig for this pilot, trying the pre-0.4.1 autoselect file");
                         using (StreamReader sr = File.OpenText(textFile))
                         {
                             MPAutoSelection.PrimaryPriorityArray[0] = sr.ReadLine();
@@ -186,7 +186,7 @@ namespace GameMod
                 {
                     List<string> l = new List<string>();
                     PassSectionToFunction(l, s);
-                    Debug.Log("Creating missing section \"" + s + "\" in pilot's .extendedconfig");
+                    Debug.LogFormat("[Config] creating missing section \"{0}\" in the pilot's extendedconfig", s);
                 }
             }
         }
@@ -200,7 +200,7 @@ namespace GameMod
                 //uConsole.Log("ExtendedConfig_Controls_SaveControlData");
                 if (GameplayManager.IsDedicatedServer())
                 {
-                    Debug.Log("ExtendedConfig_Controls_SaveControlData called on the server");
+                    Debug.Log("[Config] Controls.SaveControlData called on the server");
                     return;
                 }
                 SaveActivePilot();
@@ -215,7 +215,7 @@ namespace GameMod
                 //uConsole.Log("ExtendedConfig_PilotManager_SavePreferences");
                 if (GameplayManager.IsDedicatedServer())
                 {
-                    Debug.Log("ExtendedConfig_Controls_SavePreferences called on the server");
+                    Debug.Log("[Config] Controls.SavePreferences called on the server");
                     return;
                 }
                 SaveActivePilot();
@@ -230,7 +230,7 @@ namespace GameMod
                 uConsole.Log("ExtendedConfig_PilotManager_Create");
                 if (GameplayManager.IsDedicatedServer())
                 {
-                    Debug.Log("ExtendedConfig_PilotManager_Create called on the server");
+                    Debug.Log("[Config] PilotManager.Create called on the server");
                     return;
                 }
                 if (string.IsNullOrEmpty(PilotManager.ActivePilot))
@@ -244,7 +244,7 @@ namespace GameMod
             {
                 if (GameplayManager.IsDedicatedServer())
                 {
-                    Debug.Log("ExtendedConfig_PilotManager_Create.Postfix called on the server");
+                    Debug.Log("[Config] PilotManager.Create postfix called on the server");
                     return;
                 }
                 if (!copy_prefs && !copy_config)
@@ -263,7 +263,7 @@ namespace GameMod
             {
                 if (GameplayManager.IsDedicatedServer())
                 {
-                    Debug.Log("ExtendedConfig_Platform_DeleteUserData called on the server");
+                    Debug.Log("[Config] Platform.DeleteUserData called on the server");
                     return;
                 }
                 if (filename.EndsWith(".xprefs"))
@@ -417,10 +417,10 @@ namespace GameMod
             {
                 if (ex is UnauthorizedAccessException)
                 {
-                    Debug.Log("Error in ExtendedConfig.SaveActivePilot: Could not save pilot file due to insufficient permissions");
+                    Debug.LogError("[Config] SaveActivePilot: cannot write the pilot file, insufficient permissions");
                     return;
                 }
-                Debug.Log("Error in ExtendedConfig.SaveActivePilot: " + ex);
+                Debug.LogErrorFormat("[Config] SaveActivePilot failed: {0}", ex);
             }
         }
 
@@ -469,7 +469,7 @@ namespace GameMod
                     }
                     else
                     {
-                        Debug.Log("Error in ExtendedConfig.ProcessAutoSelectSection: unexpected line split: " + line + ", Setting Default Values.");
+                        Debug.LogWarningFormat("[Config] AutoSelect: unexpected line \"{0}\", using defaults", line);
                         Set();
                         return;
                     }
@@ -582,7 +582,7 @@ namespace GameMod
                 }
                 catch (Exception ex)
                 {
-                    Debug.Log("Error while parsing AutoSelect settings. missing entry " + ex + "\nSetting Default values");
+                    Debug.LogWarningFormat("[Config] AutoSelect: missing entry {0}, using defaults", ex);
                     Set();
                     ApplySettings();
                 }
@@ -651,13 +651,13 @@ namespace GameMod
 
             public static void ParseSectionData()
             {
-                Debug.Log("\n- Loading Joystick Curves: ");
                 SetDefault();
 
                 // Save the current configuration in case we need to reset back to it when we encounter an incorrectable error
                 List<Controller> copy_of_controllers = CloneCurrentControllerConfiguration();
 
-                //PrintControllerNamesAndAlignment();
+                int matched = 0;
+                int defaulted = 0;
                 try
                 {
                     // read in the data of the devices 
@@ -706,25 +706,16 @@ namespace GameMod
                     // best fit base line = equal name, equal axis count
                     // best fit = matching or non '-1' id > contains data > exists
                     for ( int i = 0; i < Controls.m_controllers.Count; i++){
-                        Debug.Log(i);
                         // establish base line and collect candidates
                         List<Controller> candidates = new List<Controller>();
                         foreach( Controller c in parsed_devices){
                             if (c.name.Equals(Controls.m_controllers[i].name) & c.axes.Count == Controls.m_controllers[i].m_axis_count)
-                            {
-                                Debug.Log(" Added a candidate");
                                 candidates.Add(c);
-                            }
-                            else
-                            {
-                                Debug.Log(" "+ c.name+" : "+ Controls.m_controllers[i].name+", "+ c.axes.Count+" : "+ Controls.m_controllers[i].m_axis_count);
-                            }
-                                
                         }
                         // if there are no candidates that fit the baseline then leave this controller with default values
                         if (candidates.Count <= 0){
                             controllers[i].populated = true;
-                            Debug.Log(" Set "+controllers[i].name + " to DEFAULT");
+                            defaulted++;
                             continue;
                         }
                         // if there are candidates then find the best fit among them
@@ -744,6 +735,7 @@ namespace GameMod
                         CopyController(candidates[best_candidate], controllers[i]);
                         controllers[i].id = Controls.m_controllers[i].joystickID;
                         controllers[i].populated = true;
+                        matched++;
                         parsed_devices.Remove(candidates[best_candidate]);
 
                     }
@@ -751,13 +743,11 @@ namespace GameMod
                 }
                 catch (Exception ex)
                 {
-                    Debug.Log("Error in ExtendedConfig.Section_JoystickCurve.Load:  " + ex + ", Setting Former Values.");
+                    Debug.LogErrorFormat("[Controls] joystick curves: load failed, keeping the former values -- {0}", ex);
                     controllers = copy_of_controllers;
                 }
 
-                PrintControllerNamesAndAlignment();
-
-                PrintJoystickCurves();
+                Debug.LogFormat("[Controls] joystick curves: {0} devices matched, {1} on defaults", matched, defaulted);
             }
 
             public static void CopyController(Controller data, Controller blank)
@@ -778,7 +768,7 @@ namespace GameMod
             {
                 if(c == null)
                 {
-                    Debug.Log("[ExtendedConfig.Warning] ControllerContainsData received empty controller");
+                    Debug.LogWarning("[Controls] ControllerContainsData received an empty controller");
                     return false;
                 }
                 for( int i = 0; i < c.axes.Count; i++ ){
@@ -796,45 +786,6 @@ namespace GameMod
                      & axis.curve_points[2].x == 0.75f
                      & axis.curve_points[2].y == 0.75f
                      & axis.curve_points[3].y == 1f;
-            }
-
-            public static void PrintJoystickCurves()
-            {
-                foreach( Controller c in controllers )
-                {
-                    Debug.Log("\n"+c.name+" : "+c.id);
-                    for(int i = 0; i < Mathf.Min(c.axes.Count, 6); i++)
-                    {
-                        Debug.Log("   axis: " 
-                            + c.axes[i].curve_points[0].y + ", " 
-                            + c.axes[i].curve_points[1].x + ", " 
-                            + c.axes[i].curve_points[1].y + ", " 
-                            + c.axes[i].curve_points[2].x + ", " 
-                            + c.axes[i].curve_points[2].y + ", " 
-                            + c.axes[i].curve_points[3].y);
-                    }
-                    Debug.Log("");
-                }
-            }
-
-            public static void PrintControllerNamesAndAlignment()
-            {
-                int max = new[] { Controls.m_controllers.Count, Controllers.controllers.Count, controllers.Count }.Max();
-
-                Debug.Log(string.Format(" {0, -50} | {1,-50} | {2,-50}", "Rewired", "Sensitivity/Deadzone", "Response-Curves"));
-                string spacer = "";
-                for (int i = 0; i < 156; i++)
-                    spacer += "-";
-                Debug.Log(spacer);
-                for (int i = 0; i < max; i++)
-                {
-                    Debug.Log(string.Format(" {0, -50} | {1,-50} | {2,-50}", 
-                        i < Controls.m_controllers.Count ? Controls.m_controllers[i].name + " : " + Controls.m_controllers[i].joystickID : "",
-                        i < Controllers.controllers.Count ? Controllers.controllers[i].m_device_name + " : " + Controllers.controllers[i].m_joystick_id : "",
-                        i < controllers.Count ? controllers[i].name + " : " + controllers[i].id : ""
-                    ));
-                }
-                Debug.Log("");
             }
 
             public static List<Controller> CloneCurrentControllerConfiguration()
@@ -884,7 +835,7 @@ namespace GameMod
                 }
                 catch (Exception ex)
                 {
-                    Debug.Log("Error in ExtendedConfig.Section_JoystickCurve.Save(): \n" + ex);
+                    Debug.LogErrorFormat("[Controls] joystick curves: save failed -- {0}", ex);
                 }
             }
 
@@ -920,7 +871,7 @@ namespace GameMod
             {
                 if (points.Length != 4 || points[0] == null || points[1] == null || points[2] == null || points[3] == null)
                 {
-                    Debug.Log("ExtendedConfig.GenerateCurveLookupTable: invalid argument");
+                    Debug.LogWarning("[Controls] GenerateCurveLookupTable: invalid argument");
                     points = DefaultCurvePoints();
                 }
 
@@ -974,7 +925,7 @@ namespace GameMod
                     }
                     else
                     {
-                        Debug.Log("Error in ExtendedConfig.ProcessWeaponCyclingSection: unexpected line split: " + line + ", Setting Default Values.");
+                        Debug.LogWarningFormat("[Config] WeaponCycling: unexpected line \"{0}\", using defaults", line);
                         Set();
                         return;
                     }
@@ -1045,7 +996,7 @@ namespace GameMod
                 }
                 catch (Exception ex)
                 {
-                    Debug.Log("Error while parsing WeaponCycling settings. missing entry " + ex + "\nSetting Default values");
+                    Debug.LogWarningFormat("[Config] WeaponCycling: missing entry {0}, using defaults", ex);
                     Set();
                     ApplySettings();
                 }
@@ -1142,7 +1093,7 @@ namespace GameMod
                     }
                     else
                     {
-                        Debug.Log("Error in ExtendedConfig.Section_Hotkeys.Load: unexpected line split: " + line + ", Setting Default Values.");
+                        Debug.LogWarningFormat("[Config] Hotkeys: unexpected line \"{0}\", using defaults", line);
                         Set();
                         return;
                     }
@@ -1186,7 +1137,7 @@ namespace GameMod
                 {
                     if (!Hotkeys.SetBinding(setting.Key, setting.Value))
                     {
-                        Debug.Log("[HOTKEYS] ignoring config entry '" + setting.Key + ": " + setting.Value + "'");
+                        Debug.LogWarningFormat("[Config] Hotkeys: ignoring config entry '{0}: {1}'", setting.Key, setting.Value);
                     }
                 }
                 // hotkeys added after the config file was written keep their default

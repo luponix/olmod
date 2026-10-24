@@ -67,16 +67,16 @@ namespace GameMod {
                             addrs[i] = tmp;
                         }
                         foundV4=true;
-                        Debug.LogFormat("DNS: host {0} is IPv4 {1}",name,addrs[0].ToString());
+                        Debug.LogFormat("[Internet] DNS: host {0} is IPv4 {1}",name,addrs[0].ToString());
                         break;
                     }
                 }
                 if (!foundV4) {
                     // TODO: anlayze what breaks in the V6 case, maybe we can make it work?
-                    Debug.LogFormat("Did not find an IPv4 for {0}, game might crash on V6 addresses", name);
+                    Debug.LogWarningFormat("[Internet] no IPv4 for {0}, the game might crash on V6 addresses", name);
                 }
             } else {
-                Debug.LogFormat("Failed to resolve host name {0}", name);
+                Debug.LogErrorFormat("[Internet] cannot resolve host name {0}", name);
             }
             return addrs;
         }
@@ -94,7 +94,7 @@ namespace GameMod {
             {
                 Enabled = ServerEnabled = true;
                 ServerAddress = IPAddress.Any;
-                Debug.Log("Internet server enabled");
+                Debug.Log("[Internet] internet server enabled");
             }
         }
 
@@ -205,7 +205,7 @@ namespace GameMod {
             {
                 if (UIManager.m_menu_selection == 4)
                 {
-                    Debug.Log("MpMenuUpdate - pushed internet");
+                    Debug.Log("[Internet] MpMenuUpdate pushed internet");
                     MPInternet.OldEnabled = true;
                     MenuManager.m_mp_lan_match = true;
                     MenuManager.m_mp_private_match = true;
@@ -216,7 +216,7 @@ namespace GameMod {
                 }
                 else
                 {
-                    Debug.Log("MpMenuUpdate - pushed non internet");
+                    Debug.Log("[Internet] MpMenuUpdate pushed non-internet");
                     MPInternet.OldEnabled = false;
                 }
             }
@@ -354,7 +354,7 @@ namespace GameMod {
             MPInternet.ServerAddress = MPInternet.FindPasswordAddress(pwd.Trim(), out string msg);
             if (MPInternet.ServerAddress == null)
             {
-                Debug.Log("SwitchToLobbyMenu FindPasswordAddress failed " + msg);
+                Debug.Log("[Internet] SwitchToLobbyMenu FindPasswordAddress failed " + msg);
                 NetworkMatch.CreateGeneralUIPopup("INTERNET MATCH", msg, 1);
                 //MenuManager.ChangeMenuState(MenuState.MP_LOCAL_MATCH, true);
                 /*
@@ -430,7 +430,7 @@ namespace GameMod {
                 }
                 catch (Exception ex)
                 {
-                    Debug.Log("Internet server setup failed " + ex.ToString());
+                    Debug.Log("[Internet] server setup failed " + ex.ToString());
                     Application.Quit();
                 }
             }
@@ -501,7 +501,7 @@ namespace GameMod {
             }
             catch (Exception ex)
             {
-                Debug.Log("Internet server setup failed " + ex.ToString());
+                Debug.Log("[Internet] server setup failed " + ex.ToString());
                 Application.Quit();
             }
 
@@ -522,12 +522,9 @@ namespace GameMod {
                 {
                     var m = AccessTools.Method(x, "<>m__0");
                     if (m != null)
-                    {
-                        Debug.Log("MPInternetEnumCB TargetMethod found");
                         return m;
-                    }
                 }
-            Debug.Log("MPInternetEnumCB TargetMethod not found");
+            Debug.LogError("[Internet] BroadcastState enumerator: target method not found");
             return null;
         }
 
@@ -637,7 +634,7 @@ namespace GameMod {
                     string name = i == -1 ? password : password.Substring(0, i);
                     if (!name.Equals(HostArg, StringComparison.InvariantCultureIgnoreCase))
                     {
-                        Debug.LogFormat("{0}: {1}: Match with wrong host ignored: {2}", DateTime.Now.ToString(), HostArg, name);
+                        Debug.LogFormat("[Internet] {0}: {1}: match with the wrong host ignored: {2}", DateTime.Now.ToString(), HostArg, name);
                         delReqs.Add(req);
                         break;
                     }
@@ -703,19 +700,17 @@ namespace GameMod {
             var x = FindTypeHelper("c__AnonStorey1");
             if (x != null) {
                 var m = AccessTools.Method(x, "<>m__0");
-                if (m != null) {
-                    Debug.Log("BrodcastState receiveCallback TargetMethod found");
+                if (m != null)
                     return m;
-                }
             }
-            Debug.Log("BroadcastState receiveCallback TargetMethod not found");
+            Debug.LogError("[Internet] BroadcastState receiveCallback: target method not found");
             return null;
         }
 
         // the actual patch
         private static Exception Finalizer(object __instance, Exception __exception) {
             if (__exception != null) {
-                Debug.LogFormat("BroadcastState receiveCallback died, telling main thread!");
+                Debug.LogErrorFormat("[Internet] BroadcastState receiveCallback died, telling the main thread");
                 try {
                     Type anon0 = FindTypeHelper("c__AnonStorey0");
                     Type anon1 = FindTypeHelper("c__AnonStorey1");
@@ -725,7 +720,7 @@ namespace GameMod {
                     BroadcastState bs = (BroadcastState)_this_field.GetValue(f_ref);
                    _BroadcastState_m_readLoopExit.SetValue(bs, true);
                 } catch(Exception ex) {
-                    Debug.LogFormat("failed to inform main thread: {0}", ex.ToString());
+                    Debug.LogErrorFormat("[Internet] cannot inform the main thread: {0}", ex.ToString());
                 }
             }
             return null;
@@ -752,12 +747,10 @@ namespace GameMod {
             var x = FindTypeHelper("c__AnonStoreyF");
             if (x != null) {
                 var m = AccessTools.Method(x, "<>m__1");
-                if (m != null) {
-                    //Debug.Log("TryLocalMatchmaking TargetMethod found");
+                if (m != null)
                     return m;
-                }
             }
-            Debug.Log("TryLocalMatchmaking TargetMethod not found");
+            Debug.LogError("[Internet] TryLocalMatchmaking: target method not found");
             return null;
         }
 
@@ -804,7 +797,7 @@ namespace GameMod {
                     return m;
                 }
             }
-            Debug.Log("InternetMatch FindPasswordAddress TargetMethod not found");
+            Debug.LogError("[Internet] InternetMatch.FindPasswordAddress: target method not found");
             return null;
         }
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
@@ -846,7 +839,7 @@ namespace GameMod {
                     }
                 }
             }
-            Debug.Log("MPInternetHandleInvalidMatchmakingData TargetMethod not found");
+            Debug.LogError("[Internet] HandleInvalidMatchmakingData: target method not found");
             return null;
         }
 
@@ -897,7 +890,7 @@ namespace GameMod {
                 yield return new CodeInstruction(OpCodes.Ldloc_S, theVar);
                 yield return new CodeInstruction(OpCodes.Brfalse, jumpTarget);
             } else {
-                Debug.LogFormat("MPInternetHandleInvalidMatchmakingData: transpiler failed at state {0}", state);
+                Debug.LogErrorFormat("[Internet] HandleInvalidMatchmakingData: transpiler failed at state {0}", state);
             }
             // emit the remaining instructions
             foreach (var code in instructionsAfter) {

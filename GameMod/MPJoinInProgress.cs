@@ -268,7 +268,7 @@ namespace GameMod {
                 // client does not have olmod
                 LobbyChatMessage lmsg = null;
                 if (customLevel) {
-                    Debug.LogFormat("client {0} doesn't seem to have olmod, but we use a custom level, warning it", connectionId);
+                    Debug.LogFormat("[JIP] client {0} does not seem to have olmod but the level is custom, warning it", connectionId);
                     lmsg = new LobbyChatMessage(connectionId, "Server", MpTeam.TEAM0, "Joining this match might be impossible without OLMod!", false);
                     NetworkServer.SendToClient(connectionId, 75, lmsg);
                 } else {
@@ -302,14 +302,14 @@ namespace GameMod {
 
             StringMessage levelNameMsg = new StringMessage(level);
             NetworkServer.SendToClient(connectionId, CustomMsgType.SceneLoad, levelNameMsg);
-            Debug.Log("JIP: sending scene load " + levelNameMsg.value);
+            Debug.Log("[JIP] sending scene load " + levelNameMsg.value);
 
             if (NetworkMatch.GetMatchState() == MatchState.LOBBY_LOADING_SCENE)
                 yield break;
 
             StringMessage sceneNameMsg = new StringMessage(GameplayManager.m_level_info.SceneName);
             NetworkServer.SendToClient(connectionId, CustomMsgType.SceneLoaded, sceneNameMsg);
-            Debug.Log("JIP: sending scene loaded " + sceneNameMsg.value);
+            Debug.Log("[JIP] sending scene loaded " + sceneNameMsg.value);
         }
 
         private static void Postfix(NetworkMessage msg)
@@ -422,10 +422,10 @@ namespace GameMod {
             // restore lobby_id which got wiped out in Client.OnSetLoadout
             foreach (var idData in NetworkMatch.m_player_loadout_data)
                 idData.Value.lobby_id = idData.Key;
-            //Debug.Log("JIP: SendLoadoutDataToClients: " + NetworkMatch.m_player_loadout_data.Join());
+            //Debug.Log("[JIP] SendLoadoutDataToClients: " + NetworkMatch.m_player_loadout_data.Join());
             IntegerMessage durationMsg = new IntegerMessage((int)(pregameWait * 1000));
             NetworkServer.SendToClient(connectionId, CustomMsgType.StartPregameCountdown, durationMsg);
-            Debug.Log("JIP: sending start pregame countdown");
+            Debug.Log("[JIP] sending start pregame countdown");
 
             return pregameWait;
         }
@@ -463,9 +463,9 @@ namespace GameMod {
 
             if (newPlayer.m_mp_name.StartsWith("OBSERVER"))
             {
-                Debug.LogFormat("Enabling spectator for {0}", newPlayer.m_mp_name);
+                Debug.LogFormat("[JIP] enabling spectator for {0}", newPlayer.m_mp_name);
                 newPlayer.Networkm_spectator = true;
-                Debug.LogFormat("Enabled spectator for {0}", newPlayer.m_mp_name);
+                Debug.LogFormat("[JIP] enabled spectator for {0}", newPlayer.m_mp_name);
 
                 yield return null; // make sure spectator change is received before sending MatchStart
             }
@@ -504,7 +504,7 @@ namespace GameMod {
                 if (!newPlayer.m_spectator)
                     player.CallTargetAddHUDMessage(player.connectionToClient, String.Format(Loc.LS("{0} JOINED MATCH"), newPlayer.m_mp_name), -1, true);
 
-                //Debug.Log("JIP: spawning on new client net " + player.netId + " lobby " + player.connectionToClient.connectionId);
+                //Debug.Log("[JIP] spawning on new client net " + player.netId + " lobby " + player.connectionToClient.connectionId);
                 NetworkServer.SendToClient(connectionId, CustomMsgType.Respawn, new RespawnMessage
                 {
                     m_net_id = player.netId,
@@ -597,10 +597,10 @@ namespace GameMod {
         public static void DisconnectConnectedPlayerInfo(object cip)
         {
             object hpmi = CPIType.GetProperty("MatchmakerInfo").GetValue(cip, null);
-            Debug.LogFormat("DisconnectConnectedPlayerInfo, m_has_connected was {0}", HPMIType.GetField("m_has_connected").GetValue(hpmi));
+            Debug.LogFormat("[JIP] DisconnectConnectedPlayerInfo, m_has_connected was {0}", HPMIType.GetField("m_has_connected").GetValue(hpmi));
             HPMIType.GetField("m_has_connected").SetValue(hpmi, false);
             HPMIType.GetField("m_time_slot_reserved").SetValue(hpmi, new DateTime(0)); // force timeout
-            Debug.LogFormat("DisconnectConnectedPlayerInfo, m_has_connected is {0}", HPMIType.GetField("m_has_connected").GetValue(hpmi));
+            Debug.LogFormat("[JIP] DisconnectConnectedPlayerInfo, m_has_connected is {0}", HPMIType.GetField("m_has_connected").GetValue(hpmi));
         }
 
         public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)

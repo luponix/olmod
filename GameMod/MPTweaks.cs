@@ -51,14 +51,14 @@ namespace GameMod {
             settings.Clear();
             foreach (var x in newSettings)
                 settings.Add(x.Key, x.Value);
-            Debug.Log("MPTweaks.Set " + (Overload.NetworkManager.IsServer() ? "server" : "conn " + NetworkMatch.m_my_lobby_id) + " new " + newSettings.Join() + " settings " + settings.Join()); // CCF - sometimes, these values are blanking. Don't know why. This needs to be investigated and fixed.
+            Debug.Log("[Tweaks] Set " + (Overload.NetworkManager.IsServer() ? "server" : "conn " + NetworkMatch.m_my_lobby_id) + " new " + newSettings.Join() + " settings " + settings.Join()); // CCF - sometimes, these values are blanking. Don't know why. This needs to be investigated and fixed.
             if (NetworkMatch.GetMatchState() == MatchState.PLAYING)
                 Apply();
         }
 
         public static void Reset()
         {
-            Debug.Log("MPTweaks.Reset"); // CCF
+            Debug.Log("[Tweaks] Reset"); // CCF
             settings.Clear();
         }
 
@@ -86,7 +86,7 @@ namespace GameMod {
             }
             if (key == "nocompress.reliable_timestamps" && bool.TryParse(value, out bool valTimestamps))
             {
-                //Debug.LogFormat("MPTweaks: server sends reliable timestamps: {0}",(valTimestamps)?1:0);
+                //Debug.LogFormat("[Tweaks] server sends reliable timestamps: {0}",(valTimestamps)?1:0);
                 var oldValue = (MPNoPositionCompression.NewSnapshotVersion == MPNoPositionCompression.SnapshotVersion.VELOCITY_TIMESTAMP)?Boolean.TrueString:Boolean.FalseString;
                 MPNoPositionCompression.NewSnapshotVersion = (valTimestamps)?MPNoPositionCompression.SnapshotVersion.VELOCITY_TIMESTAMP:MPNoPositionCompression.SnapshotVersion.VELOCITY;
                 return oldValue;
@@ -97,18 +97,18 @@ namespace GameMod {
         public static void Apply()
         {
             if (oldSettings.Any())
-                Debug.Log("MPTweaks.Apply " + (Overload.NetworkManager.IsServer() ? "server" : "conn " + NetworkMatch.m_my_lobby_id) + " restoring to " + oldSettings.Join());
+                Debug.Log("[Tweaks] Apply " + (Overload.NetworkManager.IsServer() ? "server" : "conn " + NetworkMatch.m_my_lobby_id) + " restoring to " + oldSettings.Join());
             foreach (var x in oldSettings)
                 ApplySetting(x.Key, x.Value);
             oldSettings.Clear();
             foreach (var x in settings)
                 oldSettings[x.Key] = ApplySetting(x.Key, x.Value);
-            Debug.Log("MPTweaks.Apply " + (Overload.NetworkManager.IsServer() ? "server" : "conn " + NetworkMatch.m_my_lobby_id) + " settings " + settings.Join() + " oldsettings " + oldSettings.Join());
+            Debug.Log("[Tweaks] Apply " + (Overload.NetworkManager.IsServer() ? "server" : "conn " + NetworkMatch.m_my_lobby_id) + " settings " + settings.Join() + " oldsettings " + oldSettings.Join());
         }
  
         public static void Send(int conn_id = -1)
         {
-            //Debug.Log("MPTweaks.Send to " + conn_id + " settings " + settings.Join());
+            //Debug.Log("[Tweaks] Send to " + conn_id + " settings " + settings.Join());
             var msg = new TweaksMessage { m_settings = settings };
             if (conn_id == -1)
             {
@@ -163,9 +163,9 @@ namespace GameMod {
         {
             if (MPDownloadLevel.DownloadBusy || MPSpawnExtension.DownloadBusy || !GameplayManager.IsDedicatedServer())
                 return;
-            Debug.Log("MPTweaksLoadScene");
+            Debug.Log("[Tweaks] LoadScene");
             RobotManager.ReadMultiplayerModeFile();
-            Debug.Log("MPTweaks loaded mode file");
+            Debug.Log("[Tweaks] loaded mode file");
             var tweaks = new Dictionary<string, string>() { };
             if (NetworkMatch.GetMode() == CTF.MatchModeCTF)
                 tweaks.Add("ctf.returntimer", CTF.ReturnTimeAmountDefault.ToStringInvariantCulture());
@@ -174,7 +174,7 @@ namespace GameMod {
             tweaks.Add("nocompress.reliable_timestamps", Boolean.TrueString);
             if (tweaks.Any())
             {
-                Debug.LogFormat("MPTweaks: sending tweaks {0}", tweaks.Join());
+                Debug.LogFormat("[Tweaks] sending tweaks {0}", tweaks.Join());
                 MPTweaks.Set(tweaks);
                 MPTweaks.Send();
             }
@@ -244,7 +244,7 @@ namespace GameMod {
         private static void OnClientCapabilities(NetworkMessage rawMsg)
         {
             var msg = rawMsg.ReadMessage<TweaksMessage>();
-            Debug.LogFormat("MPTweaks: received client capabilities {0}: {1}", rawMsg.conn.connectionId, msg.m_settings.Join());
+            Debug.LogFormat("[Tweaks] received client capabilities {0}: {1}", rawMsg.conn.connectionId, msg.m_settings.Join());
             MPTweaks.ClientCapabilitiesSet(rawMsg.conn.connectionId, msg.m_settings);
         }
 
@@ -272,17 +272,17 @@ namespace GameMod {
         {
             if (Client.GetClient() == null)
             {
-                Debug.Log("MPTweaks OnAcceptedToLobby: no client?");
+                Debug.Log("[Tweaks] OnAcceptedToLobby: no client?");
                 return;
             }
             var server = accept_msg.m_server_location;
             if (!server.StartsWith("OLMOD ") ||
                 server == "OLMOD 0.2.6") // other server / server too old
             {
-                Debug.LogFormat("MPTweaks: unsupported server {0}", server);
+                Debug.LogFormat("[Tweaks] unsupported server {0}", server);
                 return;
             }
-            Debug.Log("MPTweaks: sending client capabilites");
+            Debug.Log("[Tweaks] sending client capabilites");
             var caps = new Dictionary<string, string>();
             caps.Add("ModVersion", OlmodVersion.FullVersionString);
             caps.Add("Modded", Core.GameMod.Modded ? "1" : "0");
@@ -330,7 +330,7 @@ namespace GameMod {
             if (!MPTweaks.ClientInfos.TryGetValue(connId, out var clientInfo)) {
                 clientInfo = MPTweaks.ClientCapabilitiesSet(connId, new Dictionary<string, string>());
             }
-            Debug.Log("MPTweaks: conn " + connId + " OnLoadoutDataMessage clientInfo is now " + clientInfo.Capabilities.Join());
+            Debug.Log("[Tweaks] conn " + connId + " OnLoadoutDataMessage clientInfo is now " + clientInfo.Capabilities.Join());
             if (!MPTweaks.ClientHasMod(connId) && MPTweaks.MatchNeedsMod()) {
                 //LobbyChatMessage chatMsg = new LobbyChatMessage(connId, "SERVER", MpTeam.ANARCHY, "You need OLMOD to join this match", false);
                 //NetworkServer.SendToClient(connId, CustomMsgType.LobbyChatToClient, chatMsg);

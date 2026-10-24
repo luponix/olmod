@@ -39,7 +39,7 @@ namespace GameMod.ModsHandler
 
             if (string.IsNullOrEmpty(Config.OLModDir))
             {
-                Debug.Log("Mods: olmod directory unknown, loading nothing");
+                Debug.Log("[Mods] olmod directory unknown, loading nothing");
                 return;
             }
 
@@ -52,7 +52,7 @@ namespace GameMod.ModsHandler
                 if (startup == null)
                 {
                     startupUnreadable = true;
-                    Debug.Log("Mods: " + startupPath + " could not be read, loading nothing and leaving it untouched");
+                    Debug.Log("[Mods] " + startupPath + " could not be read, loading nothing and leaving it untouched");
                     return;
                 }
                 JArray selection = startup["mods"] as JArray;
@@ -64,7 +64,7 @@ namespace GameMod.ModsHandler
                 if (Core.GameMod.FindArg("-modded"))
                     Enabled.AddRange(Installed());
                 Save();
-                Debug.Log("Mods: seeded " + startupPath + " with " + Enabled.Count + " mod(s)");
+                Debug.Log("[Mods] seeded " + startupPath + " with " + Enabled.Count + " mod(s)");
             }
 
             foreach (string name in Enabled)
@@ -72,10 +72,10 @@ namespace GameMod.ModsHandler
                 string path = Path.Combine(Config.OLModDir, name);
                 if (!File.Exists(path))
                 {
-                    Debug.Log("Mods: " + name + " is enabled but not installed");
+                    Debug.Log("[Mods] " + name + " is enabled but not installed");
                     continue;
                 }
-                Debug.Log("Loading mod " + name);
+                Debug.Log("[Mods] loading " + name);
                 try
                 {
                     harmony.PatchAll(Assembly.LoadFile(path));
@@ -83,14 +83,14 @@ namespace GameMod.ModsHandler
                 }
                 catch (Exception ex)
                 {
-                    Debug.Log("Running mod " + name + ": " + ex.ToString());
+                    Debug.Log("[Mods] running " + name + ": " + ex.ToString());
                 }
             }
 
             Core.GameMod.ModsLoaded = string.Join(",", Loaded.ToArray());
             Core.GameMod.Modded = Loaded.Count > 0;
 
-            Debug.Log("Mods: loaded " + Loaded.Count + " of " + Installed().Count() +
+            Debug.Log("[Mods] loaded " + Loaded.Count + " of " + Installed().Count() +
                 " installed in " + Config.OLModDir +
                 (SelectionWritable ? "" : " -- selection NOT writable"));
         }
@@ -149,7 +149,7 @@ namespace GameMod.ModsHandler
             }
             catch (Exception ex)
             {
-                Debug.Log("Mods: cannot write " + startupPath + " -- " + ex.Message);
+                Debug.Log("[Mods] cannot write " + startupPath + " -- " + ex.Message);
                 return false;
             }
         }
@@ -162,7 +162,7 @@ namespace GameMod.ModsHandler
             }
             catch (Exception ex)
             {
-                Debug.Log("Mods: " + startupPath + " is not valid JSON -- " + ex.Message);
+                Debug.Log("[Mods] " + startupPath + " is not valid JSON -- " + ex.Message);
                 return null;
             }
         }

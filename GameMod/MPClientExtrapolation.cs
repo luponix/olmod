@@ -148,18 +148,21 @@ namespace GameMod {
     [HarmonyPatch(typeof(ProjectileManager), "FireProjectile")]
     class MPClientExtrapolation_FireProjectile {
         private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes) {
+            int n = 0;
             foreach (var code in codes) {
                 // Replace where the projectile is added to the list of projectiles with our own function.
                 if (code.opcode == OpCodes.Callvirt && ((MethodInfo)code.operand).Name == "Fire") {
                     yield return code;
                     yield return new CodeInstruction(OpCodes.Ldloc_1);
                     yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MPClientExtrapolation), "LerpProjectile"));
-                    Debug.Log("Patched FireProjectile for MPClientExtrapolation");
+                    n++;
                     continue;
                 }
 
                 yield return code;
             }
+            if (n == 0)
+                Debug.LogError("[Extrapolation] FireProjectile: Fire call not found");
         }
     }
 

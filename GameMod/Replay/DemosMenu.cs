@@ -158,7 +158,7 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("REPLAY: delete failed: {0}", e);
+                Debug.LogErrorFormat("[Replay] delete failed: {0}", e);
             }
             MenuManager.PlaySelectSound(1f);
             RefreshList();

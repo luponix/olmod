@@ -106,6 +106,13 @@
     <Compile Include="AxisCountFix.cs" />
     <Compile Include="MenuMusic.cs" />
     <Compile Include="Hooks\UIElement.cs" />
+    <Compile Include="Hooks\GameManager.cs" />
+    <Compile Include="Hooks\Player.cs" />
+    <Compile Include="Hooks\PlayerShip.cs" />
+    <Compile Include="Hooks\Viewer.cs" />
+    <Compile Include="Logging\LogRewrite.cs" />
+    <Compile Include="Logging\LevelScanLog.cs" />
+    <Compile Include="Logging\EngineLogNoise.cs" />
     <Compile Include="MainMenuRows.cs" />
     <Compile Include="MouseSlidingFix.cs" />
     <Compile Include="MPMatchInfo.cs" />

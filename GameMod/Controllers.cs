@@ -272,7 +272,7 @@ namespace GameMod
             if (Controllers.m_serialized_data == null)
             {
                 Controllers.m_serialized_data = String.Empty;
-                Debug.Log("No existing .xconfigmod file");
+                Debug.Log("[Controls] no existing .xconfigmod file");
                 return;
             }
             using (MemoryStream memoryStream = new MemoryStream(Encoding.ASCII.GetBytes(Controllers.m_serialized_data)))
@@ -305,7 +305,7 @@ namespace GameMod
 
         private static List<Controllers.Controller> ReadInDevicesAndReturnThemInAList(StreamReader sr, int numControllers)
         {
-            Debug.Log("Creating devices from .xconfigmod");
+            Debug.LogFormat("[Controls] loading {0} devices from .xconfigmod", numControllers);
             List<Controllers.Controller> all_controllers = new List<Controllers.Controller>();
             for (int i = 0; i < numControllers; i++)
             {
@@ -376,7 +376,7 @@ namespace GameMod
             string text = sr.ReadLine(); // 1
             if (!RUtility.StringStartsWith(text, Controls.CONFIG_KEY))
             {
-                Debug.Log("olmod controls config save file has an incorrect key: " + text);
+                Debug.LogErrorFormat("[Controls] .xconfigmod has an incorrect key: {0}", text);
                 return;
             }
 
@@ -587,7 +587,7 @@ namespace GameMod
         static void Postfix(string filename)
         {
             string fn = filename + "mod";
-            Debug.Log("SaveControlDataMod: " + fn);
+            Debug.LogFormat("[Controls] saving {0} devices to {1}", Controls.m_controllers.Count, fn);
             try
             {
                 using (MemoryStream memoryStream = new MemoryStream())
@@ -613,7 +613,7 @@ namespace GameMod
             {
                 if (ex is UnauthorizedAccessException)
                 {
-                    Debug.Log("Error in ControlsMod.SaveControlData: Could not save pilot file due to insufficient permissions");
+                    Debug.LogError("[Controls] SaveControlData: cannot write the pilot file, insufficient permissions");
                     return;
                 }
                 Debug.LogException(ex);
@@ -632,7 +632,6 @@ namespace GameMod
             {
                 Overload.Controller controller = Controls.m_controllers[i];
                 w.WriteLine((!array[i]) ? string.Empty : controller.name + ";" + Controls.m_controllers[i].joystickID);
-                Debug.Log((!array[i]) ? string.Empty : controller.name + ";" + Controls.m_controllers[i].joystickID);
                 if (array[i])
                 {
                     w.WriteLine(controller.m_axis_count);
@@ -710,19 +709,19 @@ namespace GameMod
         private static void AddRemap(string origName, string newName)
         {
             if (String.IsNullOrEmpty(origName)) {
-                    Debug.LogFormat("ControllerNameRemapper: invalid remap request with empty origName ignored");
+                    Debug.LogWarning("[Controls] remap: invalid request with an empty original name ignored");
                     return;
             }
             if (String.IsNullOrEmpty(newName)) {
                 // Delete the existing mapping
                 if (remapValues.ContainsKey(origName)) {
-                    Debug.LogFormat("ControllerNameRemapper: REMOVING config {0}->{1}", origName, remapValues[origName]);
+                    Debug.LogFormat("[Controls] remap: removing {0} -> {1}", origName, remapValues[origName]);
                     remapValues.Remove(origName);
                 }
             } else {
                 // Add the mapping
                 remapValues[origName] = newName;
-                Debug.LogFormat("ControllerNameRemapper: will remap '{0}' -> '{1}'", origName, newName);
+                Debug.LogFormat("[Controls] remap: will remap '{0}' -> '{1}'", origName, newName);
             }
         }
 
@@ -735,7 +734,7 @@ namespace GameMod
                 }
                 int idx = line.IndexOf("->");
                 if (idx < 1 || idx > line.Length-3 ) {
-                    Debug.LogFormat("ControllerNameRemapper: config option '{0}' is invalid!", line);
+                    Debug.LogWarningFormat("[Controls] remap: config option '{0}' is invalid", line);
                     return;
                 }
                 string origName = line.Substring(0, idx);
@@ -755,7 +754,7 @@ namespace GameMod
                 string fn = Path.Combine(Application.persistentDataPath, "controllers.remapmod");
                 //Debug.LogFormat("ControllerNameRemapper: looking for config file '{0}'", fn);
                 if (File.Exists(fn)) {
-                    Debug.LogFormat("ControllerNameRemapper: found config file '{0}'", fn);
+                    Debug.LogFormat("[Controls] remap: found config file '{0}'", fn);
                     StreamReader sr = new StreamReader(fn, new System.Text.UTF8Encoding());
                     string line;
                     while( (line = sr.ReadLine()) != null) {
@@ -763,7 +762,7 @@ namespace GameMod
                     }
                 }
             } catch (Exception ex) {
-                Debug.LogFormat("ControllerNameRemapper: exception during loading config: {0}", ex.Message);
+                Debug.LogErrorFormat("[Controls] remap: loading the config failed: {0}", ex.Message);
             }
         }
 
@@ -787,7 +786,7 @@ namespace GameMod
             string origName = (string)field_m_name.GetValue(__instance);
             string newName = origName;
             if (ControllerNameRemapper.RenameController(origName, ref newName)) {
-                Debug.LogFormat("ControllerNameRemapper: mapping '{0}' -> '{1}'", origName, newName);
+                Debug.LogFormat("[Controls] remap: mapping '{0}' -> '{1}'", origName, newName);
                 field_m_name.SetValue(__instance, newName);
             }
         }

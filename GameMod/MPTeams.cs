@@ -632,7 +632,7 @@ namespace GameMod
                         NetworkMatch.m_team_scores[(int)team] < NetworkMatch.m_team_scores[(int)min_team]))
                     min_team = team;
             __result = min_team;
-            Debug.LogFormat("GetTeamForPlayer: result {0}, conn {1}, counts {2}, scores {3}", (int)min_team, connection_id,
+            Debug.LogFormat("[Teams] GetTeamForPlayer: result {0}, conn {1}, counts {2}, scores {3}", (int)min_team, connection_id,
                 team_counts.Join(), NetworkMatch.m_team_scores.Join());
             return false;
         }

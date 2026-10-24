@@ -215,7 +215,7 @@ namespace GameMod {
         public static void TrackerPost(string path, JObject body)
         {
             string url;
-            Debug.LogFormat("{0}: TrackerPost {1} {2}", DateTime.Now.ToString(), path, body.ToString(Formatting.None));
+            Debug.LogFormat("[Server] {0}: TrackerPost {1} {2}", DateTime.Now.ToString(), path, body.ToString(Formatting.None));
             if (!Config.Settings.Value<bool>("isServer") ||
                 string.IsNullOrEmpty(url = Config.Settings.Value<string>("trackerBaseUrl")))
                 return;

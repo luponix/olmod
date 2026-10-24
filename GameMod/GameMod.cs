@@ -23,15 +23,15 @@ namespace GameMod.Core {
         {
             if (GameVersion != null)
             {
-                Debug.Log("olmod Initialize called but is already initialized!");
+                Debug.LogError("[Init] Initialize called but olmod is already initialized");
                 return;
             }
 
             VREnabled = FindArgVal("-vrmode", out var vrmode) && vrmode != "none";
 
             GameVersion = typeof(GameManager).Assembly.GetName().Version;
-            Debug.Log("Initializing " + OlmodVersion.FullVersionString + ", game " + GameVersion);
-            Debug.Log("Command line " + String.Join(" ", Environment.GetCommandLineArgs()));
+            Debug.Log("[Init] initializing " + OlmodVersion.FullVersionString + ", game " + GameVersion);
+            Debug.Log("[Init] command line " + String.Join(" ", Environment.GetCommandLineArgs()));
             Config.Init();
             MPInternet.CheckInternetServer();
             MainMenuRows.Add("DEMOS", Replay.DemosMenu.SEL_DEMOS_MAIN_MENU);
@@ -44,9 +44,9 @@ namespace GameMod.Core {
             }
             catch (Exception ex)
             {
-                Debug.Log(ex.ToString());
+                Debug.LogErrorFormat("[Init] initialization failed: {0}", ex);
             }
-            Debug.Log("Done initializing " + OlmodVersion.FullVersionString);
+            Debug.Log("[Init] done initializing " + OlmodVersion.FullVersionString);
 
             Mods.LoadEnabled(harmony);
 
@@ -91,7 +91,7 @@ namespace GameMod.Core {
                         if (valid)
                             TelemetryMod.telemetry_ip = ip_string;
                         else
-                            Debug.Log("Invalid Input. Telemetry IP contains subvalues outside of the [0,255] range: " + ip_string);
+                            Debug.LogWarning("[Telemetry] IP contains values outside the [0,255] range: " + ip_string);
                     }
 
                 }
@@ -103,9 +103,9 @@ namespace GameMod.Core {
                     if (port >= 0 && port < 65535)
                         TelemetryMod.telemetry_port = port;
                     else
-                        Debug.Log("Invalid Input. Telemetry Port is outside of the allowed [0, 65534] range: " + port_string);
+                        Debug.LogWarning("[Telemetry] port is outside the allowed [0,65534] range: " + port_string);
                 else
-                    Debug.Log("Invalid Input. Telemetry Port is not a whole number: " + port_string);
+                    Debug.LogWarning("[Telemetry] port is not a whole number: " + port_string);
             }
         }
 

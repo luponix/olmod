@@ -36,7 +36,7 @@ namespace GameMod
                 }
             }
             if (state != 1) {
-                Debug.LogFormat("MPReduceJoinTimeout: transpiler failed at state {0}",state);
+                Debug.LogErrorFormat("[JoinTimeout] transpiler failed at state {0}",state);
             }
         }
     }

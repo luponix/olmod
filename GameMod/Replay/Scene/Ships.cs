@@ -66,7 +66,7 @@ namespace GameMod.Replay
                     weaponMounts = ResolveMounts(clones[i])
                 };
             }
-            Debug.LogFormat("REPLAY: {0}/{1} replay ships created", created, rosterSize);
+            Debug.LogFormat("[Replay] {0}/{1} replay ships created", created, rosterSize);
         }
 
         public static void Destroy()
@@ -150,7 +150,7 @@ namespace GameMod.Replay
             }
             if (found == 0)
             {
-                Debug.LogWarning("REPLAY: no weapon mounts found on the ship mesh; replayed ships will fly without weapon models");
+                Debug.LogWarning("[Replay] no weapon mounts found on the ship mesh; replayed ships will fly without weapon models");
                 return;
             }
             weaponMountPaths = paths;

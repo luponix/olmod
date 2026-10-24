@@ -67,7 +67,7 @@ namespace GameMod.ModsHandler
                 if (request.isNetworkError || request.isHttpError)
                 {
                     Status = "unreachable";
-                    Debug.Log("ModCatalog: " + url + " -- " + request.error);
+                    Debug.Log("[Mods] catalog: " + url + " -- " + request.error);
                     yield break;
                 }
                 try
@@ -77,13 +77,13 @@ namespace GameMod.ModsHandler
                 catch (Exception ex)
                 {
                     Status = "unreadable";
-                    Debug.Log("ModCatalog: " + url + " is not a readable catalog -- " + ex.Message);
+                    Debug.Log("[Mods] catalog: " + url + " is not a readable catalog -- " + ex.Message);
                     yield break;
                 }
             }
             Loaded = true;
             Status = Entries.Count + " listed";
-            Debug.Log("ModCatalog: " + Entries.Count + " mod(s) listed at " + url);
+            Debug.Log("[Mods] catalog: " + Entries.Count + " mod(s) listed at " + url);
         }
 
         private static void Read(string json, string catalogUrl)
@@ -97,7 +97,7 @@ namespace GameMod.ModsHandler
                 string file = mod.Value<string>("file");
                 if (!IsPlainModFileName(file))
                 {
-                    Debug.Log("ModCatalog: ignoring entry with file name " + (file ?? "(none)"));
+                    Debug.Log("[Mods] catalog: ignoring entry with file name " + (file ?? "(none)"));
                     continue;
                 }
                 Entries.Add(new Entry

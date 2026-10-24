@@ -28,7 +28,7 @@ namespace GameMod {
     {
         public static void ApplyMatchOLModData()
         {
-            Debug.Log("Apply PMD name " + String.Join(",", NetworkMatch.m_name.Select(x => ((int)x).ToString()).ToArray()));
+            Debug.Log("[Setup] apply PMD name " + String.Join(",", NetworkMatch.m_name.Select(x => ((int)x).ToString()).ToArray()));
             var i = NetworkMatch.m_name.IndexOf('\0');
             if (i == -1)
             {
@@ -70,7 +70,7 @@ namespace GameMod {
     {
         static void Postfix(PrivateMatchDataMessage __result)
         {
-            Debug.Log("Build PMD name jipsingle " + MPJoinInProgress.SingleMatchEnable);
+            Debug.Log("[Setup] build PMD name jipsingle " + MPJoinInProgress.SingleMatchEnable);
             if ((MPTeams.MenuManagerTeamCount > 2 || MPJoinInProgress.MenuManagerEnabled || MPJoinInProgress.SingleMatchEnable || RearView.MPMenuManagerEnabled ||
                 MPSuddenDeath.SuddenDeathMenuEnabled) &&
                 MenuManager.m_mp_lan_match)
@@ -81,7 +81,7 @@ namespace GameMod {
                     (RearView.MPMenuManagerEnabled ? 16 : 0) |
                     (MPSuddenDeath.SuddenDeathMenuEnabled ? 32 : 0))});
             }
-            Debug.Log("Build PMD name " + String.Join(",", __result.m_name.Select(x => ((int)x).ToString()).ToArray()));
+            Debug.Log("[Setup] build PMD name " + String.Join(",", __result.m_name.Select(x => ((int)x).ToString()).ToArray()));
             if (MPJoinInProgress.MenuManagerEnabled || MPJoinInProgress.SingleMatchEnable ||
                 (MenuManager.m_mp_lan_match && MPInternet.Enabled))
                 __result.m_num_players_to_start = 1;
@@ -168,7 +168,7 @@ namespace GameMod {
                     return (int)m_prefs_hashtable[key];
                 }
             } catch (Exception) {
-                Debug.Log($"MPSetup: Could not convert key {key} value {m_prefs_hashtable[key]} to an int, resetting to default {defaultValue}.");
+                Debug.LogWarning($"[Setup] cannot convert key {key} value {m_prefs_hashtable[key]} to an int, resetting to default {defaultValue}.");
             }
             m_prefs_hashtable.Add(key, defaultValue);
             return defaultValue;
@@ -181,7 +181,7 @@ namespace GameMod {
                     return (bool)m_prefs_hashtable[key];
                 }
             } catch (Exception) {
-                Debug.Log($"MPSetup: Could not convert key {key} value {m_prefs_hashtable[key]} to a bool, resetting to default {defaultValue}.");
+                Debug.LogWarning($"[Setup] cannot convert key {key} value {m_prefs_hashtable[key]} to a bool, resetting to default {defaultValue}.");
             }
             m_prefs_hashtable.Add(key, defaultValue);
             return defaultValue;

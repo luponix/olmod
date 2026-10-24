@@ -95,7 +95,7 @@ namespace GameMod
 
             if (seedIndex < 0 || storeIndex < 0)
             {
-                Debug.LogWarning("MainMenuRows: DrawMainMenu anchors not found, falling back to half-items");
+                Debug.LogWarning("[Menu] DrawMainMenu anchors not found, falling back to half-items");
                 transpilerApplied = false;
                 return instructions;
             }

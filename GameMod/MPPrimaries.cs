@@ -316,12 +316,12 @@ namespace GameMod
                         }
                         else
                         {
-                            Debug.Log("No count set for lancer players, ignoring.  Format is, for example, \"$lancer_players;4\"");
+                            Debug.LogWarning("[Primaries] no count set for lancer players, ignoring; the format is \"$lancer_players;4\"");
                         }
                     }
                     catch (Exception)
                     {
-                        Debug.Log("Error setting $lancer_players.  Format is, for example, \"$lancer_players;4\"");
+                        Debug.LogWarning("[Primaries] cannot set $lancer_players; the format is \"$lancer_players;4\"");
                     }
                     break;
             }

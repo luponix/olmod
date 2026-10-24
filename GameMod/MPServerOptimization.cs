@@ -362,13 +362,13 @@ namespace GameMod
 				NetworkClient client = Client.GetClient();
 				if (client == null || !client.isConnected)
 				{
-					Debug.LogErrorFormat("Null client when trying to send fixed update state to server");
+					Debug.LogErrorFormat("[ServerOpt] null client when sending the fixed update state to the server");
 					return null;
 				}
 				PlayerPhysicsMessage playerPhysicsMessage = new PlayerPhysicsMessage();
 				if (Client.m_last_acknowledged_tick >= Client.m_tick)
 				{
-					Debug.LogWarningFormat("Last achnowledged tick {0} greater than or equal to tick {1}", Client.m_last_acknowledged_tick, Client.m_tick);
+					Debug.LogWarningFormat("[ServerOpt] last acknowledged tick {0} is at or past tick {1}", Client.m_last_acknowledged_tick, Client.m_tick);
 					Client.m_last_acknowledged_tick = -1;
 				}
 				int ticks = Mathf.Clamp(Client.m_tick - Client.m_last_acknowledged_tick - 1, 0, 20); // Player.MAX_UNACKNOWLEDGED_TICKS was normally 25, not 20
@@ -435,7 +435,7 @@ namespace GameMod
 			Player playerSendingMessage = Server.FindPlayerByConnectionId(msg.conn.connectionId);
 			if (playerSendingMessage == null)
 			{
-				Debug.LogErrorFormat("Unable to find Player for connection ID: {0}", msg.conn.connectionId);
+				Debug.LogErrorFormat("[ServerOpt] no Player for connection id {0}", msg.conn.connectionId);
 			}
 
 			if ((bool)playerSendingMessage && !playerSendingMessage.isLocalPlayer)
@@ -535,7 +535,7 @@ namespace GameMod
 					/*
 					if (spawndelay == 0 && player.m_input_deficit > MissedFramesThreshold)
 					{
-						Debug.Log("==CCF MISSED TOO MANY INPUTS for " + player.m_mp_name + " on player tick " + player.m_server_tick + ", skipping this frame intentionally to allow buffer catch-up==");
+						Debug.Log("[ServerOpt] missed too many inputs for " + player.m_mp_name + " on player tick " + player.m_server_tick + ", skipping this frame intentionally to allow buffer catch-up==");
 					}
 					*/
 

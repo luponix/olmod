@@ -54,7 +54,7 @@ namespace GameMod
                 _Mission_Levels_Field.SetValue(GameManager.MultiplayerMission, __m_mission_list);
             } catch (Exception ex)
             {
-                Debug.Log("InitializeMissionList() patch failed - " + ex.Message);
+                Debug.LogErrorFormat("[Levels] InitializeMissionList patch failed: {0}", ex.Message);
             }
         }
     }

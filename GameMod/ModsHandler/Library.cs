@@ -72,7 +72,7 @@ namespace GameMod.ModsHandler
             }
             catch (Exception ex)
             {
-                Debug.Log("Mods: cannot hash " + info.FullName + " -- " + ex.Message);
+                Debug.Log("[Mods] cannot hash " + info.FullName + " -- " + ex.Message);
                 return null;
             }
             hashes[file] = new Known { Length = info.Length, Written = info.LastWriteTimeUtc, Hex = hex };
@@ -118,7 +118,7 @@ namespace GameMod.ModsHandler
             }
             Downloading = null;
             Changes++;
-            Debug.Log("Mods: downloaded " + entry.File + " from " + entry.Url);
+            Debug.Log("[Mods] downloaded " + entry.File + " from " + entry.Url);
         }
 
         private static string Write(string file, byte[] payload)
@@ -138,7 +138,7 @@ namespace GameMod.ModsHandler
         {
             Downloading = null;
             LastError = "COULD NOT DOWNLOAD " + file.ToUpper() + " -- " + reason.ToUpper();
-            Debug.Log("Mods: " + LastError);
+            Debug.Log("[Mods] " + LastError);
         }
 
         private static string Hex(byte[] bytes)

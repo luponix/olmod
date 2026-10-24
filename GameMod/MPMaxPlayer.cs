@@ -19,6 +19,7 @@ namespace GameMod {
     }
 
     // set ConfigureConnection max connections to 16
+    // game 1.1.1886 already passes 16, so there is nothing to rewrite and no match is expected
     [HarmonyPatch(typeof(Server), "ConfigureConnection")]
     class MPMaxPlayerServConn
     {
@@ -31,8 +32,7 @@ namespace GameMod {
                 {
                     codes[i].opcode = OpCodes.Ldc_I4;
                     codes[i].operand = 16;
-                    Debug.Log("Patched ConfigureConnection");
-                    break;
+                    return codes;
                 }
             }
             return codes;
@@ -40,15 +40,16 @@ namespace GameMod {
     }
 
     // set LocalLANHost.FindGameSessionToCreate max players to 16
+    // game 1.1.1886 already passes 16, so there is nothing to rewrite and no match is expected
     [HarmonyPatch]
     class MPMaxPlayerFindGameSess
     {
         static MethodBase TargetMethod()
         {
-            Debug.Log("MPMaxPlayerFindGameSess TargetMethod");
             foreach (var x in typeof(LocalLANHost).GetNestedTypes(BindingFlags.NonPublic))
                 if (x.Name.Contains("FindGameSessionToCreate"))
                     return x.GetMethod("MoveNext");
+            Debug.LogError("[MaxPlayer] FindGameSessionToCreate: iterator type not found");
             return null;
         }
 
@@ -65,8 +66,7 @@ namespace GameMod {
                 {
                     codes[i].opcode = OpCodes.Ldc_I4;
                     codes[i].operand = 16;
-                    Debug.Log("Patched FindGameSessionToCreate");
-                    break;
+                    return codes;
                 }
                 i++;
             }
@@ -75,16 +75,16 @@ namespace GameMod {
     }
 
     // set LocalLANHost.DoBackfillRequest max players to 16
+    // game 1.1.1886 already sets 16, so there is nothing to rewrite and no match is expected
     [HarmonyPatch]
     class MPMaxPlayerBackfill
     {
         static MethodBase TargetMethod()
         {
             foreach (var x in typeof(LocalLANHost).GetNestedTypes(BindingFlags.NonPublic))
-                if (x.Name.Contains("DoBackfillRequest")) {
-                    Debug.Log("Found DoBackfillRequest " + x.Name);
+                if (x.Name.Contains("DoBackfillRequest"))
                     return x.GetMethod("MoveNext");
-                }
+            Debug.LogError("[MaxPlayer] DoBackfillRequest: iterator type not found");
             return null;
         }
 
@@ -95,7 +95,6 @@ namespace GameMod {
                 if (state == 0 && c.opcode == OpCodes.Ldc_I4_8) {
                     yield return new CodeInstruction(OpCodes.Ldc_I4, 16);
                     state = 1;
-                    Debug.Log("Patched DoBackfillRequest");
                     continue;
                 }
                 yield return c;
@@ -147,13 +146,14 @@ namespace GameMod {
                     n++;
                 }
             }
-            Debug.Log("Patched FindPrivateMatchGrouping n=" + n);
+            if (n != 2)
+                Debug.LogErrorFormat("[MaxPlayer] FindPrivateMatchGrouping: patched {0} sites, expected 2", n);
             return codes;
         }
 
         static void Postfix(DistributedMatchUp.Match[] __result)
         {
-            Debug.LogFormat("{0} FindPrivateMatchGrouping result: {1}", DateTime.Now, __result == null ? "null" : __result.Length.ToString());
+            Debug.LogFormat("[MaxPlayer] {0} FindPrivateMatchGrouping result: {1}", DateTime.Now, __result == null ? "null" : __result.Length.ToString());
         }
     }
 
@@ -223,12 +223,10 @@ namespace GameMod {
                 if (x.Name.Contains("TryLocalMatchmaking"))
                 {
                     var m = AccessTools.Method(x, "<>m__0");
-                    if (m != null) {
-                        Debug.Log("MPMaxTryLocalMatchmaking TargetMethod found");
+                    if (m != null)
                         return m;
-                    }
                 }
-            Debug.Log("MPMaxTryLocalMatchmaking TargetMethod not found");
+            Debug.LogError("[MaxPlayer] TryLocalMatchmaking: target method not found");
             return null;
         }
 

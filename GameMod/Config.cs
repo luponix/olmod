@@ -19,7 +19,7 @@ namespace GameMod {
         {
             if (string.IsNullOrEmpty(OLModDir))
             {
-                Debug.Log("olmod directory unknown " + Environment.GetEnvironmentVariable("OLMODDIR") + " path " + Environment.GetEnvironmentVariable("PATH"));
+                Debug.Log("[Init] olmod directory unknown " + Environment.GetEnvironmentVariable("OLMODDIR") + " path " + Environment.GetEnvironmentVariable("PATH"));
                 return;
             }
             string settingsFilename = "olmodsettings.json";
@@ -30,11 +30,11 @@ namespace GameMod {
             try
             {
                 Settings = JObject.Parse(File.ReadAllText(settingsFilename));
-                Debug.Log("olmod settings loaded from " + settingsFilename);
+                Debug.Log("[Init] settings loaded from " + settingsFilename);
             }
             catch (Exception ex)
             {
-                Debug.Log("olmod settings loading failed " + ex.Message + " " + settingsFilename);
+                Debug.LogError("[Init] settings loading failed " + ex.Message + " " + settingsFilename);
             }
         }
 
@@ -46,7 +46,7 @@ namespace GameMod {
                 //if (OLModDir != null && OLModDir.EndsWith(Path.DirectorySeparatorChar + "Overload_Data" + Path.DirectorySeparatorChar + "Managed", StringComparison.InvariantCultureIgnoreCase))
                 //    OLModDir = Path.GetDirectoryName(Path.GetDirectoryName(OLModDir));
             }
-            Debug.Log("olmod directory " + OLModDir);
+            Debug.Log("[Init] olmod directory " + OLModDir);
             NoDownload = Core.GameMod.FindArg("-nodownload");
             Settings = new JObject();
             LoadSettings();

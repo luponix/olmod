@@ -89,7 +89,7 @@ namespace GameMod
                 }
             }
             if (state != 2) {
-                Debug.LogFormat("FixFPSCalculation: transpiler failed at state {0}",state);
+                Debug.LogErrorFormat("[FrameTime] FixFPSCalculation: transpiler failed at state {0}",state);
             }
         }
     }

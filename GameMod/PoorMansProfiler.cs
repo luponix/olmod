@@ -458,11 +458,11 @@ namespace GameMod {
                     }
                 }
                 sr.Dispose();
-                UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: added {0} filters from list {1}", cnt, filename);
+                UnityEngine.Debug.LogFormat("[Profiler] added {0} filters from list {1}", cnt, filename);
                 return true;
             }
             if (warnIfNotFound) {
-                UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: can't find filter list file {0}", filename);
+                UnityEngine.Debug.LogFormat("[Profiler] can't find filter list file {0}", filename);
             }
             return false;
         }
@@ -479,7 +479,7 @@ namespace GameMod {
                     return true;
                 }
             }
-            UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: can't find filter list file {0}", filename);
+            UnityEngine.Debug.LogFormat("[Profiler] can't find filter list file {0}", filename);
             return false;
         }
 
@@ -564,12 +564,12 @@ namespace GameMod {
         public static void Initialize(Harmony harmony)
         {
             if (initMode >= 2) {
-                UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: already initialized");
+                UnityEngine.Debug.LogFormat("[Profiler] already initialized");
                 return;
             }
 
             if (initMode == 0 && GameMod.Core.GameMod.FindArg("-pmp-lazy")) {
-                UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: lazy init");
+                UnityEngine.Debug.LogFormat("[Profiler] lazy init");
                 // only initialize the console command Patch
                 harmony.Patch(AccessTools.Method(typeof(GameManager), "Start"), null, new HarmonyMethod(typeof(PoorMansProfiler).GetMethod("StartPostfix"), Priority.Last));
                 lazyHarmony = harmony;
@@ -599,16 +599,16 @@ namespace GameMod {
             if (lockingMode < 0) {
                 // AUTO: on for servers, off for client (?!)
                 if (GameMod.Core.GameMod.FindArg("-batchmode")) {
-                    UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: server detected, enable locking");
+                    UnityEngine.Debug.LogFormat("[Profiler] server detected, enable locking");
                     lockingMode = 1;
                 } else {
-                    UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: client detected, not enabling locking");
+                    UnityEngine.Debug.LogFormat("[Profiler] client detected, not enabling locking");
                     lockingMode = 0;
                 }
             }
             useLocking = (lockingMode > 0);
 
-            UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: enabled, interval: {0}, lock: {1}, output path: {2}", fixedTickCount, useLocking, outputPath);
+            UnityEngine.Debug.LogFormat("[Profiler] enabled, interval: {0}, lock: {1}, output path: {2}", fixedTickCount, useLocking, outputPath);
 
             // Dictionary of all previously patched methods
             Dictionary<MethodBase,bool> patchedMethods = new Dictionary<MethodBase,bool>();
@@ -627,20 +627,20 @@ namespace GameMod {
             }
             if (filters.filters.Count < 1) {
                 filters.AddDefaults();
-                UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: using default filters");
+                UnityEngine.Debug.LogFormat("[Profiler] using default filters");
             }
             //filters.Save("/tmp/pmpa");
-            UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: using filter with {0} entries", filters.filters.Count);
+            UnityEngine.Debug.LogFormat("[Profiler] using filter with {0} entries", filters.filters.Count);
 
             // apply to the previously patched methods
             foreach(var m in harmony.GetPatchedMethods()) {
                 patchedMethods[m] = true;
                 if (filters.Apply(m,true)) {
                     targetMethods[m] = true;
-                    UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: selected {0} {1} (previously patched)", m.DeclaringType.FullName, m.ToString());
+                    UnityEngine.Debug.LogFormat("[Profiler] selected {0} {1} (previously patched)", m.DeclaringType.FullName, m.ToString());
                 }
             }
-            UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: found {0} previously patched methods", patchedMethods.Count);
+            UnityEngine.Debug.LogFormat("[Profiler] found {0} previously patched methods", patchedMethods.Count);
 
 
             Assembly ourAsm = Assembly.GetExecutingAssembly();
@@ -651,17 +651,17 @@ namespace GameMod {
             foreach (var asm in assemblies) {
                 foreach (var t in asm.GetTypes()) {
                     foreach(var m in t.GetMethods(AccessTools.all)) {
-                        //UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: XXX {0} {1}", m.DeclaringType.FullName, m.ToString());
+                        //UnityEngine.Debug.LogFormat("[Profiler] XXX {0} {1}", m.DeclaringType.FullName, m.ToString());
                         if (!patchedMethods.ContainsKey(m) && filters.Apply(m, false)) {
                             targetMethods[m] = true;
-                            UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: selected {0} {1}", m.DeclaringType.FullName, m.ToString());
+                            UnityEngine.Debug.LogFormat("[Profiler] selected {0} {1}", m.DeclaringType.FullName, m.ToString());
                         }
                     }
                 }
             }
             
             // Patch the methods with the profiler prefix and postfix
-            UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: applying to {0} methods", targetMethods.Count);
+            UnityEngine.Debug.LogFormat("[Profiler] applying to {0} methods", targetMethods.Count);
             MethodInfo mPrefix = null;
             if (useLocking){
                 mPrefix = typeof(PoorMansProfiler).GetMethod("PoorMansProfilerPrefixLock");
@@ -859,11 +859,11 @@ namespace GameMod {
         {
             if (!uConsole.NextParameterIsInt())
             {
-                UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: interval is {0} fixed ticks", fixedTickCount);
+                UnityEngine.Debug.LogFormat("[Profiler] interval is {0} fixed ticks", fixedTickCount);
                 return;
             }
             int val = uConsole.GetInt();
-            UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: setting interval from {0} to {1} fixed ticks", fixedTickCount, val);
+            UnityEngine.Debug.LogFormat("[Profiler] setting interval from {0} to {1} fixed ticks", fixedTickCount, val);
             fixedTickCount = val;
         }
 
@@ -929,7 +929,7 @@ namespace GameMod {
         // Function to write the statistics to a files
         public static void WriteResults(Dictionary<MethodBase,MethodProfileCollector> pdc, string baseFilename, int cnt, DateTime tsBegin, DateTime tsEnd)
         {
-            UnityEngine.Debug.LogFormat("POOR MAN's PROFILER: cycle: {0} intervals, {1} methods to {2}*.csv",cnt,pdc.Count,baseFilename);
+            UnityEngine.Debug.LogFormat("[Profiler] cycle: {0} intervals, {1} methods to {2}*.csv",cnt,pdc.Count,baseFilename);
             WriteResultsInfo(pdc, baseFilename, cnt, tsBegin, tsEnd);
             WriteResultsValue(pdc, baseFilename, cnt, MethodProfile.Info.Count);
             WriteResultsValue(pdc, baseFilename, cnt, MethodProfile.Info.AvgTime);

@@ -196,7 +196,7 @@ namespace GameMod.Replay
             Session.Mode = SessionMode.Recording;
             started = true;
             alreadySaved = false;
-            Debug.LogFormat("REPLAY: recording started on {0} with {1} players", Recording.sceneName, Recording.players.Count);
+            Debug.LogFormat("[Replay] recording started on {0} with {1} players", Recording.sceneName, Recording.players.Count);
         }
 
         public static void StopAndSave()
@@ -214,11 +214,11 @@ namespace GameMod.Replay
                 if (Recording.frames.Count > 0)
                     OlrFile.Save(Recording);
                 else
-                    Debug.Log("REPLAY: nothing to save (0 frames recorded)");
+                    Debug.Log("[Replay] nothing to save (0 frames recorded)");
             }
             catch (System.Exception e)
             {
-                Debug.LogErrorFormat("REPLAY: save failed: {0}", e);
+                Debug.LogErrorFormat("[Replay] save failed: {0}", e);
             }
             Reset();
         }

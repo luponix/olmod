@@ -138,7 +138,7 @@ namespace GameMod
                     int spinup = int.Parse(value);
                     if (spinup < 0 || spinup > 8)
                     {
-                        Debug.LogError("Invalid m_spinup_starting_time, must be 0 to 8.");
+                        Debug.LogError("[Presets] invalid m_spinup_starting_time, must be 0 to 8");
                     }
                     else
                     {
@@ -147,7 +147,7 @@ namespace GameMod
                 }
                 catch (Exception e)
                 {
-                    Debug.LogError("Invalid m_spinup_starting_time, error reading value: " + e);
+                    Debug.LogError("[Presets] invalid m_spinup_starting_time, cannot read the value: " + e);
                 }
             }
             else // all other fields fall through like normal

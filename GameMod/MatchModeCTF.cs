@@ -209,7 +209,7 @@ namespace GameMod {
             {
                 if (posCount[flag] == 0)
                 {
-                    Debug.Log("CTF: No goal found for team " + MPTeams.AllTeams[flag]);
+                    Debug.Log("[CTF] No goal found for team " + MPTeams.AllTeams[flag]);
                 }
                 else
                 {
@@ -321,7 +321,7 @@ namespace GameMod {
         {
             if (flag_id >= HasSpawnPoint.Length || !HasSpawnPoint[flag_id])
             {
-                Debug.Log("CTF: No home spawn point for flag " + flag_id);
+                Debug.LogWarning("[CTF] no home spawn point for flag " + flag_id);
                 return;
             }
             CTF.FlagWasHome = true;
@@ -333,15 +333,15 @@ namespace GameMod {
             var prefab = FlagObjs[flag_id];
             if (prefab == null)
             {
-                Debug.LogWarningFormat("CTF: Missing prefab for flag {0}", flag_id);
+                Debug.LogWarningFormat("[CTF] Missing prefab for flag {0}", flag_id);
                 return;
             }
-            //Debug.Log("CTF: Spawning flag " + flag_id);
+            //Debug.Log("[CTF] Spawning flag " + flag_id);
 
             GameObject flag = UnityEngine.Object.Instantiate(prefab, pos, Quaternion.identity);
             if (flag == null)
             {
-                Debug.LogWarningFormat("CTF: Failed to instantiate prefab: {0} in CTF.SpawnAt", prefab.name);
+                Debug.LogWarningFormat("[CTF] Failed to instantiate prefab: {0} in CTF.SpawnAt", prefab.name);
                 return;
             }
 
@@ -405,7 +405,7 @@ namespace GameMod {
 
         public static void NotifyAll(CTFEvent evt, string message, Player player, int flag)
         {
-            Debug.Log("CTF.NotifyAll " + evt);
+            Debug.Log("[CTF] NotifyAll " + evt);
             NetworkServer.SendToAll(MessageTypes.MsgCTFNotify, new CTFNotifyMessage { m_event = evt, m_message = message,
                 m_player_id = player == null ? default(NetworkInstanceId) : player.netId, m_flag_id = flag });
             LogEvent(evt, player, MPTeams.AllTeams[flag]);
@@ -668,17 +668,17 @@ namespace GameMod {
 
         private static GameObject NetworkSpawnItemHandler(Vector3 pos, NetworkHash128 asset_id)
         {
-            //Debug.Log("CTF: client " + NetworkMatch.m_my_lobby_id + " flag spawning " + asset_id);
+            //Debug.Log("[CTF] client " + NetworkMatch.m_my_lobby_id + " flag spawning " + asset_id);
             GameObject prefabFromAssetId = m_registered_prefabs[asset_id];
             if (prefabFromAssetId == null)
             {
-                Debug.LogErrorFormat("CTF: Error looking up item prefab with asset_id {0}", asset_id.ToString());
+                Debug.LogErrorFormat("[CTF] Error looking up item prefab with asset_id {0}", asset_id.ToString());
                 return null;
             }
             GameObject gameObject = UnityEngine.Object.Instantiate(prefabFromAssetId, pos, Quaternion.identity);
             if (gameObject == null)
             {
-                Debug.LogErrorFormat("CTF: Error instantiating item prefab {0}", prefabFromAssetId.name);
+                Debug.LogErrorFormat("[CTF] Error instantiating item prefab {0}", prefabFromAssetId.name);
                 return null;
             }
             gameObject.SetActive(true);
@@ -737,7 +737,7 @@ namespace GameMod {
 
                 if (flag == null)
                 {
-                    Debug.LogWarningFormat("CTF: Failed to instantiate prefab: {0} in RegisterSpawnHandlers", prefab.name);
+                    Debug.LogWarningFormat("[CTF] Failed to instantiate prefab: {0} in RegisterSpawnHandlers", prefab.name);
                     return;
                 }
                 var assetId = CTF.FlagAssetId(i);
@@ -760,7 +760,7 @@ namespace GameMod {
                 m_registered_prefabs.Add(assetId, flag);
                 ClientScene.RegisterSpawnHandler(assetId, NetworkSpawnItemHandler, NetworkUnspawnItemHandler);
             }
-            Debug.Log("CTF: Created " + CTF.FlagObjs.Count + " flag prefabs");
+            Debug.Log("[CTF] Created " + CTF.FlagObjs.Count + " flag prefabs");
         }
     }
 
@@ -1110,7 +1110,7 @@ namespace GameMod {
                 GameplayManager.AddHUDMessage(message, -1, true);
             }
                 
-            Debug.Log("OnCTFNotify " + msg.m_event);
+            Debug.Log("[CTF] OnCTFNotify " + msg.m_event);
             switch (msg.m_event) {
                 case CTFEvent.PICKUP:
                     SFXCueManager.PlayRawSoundEffect2D(SoundEffect.sfx_lockdown_initiated, 1f, 0.8f, 0f, false);

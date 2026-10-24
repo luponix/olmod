@@ -15,7 +15,6 @@ namespace GameMod {
         private static MethodInfo _GameManager_InitializeMissionList_Method = typeof(GameManager).GetMethod("InitializeMissionList", AccessTools.all);
         public static void CmdReloadMissions()
         {
-            MBLevelPatch.SLInit = false;
             _GameManager_InitializeMissionList_Method.Invoke(GameManager.m_gm, null);
             uConsole.Log("Missions reloaded (" + GameManager.GetAvailableMissions().Length + " sp, " +
                 GameManager.ChallengeMission.NumLevels + " cm, " + GameManager.MultiplayerMission.NumLevels + " mp)");

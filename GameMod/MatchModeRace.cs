@@ -240,7 +240,7 @@ namespace GameMod
                             flag = player.AddArmor(GameplayManager.dl_powerup_shields[GameplayManager.DifficultyLevel], false, false);
                             break;
                         default:
-                            Debug.Log("Undefined MPTags.PowerupType pickup");
+                            Debug.LogWarning("[Race] undefined MPTags.PowerupType pickup");
                             flag = false;
                             break;
                     }
@@ -1254,7 +1254,7 @@ namespace GameMod
             GameObject gameObject = UnityEngine.Object.Instantiate<GameObject>(prefab, pos, Quaternion.identity);
             if (gameObject == null)
             {
-                Debug.LogWarningFormat("Failed to instantiate prefab: {0} in Item::Spew", new object[]
+                Debug.LogWarningFormat("[Race] cannot instantiate prefab {0} in Item.Spew", new object[]
                 {
                 prefab.name
                 });
@@ -1267,7 +1267,7 @@ namespace GameMod
             Item component = gameObject.GetComponent<Item>();
             if (component == null)
             {
-                Debug.LogErrorFormat("Failed to find Item component on {0} in Item::Spew", new object[]
+                Debug.LogErrorFormat("[Race] no Item component on {0} in Item.Spew", new object[]
                 {
                 gameObject.name
                 });

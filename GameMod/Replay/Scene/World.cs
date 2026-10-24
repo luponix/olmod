@@ -284,7 +284,7 @@ namespace GameMod.Replay
             var prefab = GameManager.m_gm != null ? GameManager.m_gm.m_monsterball : null;
             if (prefab == null)
             {
-                Debug.LogError("REPLAY: no monsterball prefab to clone");
+                Debug.LogError("[Replay] no monsterball prefab to clone");
                 return;
             }
             ball = UnityEngine.Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);

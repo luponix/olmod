@@ -112,7 +112,7 @@ namespace GameMod
             }
             else if (running) // reset everything since we're not connected anymore but we *were* running
             {
-                Debug.Log("Maximum packet loss seen during a sample window last round (" + sampleTime + "-second window): " + InMin + "% in, " + OutMin + "% out");
+                Debug.Log("[Net] maximum packet loss last round (" + sampleTime + "-second window): " + InMin + "% in, " + OutMin + "% out");
                 InColor = UIManager.m_col_good_ping;
                 OutColor = UIManager.m_col_good_ping;
                 InColorMin = UIManager.m_col_good_ping;

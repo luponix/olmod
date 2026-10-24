@@ -117,9 +117,7 @@ namespace GameMod
         {
             QualitySettings.maxQueuedFrames = uConsole.GetInt();
 
-            Debug.Log("-------------------------------");
-            Debug.Log("QualitySettings.maxQueuedFrames set to " + QualitySettings.maxQueuedFrames);
-            Debug.Log("-------------------------------");
+            Debug.LogFormat("[Perf] maxQueuedFrames set to {0}", QualitySettings.maxQueuedFrames);
         }
     }
 }

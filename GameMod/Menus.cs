@@ -2717,7 +2717,7 @@ namespace GameMod {
             if (!JoystickRotationFix.server_support && !GameplayManager.IsMultiplayerActive && NetworkMatch.GetMatchState() != MatchState.LOBBY) // TODO @ Lupo - this shouldn't be here in the menu code. I've moved it as-is for now.
             {
                 JoystickRotationFix.server_support = true;
-                Debug.Log("JoystickRamping.server_support didnt reset properly");
+                Debug.Log("[Controls] ramping: server_support did not reset properly");
             }
             uie.SelectAndDrawStringOptionItem(Loc.LS("MAX TURN RAMP MODE"), position, 0, JoystickRotationFix.alt_turn_ramp_mode ? "LINEAR" : "DEFAULT", "LINEAR ADDS THE MAX TURN RAMPING SPEED LINEARLY ALONG THE INPUT [KB/JOYSTICK ONLY]", colwidth, !JoystickRotationFix.server_support);
             position.y += 62f;

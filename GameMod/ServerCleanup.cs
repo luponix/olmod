@@ -17,7 +17,7 @@ namespace GameMod {
         static void Postfix() {
             if (GameplayManager.IsDedicatedServer()) {
                 AudioListener.pause = true;
-                Debug.Log("Dedicated Server: paused AudioListener");
+                Debug.Log("[Server] dedicated server: paused the AudioListener");
             }
         }
     }

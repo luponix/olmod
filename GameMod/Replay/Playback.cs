@@ -59,7 +59,7 @@ namespace GameMod.Replay
             catch (Exception e)
             {
                 GameplayManager.AddHUDMessage("Replay load failed");
-                Debug.LogErrorFormat("REPLAY: load failed: {0}", e);
+                Debug.LogErrorFormat("[Replay] load failed: {0}", e);
                 return;
             }
             if (Replay.frames.Count == 0)
@@ -75,7 +75,7 @@ namespace GameMod.Replay
             if (levelIndex < 0)
             {
                 GameplayManager.AddHUDMessage("Replay level not found: " + Replay.sceneName);
-                Debug.LogErrorFormat("REPLAY: level not found: '{0}' hash='{1}'", Replay.sceneName, Replay.levelIdHash);
+                Debug.LogErrorFormat("[Replay] level not found: '{0}' hash='{1}'", Replay.sceneName, Replay.levelIdHash);
                 Replay = null;
                 return;
             }
@@ -88,7 +88,7 @@ namespace GameMod.Replay
             Launching = true;
             try
             {
-                Debug.LogFormat("REPLAY: loading level index {0} ({1}) with {2} players, {3} frames", levelIndex, Replay.sceneName, Replay.players.Count, Replay.frames.Count);
+                Debug.LogFormat("[Replay] loading level index {0} ({1}) with {2} players, {3} frames", levelIndex, Replay.sceneName, Replay.players.Count, Replay.frames.Count);
 
                 GameplayManager.CreateNewGame(mission, levelIndex);
 
@@ -98,7 +98,7 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("REPLAY: level launch failed: {0}", e);
+                Debug.LogErrorFormat("[Replay] level launch failed: {0}", e);
                 Session.Mode = SessionMode.Off;
                 Replay = null;
             }
@@ -148,7 +148,7 @@ namespace GameMod.Replay
                 ? GameManager.m_player_ship.c_trans_ship : null;
             if (shipMesh == null)
             {
-                Debug.LogError("REPLAY: no ship mesh to clone");
+                Debug.LogError("[Replay] no ship mesh to clone");
                 return;
             }
             Ships.Create(Replay, shipMesh);
@@ -625,7 +625,7 @@ namespace GameMod.Replay
                 catch (Exception e)
                 {
                     if (faultsReported++ < 3)
-                        Debug.LogErrorFormat("REPLAY: playback fault in {0}: {1}", step.Method.Name, e);
+                        Debug.LogErrorFormat("[Replay] playback fault in {0}: {1}", step.Method.Name, e);
                 }
             }
         }

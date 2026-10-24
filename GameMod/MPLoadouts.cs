@@ -499,7 +499,7 @@ namespace GameMod
         {
             if (Client.GetClient() == null)
             {
-                Debug.LogErrorFormat("Null client in MPLoadouts.SendServerPlayerLoadout for player", new object[0]);
+                Debug.LogErrorFormat("[Loadouts] null client in SendServerPlayerLoadout", new object[0]);
                 return;
             }
 
@@ -514,7 +514,7 @@ namespace GameMod
         {
             if (Client.GetClient() == null)
             {
-                Debug.LogErrorFormat("Null client in MPLoadouts.CallCmdToggleLoadout for player", new object[0]);
+                Debug.LogErrorFormat("[Loadouts] null client in CallCmdToggleLoadout", new object[0]);
                 return;
             }
 
@@ -841,7 +841,7 @@ namespace GameMod
             }
             else
             {
-                Debug.Log($"Didn't find custom loadout data for {player.m_mp_name}, {lobby_id}, using stock LoadoutDataMessage.  (Old client?)");
+                Debug.Log($"[Loadouts] no custom loadout data for {player.m_mp_name}, {lobby_id}, using stock LoadoutDataMessage.  (Old client?)");
                 NetworkSpawnPlayer.SetMultiplayerLoadout(player, loadout_data, use_loadout1);
             }
         }
@@ -1454,10 +1454,8 @@ namespace GameMod
                     yield return code;
                 }
             }
-            if (state != 5 || fail > 0) {
-            } else {
-                Debug.LogFormat("MPLoadouts_MenuManager_MpMatchSetup: transpiler failed at state {0} {1}", state, fail);
-            }
+            if (state != 5 || fail > 0)
+                Debug.LogErrorFormat("[Loadouts] MpMatchSetup: transpiler failed at state {0} {1}", state, fail);
         }
     }
 }

@@ -11,7 +11,7 @@ namespace GameMod {
             if (Overload.NetworkManager.IsServer()) {
                 if (NetworkMatch.m_players.ContainsKey(msg.conn.connectionId)) {
                     var player = NetworkMatch.m_players[msg.conn.connectionId];
-                    Debug.Log($"Player connected: {player.m_name} from {msg.conn.address}");
+                    Debug.Log($"[Server] player connected: {player.m_name} from {msg.conn.address}");
                 }
             }
         }

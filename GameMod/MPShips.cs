@@ -49,7 +49,7 @@ namespace GameMod
                     {
                         s.collider[i] = Object.Instantiate(ab.LoadAsset<GameObject>(s.colliderNames[i]));
                         Object.DontDestroyOnLoad(s.collider[i]);
-                        Debug.Log("MeshCollider loaded: " + s.collider[i].name);
+                        Debug.Log("[Ships] mesh collider loaded: " + s.collider[i].name);
                     }
                 }
                 ab.Unload(false);

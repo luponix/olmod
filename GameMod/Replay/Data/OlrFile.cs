@@ -34,7 +34,7 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("REPLAY: could not create replay dir: {0}", e);
+                Debug.LogErrorFormat("[Replay] could not create replay dir: {0}", e);
             }
         }
 
@@ -66,7 +66,7 @@ namespace GameMod.Replay
                     WriteBody(writer, replay);
                 }
             }
-            Debug.LogFormat("REPLAY: saved {0} ({1} frames, {2} events, {3} chat)", path, replay.frames.Count, replay.events.Count, replay.chat.Count);
+            Debug.LogFormat("[Replay] saved {0} ({1} frames, {2} events, {3} chat)", path, replay.frames.Count, replay.events.Count, replay.chat.Count);
             return path;
         }
 
@@ -179,7 +179,7 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("REPLAY: ReadInfo failed for {0}: {1}", path, e);
+                Debug.LogErrorFormat("[Replay] ReadInfo failed for {0}: {1}", path, e);
             }
             return info;
         }
@@ -498,7 +498,7 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("REPLAY: list failed: {0}", e);
+                Debug.LogErrorFormat("[Replay] list failed: {0}", e);
             }
             return paths;
         }
@@ -540,7 +540,7 @@ namespace GameMod.Replay
                 }
                 catch (Exception e)
                 {
-                    Debug.LogErrorFormat("REPLAY: game dir list failed: {0}", e);
+                    Debug.LogErrorFormat("[Replay] game dir list failed: {0}", e);
                 }
             }
         }

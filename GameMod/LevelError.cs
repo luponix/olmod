@@ -48,7 +48,7 @@ namespace GameMod
             {
                 // End match, disconnect clients and do minor server cleanup
                 LevelError_UserLevelLoader_Awake.loadError = false;
-                Debug.Log("Server error loading map, killing match");
+                Debug.LogError("[Levels] server error loading the map, killing the match");
                 AccessTools.Method(typeof(NetworkMatch), "NetSystemNotifyMatchOver").Invoke(null, null);
                 NetworkMatch.ExitMatchToMainMenu();
                 GameManager.m_player_ship = PlayerShip.Instantiate();

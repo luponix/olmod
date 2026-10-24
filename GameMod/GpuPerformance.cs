@@ -370,7 +370,7 @@ namespace GameMod
             }
             catch (System.Exception e)
             {
-                Debug.LogError("ShipMeshCombine: " + e);
+                Debug.LogError("[Perf] ShipMeshCombine: " + e);
             }
         }
     }

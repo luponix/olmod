@@ -103,7 +103,8 @@ namespace GameMod
                     n++;
                 }
             }
-            Debug.Log("Patched MpMatchSetup n=" + n);
+            if (n != 2)
+                Debug.LogErrorFormat("[Monsterball] MpMatchSetup: patched {0} sites, expected 2", n);
             return codes;
         }
     }
@@ -401,26 +402,6 @@ namespace GameMod
                 return;
 
             Client.GetClient().RegisterHandler(MessageTypes.MsgMonsterballPlayerStats, OnMonsterballPlayerStats);
-        }
-    }
-
-    // add monsterball mb_arena1 level to multiplayer levels
-    [HarmonyPatch(typeof(GameManager), "ScanForLevels")]
-    class MBLevelPatch {
-        public static bool SLInit = false;
-        static void Prefix() {
-            if (SLInit)
-                return;
-            SLInit = true;
-            /*
-            Overload.GameManager.MultiplayerMission.AddLevel("mb_arena1", "ARENA", "TITAN_06", new int[]
-                        {
-                                1,
-                                4,
-                                2,
-                                8
-                        });
-            */
         }
     }
 }

@@ -213,7 +213,7 @@ namespace GameMod
                                                 }
                                                 else
                                                 {
-                                                    Debug.Log("Error while pressing JoystickCurveEditor->[Apply to all Axis] Button: Axis mismatch between Overload.Controls and ExtendedConfig.Section_JoystickCurve");
+                                                    Debug.Log("[Controls] curve editor, apply to all axes: axis mismatch between Overload.Controls and ExtendedConfig.Section_JoystickCurve");
                                                 }
                                             }
                                         }
@@ -885,7 +885,7 @@ namespace GameMod
                 }
                 catch (Exception ex)
                 {
-                    Debug.Log(" JoystickCurveEditor_OverloadController_GetAxis: Incorrect Device information: " + ex);
+                    Debug.Log("[Controls] curve editor GetAxis: incorrect device information: " + ex);
                     ExtendedConfig.Section_JoystickCurve.SetDefault();
                     return true;
                 }

@@ -72,7 +72,7 @@ namespace GameMod.Replay
             string path = Commands.ResolveReplayPath(demoPaths, autoDemo);
             if (path == null)
             {
-                Debug.LogErrorFormat("BENCH: auto-run demo not found: {0}", autoDemo);
+                Debug.LogErrorFormat("[Bench] auto-run demo not found: {0}", autoDemo);
                 Application.Quit();
                 return;
             }
@@ -80,12 +80,12 @@ namespace GameMod.Replay
             int playerCount = info.playerNames != null ? info.playerNames.Length : 0;
             if (playerCount == 0)
             {
-                Debug.LogErrorFormat("BENCH: auto-run demo has no roster: {0}", autoDemo);
+                Debug.LogErrorFormat("[Bench] auto-run demo has no roster: {0}", autoDemo);
                 Application.Quit();
                 return;
             }
             targetPov = Mathf.Clamp(autoPov, 0, playerCount - 1);
-            Debug.LogFormat("BENCH: auto-starting {0} following [{1}]", Path.GetFileName(path), targetPov);
+            Debug.LogFormat("[Bench] auto-starting {0} following [{1}]", Path.GetFileName(path), targetPov);
             Start(path, targetPov);
         }
 
@@ -134,7 +134,7 @@ namespace GameMod.Replay
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
 
-            Debug.LogFormat("BENCH: run started ({0}, {1}s, warmup {2}s)", demoName, demoDuration.ToString("0.0"), WARMUP_SECONDS);
+            Debug.LogFormat("[Bench] run started ({0}, {1}s, warmup {2}s)", demoName, demoDuration.ToString("0.0"), WARMUP_SECONDS);
         }
 
         private static void RestoreSyncSettings()
@@ -166,7 +166,7 @@ namespace GameMod.Replay
             Running = false;
             RestoreSyncSettings();
             frameTimes.Clear();
-            Debug.LogFormat("BENCH: aborted ({0})", reason);
+            Debug.LogFormat("[Bench] aborted ({0})", reason);
             if (autoQuit)
                 Application.Quit();
         }
@@ -179,14 +179,14 @@ namespace GameMod.Replay
             savedFilePath = WriteReportFile();
             if (autoQuit)
             {
-                Debug.LogFormat("BENCH: auto-run complete{0} -- quitting", (savedFilePath != "" ? ", saved " + savedFilePath : ""));
+                Debug.LogFormat("[Bench] auto-run complete{0} -- quitting", (savedFilePath != "" ? ", saved " + savedFilePath : ""));
                 Application.Quit();
                 return;
             }
             ShowingResults = true;
 
             Playback.BlankSceneForResults();
-            Debug.LogFormat("BENCH: finished, {0} frames{1}", frameTimes.Count, (savedFilePath != "" ? ", saved " + savedFilePath : ""));
+            Debug.LogFormat("[Bench] finished, {0} frames{1}", frameTimes.Count, (savedFilePath != "" ? ", saved " + savedFilePath : ""));
         }
 
         private static void Exit()
@@ -200,7 +200,7 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("BENCH: DoneLevel failed: {0}", e);
+                Debug.LogErrorFormat("[Bench] DoneLevel failed: {0}", e);
             }
             try
             {
@@ -208,7 +208,7 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("BENCH: menu switch failed: {0}", e);
+                Debug.LogErrorFormat("[Bench] menu switch failed: {0}", e);
             }
 
             Time.timeScale = 1f;
@@ -367,7 +367,7 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("BENCH: GetShadowQualityName lookup failed: {0}", e);
+                Debug.LogErrorFormat("[Bench] GetShadowQualityName lookup failed: {0}", e);
             }
             return quality.ToString();
         }
@@ -395,7 +395,7 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                Debug.LogErrorFormat("BENCH: could not write report: {0}", e);
+                Debug.LogErrorFormat("[Bench] could not write report: {0}", e);
                 return "";
             }
         }
@@ -653,7 +653,7 @@ namespace GameMod.Replay
                 autoStartDelaySeconds = 1.5f;
                 if (Core.GameMod.FindArgVal("-replay-pov", out string povText))
                     int.TryParse(povText, out autoPov);
-                Debug.LogFormat("BENCH: auto-run armed for '{0}' pov {1}", autoDemo, autoPov);
+                Debug.LogFormat("[Bench] auto-run armed for '{0}' pov {1}", autoDemo, autoPov);
             }
 
             static void CmdReplayBenchmark()

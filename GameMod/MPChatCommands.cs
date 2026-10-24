@@ -99,7 +99,7 @@ namespace GameMod {
         public static bool SendTo(string msg, int connection_id=-1 , int except_connection_id=-1, bool authOnly=false, bool unblockedOnly=false, string sender_name = "Server", MpTeam team = MpTeam.TEAM0, bool isTeamMessage=false, int sender_connection_id=-1) {
             MatchState s = NetworkMatch.GetMatchState();
             if (s == MatchState.NONE || s == MatchState.LOBBY_LOADING_SCENE) {
-                Debug.LogFormat("MPChatTools SendTo() called during match state {0}, ignored",s);
+                Debug.LogFormat("[ChatCmd] SendTo() called during match state {0}, ignored",s);
                 return false;
             }
             bool inLobby = (s == MatchState.LOBBY || s == MatchState.LOBBY_LOAD_COUNTDOWN);
@@ -279,14 +279,14 @@ namespace GameMod {
             }
             senderEntry=FindPlayerEntryForConnection(sender_conn, inLobby);
             if (senderEntry == null || String.IsNullOrEmpty(senderEntry.name)) {
-                Debug.LogFormat("CHATCMD {0}: {1} {2}: failed to identify sender", cmd, cmdName, arg);
+                Debug.LogFormat("[ChatCmd] {0}: {1} {2}: failed to identify sender", cmd, cmdName, arg);
                 return false;
             }
-            Debug.LogFormat("CHATCMD {0}: {1} {2} by {3}", cmd, cmdName, arg, senderEntry.name);
+            Debug.LogFormat("[ChatCmd] {0}: {1} {2} by {3}", cmd, cmdName, arg, senderEntry.name);
             if (needAuth) {
                 if (!CheckPermission(senderEntry,sender_conn)) {
                     ReturnToSender(String.Format("You do not have the permission for command {0}!", cmd));
-                    Debug.LogFormat("CHATCMD {0}: client is not authenticated!", cmd);
+                    Debug.LogFormat("[ChatCmd] {0}: client is not authenticated!", cmd);
                     return false;
                 }
             }
@@ -350,7 +350,7 @@ namespace GameMod {
                     result = DoListPlayers();
                     break;
                 default:
-                    Debug.LogFormat("CHATCMD {0}: {1} {2} was not handled by server", cmd, cmdName, arg);
+                    Debug.LogFormat("[ChatCmd] {0}: {1} {2} was not handled by server", cmd, cmdName, arg);
                     result = true; // treat it as normal chat message
                     break;
             }
@@ -378,7 +378,7 @@ namespace GameMod {
                         }
                     }
                     if (doAdd) {
-                        Debug.LogFormat("MPChatCommands: adding trusted player {0}", entry.Describe());
+                        Debug.LogFormat("[ChatCmd] adding trusted player {0}", entry.Describe());
                         trustedPlayers.Add(entry);
                     }
                 }
@@ -389,12 +389,12 @@ namespace GameMod {
         private static bool SetAuth(bool allowed, MPBanEntry playerEntry)
         {
             if (playerEntry == null || !playerEntry.IsValid()) {
-                Debug.LogFormat("SETAUTH called without valid player");
+                Debug.LogFormat("[ChatCmd] SETAUTH called without valid player");
                 return false;
             }
 
             if (allowed) {
-                Debug.LogFormat("AUTH: player {0} is authenticated", playerEntry.name);
+                Debug.LogFormat("[ChatCmd] AUTH: player {0} is authenticated", playerEntry.name);
                 bool doAdd = true;
                 foreach(MPBanEntry entry in authenticatedPlayers) {
                     if (entry.matches(playerEntry, "AUTHENTICATED PLAYER: ")) {
@@ -407,7 +407,7 @@ namespace GameMod {
                 }
             } else {
                 // de-auth
-                Debug.LogFormat("AUTH: player {0} is NOT authenticated any more", playerEntry.name);
+                Debug.LogFormat("[ChatCmd] AUTH: player {0} is NOT authenticated any more", playerEntry.name);
                 if (authenticatedPlayers.RemoveAll(entry => entry.matches(playerEntry, "AUTHENTICATED PLAYER: ")) < 1) {
                     return false;
                 }
@@ -419,19 +419,19 @@ namespace GameMod {
         private static bool SetAuthIsPassword(string password)
         {
             if (String.IsNullOrEmpty(password)) {
-                Debug.Log("SETAUTH Password check called without password");
+                Debug.Log("[ChatCmd] SETAUTH Password check called without password");
                 return false;
             }
             string serverPassword = null;
             if (!GameMod.Core.GameMod.FindArgVal("-chatCommandPassword", out serverPassword) || String.IsNullOrEmpty(serverPassword)) {
-                Debug.Log("SETAUTH Password is DISABLED on this server");
+                Debug.Log("[ChatCmd] SETAUTH Password is DISABLED on this server");
                 return false;
             }
             if (password.ToUpper() == serverPassword.ToUpper()) {
-                Debug.Log("SETAUTH Password CORRECT");
+                Debug.Log("[ChatCmd] SETAUTH Password CORRECT");
                 return true;
             }
-            Debug.LogFormat("SETAUTH Password {0} is WRONG", password);
+            Debug.LogFormat("[ChatCmd] SETAUTH Password {0} is WRONG", password);
             return false;
         }
 
@@ -439,7 +439,7 @@ namespace GameMod {
         public static bool IsAuthenticatedPlayer(MPBanEntry playerEntry)
         {
             if (playerEntry == null || !playerEntry.IsValid()) {
-                Debug.LogFormat("IsAuthenticatedPlayer without valid player");
+                Debug.LogFormat("[ChatCmd] IsAuthenticatedPlayer without a valid player");
                 return false;
             }
             foreach(MPBanEntry e in authenticatedPlayers) {
@@ -459,7 +459,7 @@ namespace GameMod {
             GetTrustedPlayerIds();
             foreach(MPBanEntry e in trustedPlayers) {
                 if (e.matches(entry, "TRUSTED PLAYER: ")) {
-                    Debug.LogFormat("MPChatCommands: player {0} id {0} is trusted on this server", entry.name, entry.id);
+                    Debug.LogFormat("[ChatCmd] player {0} id {0} is trusted on this server", entry.name, entry.id);
                     return true;
                 }
             }
@@ -472,12 +472,12 @@ namespace GameMod {
             string op = (give)?"GIVEPERM":"REVOKEPERM";
             if (!SelectPlayer(arg)) {
                 if (give) {
-                    Debug.LogFormat("{0}: no player {1} found", op, arg);
+                    Debug.LogFormat("[ChatCmd] {0}: no player {1} found", op, arg);
                     ReturnToSender(String.Format("{0}: player {1} not found",op, arg));
                     return false;
                 } else {
                     authenticatedPlayers.Clear();
-                    Debug.LogFormat("{0}: all client permissions revoked", op, arg);
+                    Debug.LogFormat("[ChatCmd] {0}: all client permissions revoked", op, arg);
                     ReturnToSender(String.Format("{0}: all client permissions revoked",op));
                 }
             }
@@ -531,9 +531,9 @@ namespace GameMod {
                 return false;
             }
 
-            Debug.LogFormat("{0} request for {1}", op, arg);
+            Debug.LogFormat("[ChatCmd] {0} request for {1}", op, arg);
             if (!SelectPlayer(arg)) {
-                Debug.LogFormat("{0}: no player {1} found", op, arg);
+                Debug.LogFormat("[ChatCmd] {0}: no player {1} found", op, arg);
                 ReturnToSender(String.Format("{0}: player {1} not found",op, arg));
                 return false;
             }
@@ -545,12 +545,12 @@ namespace GameMod {
 
             if(selectedPlayerConnectionId >= 0) {
                 if (sender_conn == selectedPlayerConnectionId) {
-                    Debug.LogFormat("{0}: won't self-apply", op);
+                    Debug.LogFormat("[ChatCmd] {0}: won't self-apply", op);
                     ReturnToSender(String.Format("{0}: won't self-apply",op));
                     return false;
                 }
                 if (selectedPlayerConnectionId == MPBanPlayers.MatchCreatorConnectionId) {
-                    Debug.LogFormat("{0}: won't apply to match creator", op);
+                    Debug.LogFormat("[ChatCmd] {0}: won't apply to match creator", op);
                     ReturnToSender(String.Format("{0}: won't apply to match creator",op));
                     return false;
                 }
@@ -558,7 +558,7 @@ namespace GameMod {
 
             if (doBan) {
                 if (!selectedPlayerEntry.IsValid()) {
-                    Debug.LogFormat("{0}: failed to find ban entry for player {1}", op, arg);
+                    Debug.LogFormat("[ChatCmd] {0}: failed to find ban entry for player {1}", op, arg);
                     ReturnToSender(String.Format("{0}: failed to find ban entry for {1}",op, arg));
                     return false;
                 }
@@ -625,7 +625,7 @@ namespace GameMod {
         // Execute END command
         public bool DoEnd()
         {
-            Debug.Log("END request via chat command");
+            Debug.Log("[ChatCmd] END request");
             ReturnTo(String.Format("manual match END request by {0}",senderEntry.name));
             NetworkMatch.End();
             return false;
@@ -637,7 +637,7 @@ namespace GameMod {
             String op = (start)?"START":"EXTEND";
 
             if (!inLobby) {
-                Debug.LogFormat("{0} request via chat command ignored in non-LOBBY state",op);
+                Debug.LogFormat("[ChatCmd] {0} request via chat command ignored in non-LOBBY state",op);
                 ReturnToSender(String.Format("{0} rejected: not in Lobby",op));
                 return false;
             }
@@ -645,7 +645,7 @@ namespace GameMod {
             if (!int.TryParse(arg, NumberStyles.Number, CultureInfo.InvariantCulture, out seconds)) {
                 seconds = (start)?5:180;
             }
-            Debug.LogFormat("{0} request via chat command: {1} seconds",op, seconds);
+            Debug.LogFormat("[ChatCmd] {0} request via chat command: {1} seconds",op, seconds);
             FieldInfo haiInfo = AccessTools.Field(typeof(NetworkMatch),"m_host_active_info");
             var hai = haiInfo.GetValue(null);
             if (hai != null) {
@@ -672,7 +672,7 @@ namespace GameMod {
                 ReturnTo(String.Format("manual {0} request by {1}: {2} seconds",op,senderEntry.name,seconds));
                 ServerLobbyStatus.SendToTracker(); // update the tracker
             } else {
-                Debug.LogFormat("{0} request via chat command ignored: no HostActiveMatchInfo",op);
+                Debug.LogFormat("[ChatCmd] {0} request via chat command ignored: no HostActiveMatchInfo",op);
                 ReturnToSender(String.Format("{0} rejected: no HostActiveMatchInfo",op));
             }
             return false;
@@ -710,7 +710,7 @@ namespace GameMod {
         // Execute TEST command
         public bool DoTest()
         {
-            Debug.LogFormat("TEST request for {0}", arg);
+            Debug.LogFormat("[ChatCmd] TEST request for {0}", arg);
             if (!SelectPlayer(arg)) {
                 ReturnToSender(String.Format("did not find player {0}",arg));
                 return false;
@@ -747,7 +747,7 @@ namespace GameMod {
                 // requesting a switch for another player requires permission
                 if (!CheckPermission(senderEntry, sender_conn)) {
                     ReturnToSender(String.Format("You do not have the permission for command {0}!", cmd));
-                    Debug.LogFormat("CHATCMD {0}: client is not authenticated!", cmd);
+                    Debug.LogFormat("[ChatCmd] {0}: client is not authenticated!", cmd);
                     return false;
                 }
             }
@@ -813,10 +813,10 @@ namespace GameMod {
         private int TrimBanCandidate(ref MPBanEntry candidate, MPBanEntry authenticated) {
             int val = candidate.trim(authenticated, "Alias check: ");
             if (val < 0) {
-                Debug.LogFormat("BAN rejected because it would affect {0}",authenticated.name);
+                Debug.LogFormat("[ChatCmd] BAN rejected because it would affect {0}",authenticated.name);
                 ReturnToSender(String.Format("BAN rejected because it would also affect {0}",authenticated.name));
             } else if (val > 0) {
-                Debug.LogFormat("BAN entry reduced to {0} to avoid aliasing {1}",candidate.Describe(),authenticated.Describe());
+                Debug.LogFormat("[ChatCmd] BAN entry reduced to {0} to avoid aliasing {1}",candidate.Describe(),authenticated.Describe());
             }
             return val;
         }
@@ -961,11 +961,11 @@ namespace GameMod {
                 // as the previous one
                 if (connection_id >= 0 && MPBanPlayers.MatchCreatorConnectionId >= 0) {
                     if (connection_id == MPBanPlayers.MatchCreatorConnectionId) {
-                        Debug.LogFormat("MATCH CREATOR: connection ID {0} is authenticated", connection_id);
+                        Debug.LogFormat("[ChatCmd] match creator: connection ID {0} is authenticated", connection_id);
                         return true;
                     }
                 } else {
-                    Debug.LogFormat("MATCH CREATOR: connection id not checked ({0} {1})", connection_id, MPBanPlayers.MatchCreatorConnectionId);
+                    Debug.LogFormat("[ChatCmd] match creator: connection id not checked ({0} {1})", connection_id, MPBanPlayers.MatchCreatorConnectionId);
                     return true;
                 }
             }
@@ -1111,7 +1111,7 @@ namespace GameMod {
                 }
             }
             if (bestPlayer == null) {
-                Debug.LogFormat("CHATCMD: did not find a player matching {0}", pattern);
+                Debug.LogFormat("[ChatCmd] did not find a player matching {0}", pattern);
             }
             return bestPlayer;
         }
@@ -1147,7 +1147,7 @@ namespace GameMod {
                 }
             }
             if (bestPlayer == null) {
-                Debug.LogFormat("CHATCMD: did not find a player matching {0}", pattern);
+                Debug.LogFormat("[ChatCmd] did not find a player matching {0}", pattern);
             }
             return bestPlayer;
         }
@@ -1162,7 +1162,7 @@ namespace GameMod {
         // Reset the state of the chat commands
         // This clears all authentications
         public static void Reset() {
-            Debug.Log("MPChatCommands: clearing command authentications");
+            Debug.Log("[ChatCmd] clearing command authentications");
             authenticatedPlayers.Clear();
         }
     }

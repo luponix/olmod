@@ -15,7 +15,7 @@ namespace GameMod.ModsHandler
             if (commandLine.Length == 0)
             {
                 LastError = "the command line is empty";
-                UnityEngine.Debug.Log("Relaunch: " + LastError);
+                UnityEngine.Debug.Log("[Mods] relaunch: " + LastError);
                 return false;
             }
 
@@ -31,20 +31,20 @@ namespace GameMod.ModsHandler
             start.UseShellExecute = false;
             start.WorkingDirectory = Environment.CurrentDirectory;
 
-            UnityEngine.Debug.Log("Relaunch: starting " + start.FileName + " " + start.Arguments);
+            UnityEngine.Debug.Log("[Mods] relaunch: starting " + start.FileName + " " + start.Arguments);
             try
             {
                 if (Process.Start(start) == null)
                 {
                     LastError = "the new process did not start";
-                    UnityEngine.Debug.Log("Relaunch: " + LastError);
+                    UnityEngine.Debug.Log("[Mods] relaunch: " + LastError);
                     return false;
                 }
             }
             catch (Exception ex)
             {
                 LastError = ex.Message;
-                UnityEngine.Debug.Log("Relaunch: " + ex);
+                UnityEngine.Debug.Log("[Mods] relaunch: " + ex);
                 return false;
             }
 

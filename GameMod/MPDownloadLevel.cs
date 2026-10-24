@@ -47,14 +47,14 @@ namespace GameMod
         {
             if (!File.Exists(zipFilename))
             {
-                Debug.Log($"ZipContainsLevel: File \"{zipFilename}\" not found");
+                Debug.Log($"[Download] ZipContainsLevel: File \"{zipFilename}\" not found");
                 return false;
             }
             string[] parts = levelIdHash.Split(new[] { ':' });
             string levelFile = parts[0];
             if (!int.TryParse(parts[1], NumberStyles.HexNumber, null, out int hash))
             {
-                //Debug.Log("ZipContainsLevel: invalid levelIdHash " + levelIdHash);
+                //Debug.Log("[Download] ZipContainsLevel: invalid levelIdHash " + levelIdHash);
                 return false;
             }
             try
@@ -67,7 +67,7 @@ namespace GameMod
             }
             catch (Exception ex)
             {
-                Debug.Log("ZipContainsLevel: reading " + zipFilename + ": " + ex);
+                Debug.Log("[Download] ZipContainsLevel: reading " + zipFilename + ": " + ex);
             }
             return false;
         }
@@ -104,7 +104,7 @@ namespace GameMod
 
         private static void AddMPLevel(string filename)
         {
-            Debug.Log("MPDownloadLevel.AddMPLevel " + filename);
+            Debug.Log("[Download] AddMPLevel " + filename);
             if (filename.EndsWith(".mp", StringComparison.InvariantCultureIgnoreCase))
                 GameManager.MultiplayerMission.AddAddOnLevel(filename, null, "OUTER_05", new[] { 2, 3, 4, 4 }, false);
             else if (filename.EndsWith(".zip", StringComparison.InvariantCultureIgnoreCase))
@@ -149,7 +149,7 @@ namespace GameMod
 
         private static void OnLogError(string errorMessage, bool showInStatus, float flash)
         {
-            Debug.Log(errorMessage);
+            Debug.LogErrorFormat("[Download] {0}", errorMessage);
             if (showInStatus)
             {
                 MenuManager.AddMpStatus(errorMessage, flash, 9);
@@ -159,7 +159,7 @@ namespace GameMod
 
         private static void OnDownloadFailed()
         {
-            Debug.Log("MPDownloadLevel.OnDownloadFailed");
+            Debug.LogError("[Download] download failed");
             DownloadBusy = false;
             if (Overload.NetworkManager.IsServer())
             {
@@ -171,7 +171,7 @@ namespace GameMod
         private static FieldInfo _NetworkMatch_m_match_force_playlist_level_idx_Field = typeof(NetworkMatch).GetField("m_match_force_playlist_level_idx", BindingFlags.NonPublic | BindingFlags.Static);
         private static void OnDownloadCompleted(int newLevelIndex)
         {
-            Debug.Log($"MPDownloadLevel.OnDownloadCompleted (newLevelIndex={newLevelIndex})");
+            Debug.Log($"[Download] download completed (newLevelIndex={newLevelIndex})");
             if (Overload.NetworkManager.IsServer())
             {
                 _NetworkMatch_m_match_force_playlist_level_idx_Field.SetValue(null, newLevelIndex);
@@ -199,7 +199,7 @@ namespace GameMod
                 GameManager.MultiplayerMission.FindAddOnLevelNumByIdStringHash(levelIdHash);
             public override string[] LevelDirectories => new[] { DataLevelDir, DLCLevelDir };
             public override IEnumerable<ILevelDownloadInfo> GetMPLevels() => MPDownloadLevel.GetMPLevels();
-            public override void LogDebug(object message) => Debug.Log(message);
+            public override void LogDebug(object message) => Debug.LogFormat("[Download] {0}", message);
             public override void LogError(string errorMessage, bool showInStatus, float flash = 1) =>
                 OnLogError(errorMessage, showInStatus, flash);
             public override void RemoveMPLevel(int index) => MPDownloadLevel.RemoveMPLevel(index);
@@ -234,12 +234,12 @@ namespace GameMod
                 yield return null;
             if (!name.Contains(":") || Config.NoDownload || GameManager.MultiplayerMission.FindAddOnLevelNumByIdStringHash(name) >= 0) // test here to prevent loop
             {
-                Debug.Log("Level downloaded, loading scene");
+                Debug.Log("[Download] level downloaded, loading the scene");
                 Overload.NetworkManager.LoadScene(name);
             }
             else
             {
-                Debug.Log("Match scene load failed: level still not found after download finished " + name);
+                Debug.LogError("[Download] scene load failed, the level is still missing after the download: " + name);
                 UIManager.DestroyAll(true);
                 NetworkMatch.ExitMatchToMainMenu();
             }
@@ -295,9 +295,9 @@ namespace GameMod
             }
             catch (Exception ex)
             {
-                Debug.Log(ex);
+                Debug.LogErrorFormat("[Download] GetAddOnLevelIdStringHash failed: {0}", ex);
             }
-            Debug.Log("GetAddOnLevelIdStringHash " + __instance.ZipPath + " " + __instance.FilePath + " " + ___m_cachedIdStringHash);
+            Debug.Log("[Download] GetAddOnLevelIdStringHash " + __instance.ZipPath + " " + __instance.FilePath + " " + ___m_cachedIdStringHash);
             __result = ___m_cachedIdStringHash;
             return false;
         }

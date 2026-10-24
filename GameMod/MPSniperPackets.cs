@@ -429,7 +429,7 @@ namespace GameMod
                     if (msg.m_value < 0 || msg.m_value > 20)
                     {
                         // Drop packet if value is out of range.
-                        Debug.Log($"*** WARNING *** Client {player.m_mp_name} received a value out of range! Tried to add {msg.m_value} of {msg.m_type}");
+                        Debug.LogWarning($"[Sniper] client {player.m_mp_name} received a value out of range! Tried to add {msg.m_value} of {msg.m_type}");
                         return;
                     }
 
@@ -468,7 +468,7 @@ namespace GameMod
                     if (msg.m_value < 0 || msg.m_value > 200)
                     {
                         // Drop packet if value is out of range.
-                        Debug.Log($"*** WARNING *** Client {player.m_mp_name} received a value out of range! Tried to add {msg.m_value} of {msg.m_type}");
+                        Debug.LogWarning($"[Sniper] client {player.m_mp_name} received a value out of range! Tried to add {msg.m_value} of {msg.m_type}");
                         return;
                     }
 
@@ -495,7 +495,7 @@ namespace GameMod
                     if (msg.m_value < 0 || msg.m_value > 80)
                     {
                         // Drop packet if value is out of range.
-                        Debug.Log($"*** WARNING *** Client {player.m_mp_name} received a value out of range! Tried to add {msg.m_value} of {msg.m_type}");
+                        Debug.LogWarning($"[Sniper] client {player.m_mp_name} received a value out of range! Tried to add {msg.m_value} of {msg.m_type}");
                         return;
                     }
                     var hasMissiles = player.NumUnlockedMissilesWithAmmo() > 0;
@@ -788,7 +788,7 @@ namespace GameMod
 
                     // Don't fire what we don't know about.
                     default:
-                        Debug.Log($"{DateTime.Now:MM/dd/yyyy hh:mm:ss.fff tt} - Fire packet dropped, invalid projectile: {player.m_mp_name} - {msg.m_type}");
+                        Debug.Log($"[Sniper] fire packet dropped, invalid projectile: {player.m_mp_name} - {msg.m_type}");
                         return;
                 }
 
@@ -798,7 +798,7 @@ namespace GameMod
 
                     if (_primaryFireBuffer[key] - now - 0.25f > refireTime)
                     {
-                        Debug.Log($"{DateTime.Now:MM/dd/yyyy hh:mm:ss.fff tt} {now:N3} - Fire packet dropped, client is bursting: {player.m_mp_name} - {msg.m_type}");
+                        Debug.Log($"[Sniper] fire packet dropped, client is bursting: {player.m_mp_name} - {msg.m_type}");
 
                         if (_primaryFireBuffer[key] - now > 2 * refireTime + 0.25f)
                         {
@@ -814,7 +814,7 @@ namespace GameMod
 
                     if (_secondaryFireBuffer[key] - now - 0.25f > refireTime)
                     {
-                        Debug.Log($"{DateTime.Now:MM/dd/yyyy hh:mm:ss.fff tt} - Fire packet dropped, client is bursting: {player.m_mp_name} - {msg.m_type}");
+                        Debug.Log($"[Sniper] fire packet dropped, client is bursting: {player.m_mp_name} - {msg.m_type}");
 
                         if (_secondaryFireBuffer[key] - now > 2 * refireTime + 0.25f)
                         {
@@ -830,7 +830,7 @@ namespace GameMod
 
                     if (_flareFireBuffer[key] - now - 0.25f > refireTime)
                     {
-                        Debug.Log($"{DateTime.Now:MM/dd/yyyy hh:mm:ss.fff tt} - Fire packet dropped, client is bursting: {player.m_mp_name} - {msg.m_type}");
+                        Debug.Log($"[Sniper] fire packet dropped, client is bursting: {player.m_mp_name} - {msg.m_type}");
 
                         if (_flareFireBuffer[key] - now > 2 * refireTime + 0.25f)
                         {

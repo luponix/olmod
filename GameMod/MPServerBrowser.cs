@@ -45,7 +45,7 @@ namespace GameMod
 
             if (www.isNetworkError || www.isHttpError)
             {
-                Debug.Log(www.error);
+                Debug.LogErrorFormat("[Browser] server list request failed: {0}", www.error);
                 yield break;
             }
 
@@ -867,7 +867,7 @@ namespace GameMod
                 case MenuSubState.BACK:
                     if (UIManager.PushedSelect(100))
                     {
-                        Debug.Log("Pushed back");
+                        Debug.Log("[Browser] pushed back");
                         Stack<MenuState> m_back_stack = (Stack<MenuState>)_MenuManager_m_back_stack_Field.GetValue(null);
                         _MenuManager_m_menu_state_timer_Field.SetValue(null, 0f);
                         UIManager.DestroyAll(false);

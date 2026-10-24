@@ -50,7 +50,7 @@ namespace GameMod
         {
             if (___m_music_source.clip == null && ___m_current_track != null) // couldn't load built in, try custom
             {
-                Debug.Log("Trying loading custom music " + ___m_current_track);
+                Debug.Log("[Music] trying to load custom music " + ___m_current_track);
                 ___m_music_source.clip =
                     GameplayManager.Level.Mission.Type == MissionType.ADD_ON ?
                         GameplayManager.Level.Mission.LoadAudioClip(___m_current_track) :

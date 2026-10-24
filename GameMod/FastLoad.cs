@@ -13,7 +13,7 @@ namespace GameMod {
         {
             var enabled = Core.GameMod.FindArg("-fastload");
             if (enabled)
-                Debug.Log("fastload enabled");
+                Debug.Log("[FastLoad] fastload enabled");
             return enabled;
         }
         private static void Prefix(GameManager __instance, IEnumerator<float> ___m_initialization_enumerator, ref float ___m_initialization_progress)
@@ -34,7 +34,7 @@ namespace GameMod {
         {
             var enabled = Core.GameMod.FindArg("-nosound");
             if (enabled)
-                Debug.Log("nosound enabled");
+                Debug.Log("[FastLoad] nosound enabled");
             return enabled;
         }
 
@@ -67,7 +67,7 @@ namespace GameMod {
         {
             var enabled = Core.GameMod.FindArg("-norobot");
             if (enabled)
-                Debug.Log("norobot enabled");
+                Debug.Log("[FastLoad] norobot enabled");
             return enabled;
         }
         private static bool Prefix(ref IEnumerable<float> __result, ref GameObject[] ___m_enemy_prefab)
@@ -93,7 +93,7 @@ namespace GameMod {
         {
             var enabled = Core.GameMod.FindArg("-texreslow");
             if (enabled)
-                Debug.Log("texreslow enabled");
+                Debug.Log("[FastLoad] texreslow enabled");
             return enabled;
         }
         private static void Prefix()

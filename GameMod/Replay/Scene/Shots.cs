@@ -212,10 +212,10 @@ namespace GameMod.Replay
                 yield return instruction;
             }
 
-            UnityEngine.Debug.Log(rewritten > 0
-                ? "REPLAY: " + methodName + " -- " + rewritten + " multiplayer tests rewritten"
-                : "REPLAY: " + methodName + " -- NO multiplayer test found, replayed shots will "
-                  + "use singleplayer behaviour");
+            if (rewritten == 0)
+                UnityEngine.Debug.LogErrorFormat(
+                    "[Replay] {0}: no multiplayer test found, replayed shots will use singleplayer behaviour",
+                    methodName);
         }
 
         [HarmonyPatch(typeof(Projectile), "Fire")]

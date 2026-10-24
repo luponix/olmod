@@ -37,7 +37,7 @@ namespace GameMod
     {
         private static void Prefix(string customEventName, IDictionary<string, object> eventData)
         {
-            Debug.Log("AnalyticsCustomEvent " + customEventName + " " + eventData.Join());
+            Debug.Log("[Matchmaker] AnalyticsCustomEvent " + customEventName + " " + eventData.Join());
         }
     }
 
@@ -49,10 +49,10 @@ namespace GameMod
         static void Prefix(DistributedMatchUp.Match[] requests, DistributedMatchUp.Match backfillSeedMatch)
         {
             foreach (var m in requests)
-                Debug.Log(DateTime.Now.ToString() + ": HOST: FindGameSessionToCreate req " + m.uid + " maxp=" + m.maxPlayers + " #p=" + JArray.Parse(m.matchData["mm_players"].stringValue).Count);
+                Debug.Log("[Matchmaker] " + DateTime.Now.ToString() + ": HOST: FindGameSessionToCreate req " + m.uid + " maxp=" + m.maxPlayers + " #p=" + JArray.Parse(m.matchData["mm_players"].stringValue).Count);
             if (backfillSeedMatch != null) {
                 var m = backfillSeedMatch;
-                Debug.Log(DateTime.Now.ToString() + ": HOST: FindGameSessionToCreate backfill " + m.uid + " maxp=" + m.maxPlayers + " #p=" + JArray.Parse(m.matchData["mm_players"].stringValue).Count);
+                Debug.Log("[Matchmaker] " + DateTime.Now.ToString() + ": HOST: FindGameSessionToCreate backfill " + m.uid + " maxp=" + m.maxPlayers + " #p=" + JArray.Parse(m.matchData["mm_players"].stringValue).Count);
             }
         }
     }
@@ -64,7 +64,7 @@ namespace GameMod
         static void Postfix(DistributedMatchUp __instance)
         {
             DistributedMatchUp.Match m = __instance.ActiveMatch;
-            Debug.Log(DateTime.Now.ToString() + " " + System.Diagnostics.Process.GetCurrentProcess().Id + ": create match " + m.uid + " updated to " + m.matchData["mm_ticketType"]);
+            Debug.Log("[Matchmaker] " + DateTime.Now.ToString() + " " + System.Diagnostics.Process.GetCurrentProcess().Id + ": create match " + m.uid + " updated to " + m.matchData["mm_ticketType"]);
         }
     }
 
@@ -75,7 +75,7 @@ namespace GameMod
         static void Postfix(DistributedMatchUp __instance)
         {
             DistributedMatchUp.Match m = __instance.ActiveMatch;
-            Debug.Log(DateTime.Now.ToString() + " " + System.Diagnostics.Process.GetCurrentProcess().Id + ": update match " + m.uid + " updated to " + m.matchData["mm_ticketType"]);
+            Debug.Log("[Matchmaker] " + DateTime.Now.ToString() + " " + System.Diagnostics.Process.GetCurrentProcess().Id + ": update match " + m.uid + " updated to " + m.matchData["mm_ticketType"]);
         }
     }
 
@@ -86,7 +86,7 @@ namespace GameMod
         static void Postfix(DistributedMatchUp.Match __result)
         {
             var m = __result;
-            Debug.Log(DateTime.Now.ToString() + " " + System.Diagnostics.Process.GetCurrentProcess().Id + ": received " + (m == null ? "null" : m.uid + " type " + m.matchData["mm_ticketType"] + " tickets " + m.matchData.GetValueSafe("mm_mmTickets")));
+            Debug.Log("[Matchmaker] " + DateTime.Now.ToString() + " " + System.Diagnostics.Process.GetCurrentProcess().Id + ": received " + (m == null ? "null" : m.uid + " type " + m.matchData["mm_ticketType"] + " tickets " + m.matchData.GetValueSafe("mm_mmTickets")));
         }
     }
 
@@ -95,7 +95,7 @@ namespace GameMod
     {
         static void Postfix(Dictionary<IPEndPointProcessId, DistributedMatchUp.Match> ___m_remoteMatches, IPEndPointProcessId sender, DistributedMatchUp __instance)
         {
-            Debug.Log(DateTime.Now.ToString() + " " + System.Diagnostics.Process.GetCurrentProcess().Id + " OnClientStateUpdate: sender " + sender + " all: " +
+            Debug.Log("[Matchmaker] " + DateTime.Now.ToString() + " " + System.Diagnostics.Process.GetCurrentProcess().Id + " OnClientStateUpdate: sender " + sender + " all: " +
                 ___m_remoteMatches.Join(x => x.Key + "[" + x.Value.uid + " " + x.Value.matchData.GetValueSafe("mm_ticketType") + " " + x.Value.matchData.GetValueSafe("mm_mmTickets") + "]"));
         }
     }
@@ -105,7 +105,7 @@ namespace GameMod
     {
         private static void Postfix(IPEndPointProcessId sender)
         {
-            Debug.LogFormat("{0} {1} disconnect {2}", DateTime.Now.ToString(), System.Diagnostics.Process.GetCurrentProcess().Id, sender);
+            Debug.LogFormat("[Matchmaker] {0} {1} disconnect {2}", DateTime.Now.ToString(), System.Diagnostics.Process.GetCurrentProcess().Id, sender);
         }
     }
 
@@ -116,7 +116,7 @@ namespace GameMod
         private static void Prefix()
         {
             UnityEngine.Networking.LogFilter.currentLogLevel = UnityEngine.Networking.LogFilter.Debug;
-            Debug.Log("Client.AddPlayer");
+            Debug.Log("[Matchmaker] Client.AddPlayer");
         }
     }
 
@@ -126,7 +126,7 @@ namespace GameMod
     {
         private static void Postfix()
         {
-            Debug.LogFormat("GameplayManager OnSceneLoaded GameplayManager.LevelIsLoaded={0}, DynamicGI.isConverged={1} GameManager.m_local_player.isLocalPlayer={2}",
+            Debug.LogFormat("[Matchmaker] GameplayManager OnSceneLoaded GameplayManager.LevelIsLoaded={0}, DynamicGI.isConverged={1} GameManager.m_local_player.isLocalPlayer={2}",
                 GameplayManager.LevelIsLoaded, DynamicGI.isConverged, GameManager.m_local_player.isLocalPlayer);
         }
     }

@@ -268,7 +268,7 @@ namespace GameMod {
                 pos.y += 62f + 62f;
                 pos.x += num * 0.5f - 123f;
                 var size = new Vector2(24f, 24f);
-                Debug.Log("mouse " + UIManager.m_mouse_pos + " pos " + pos + " size " + size);
+                Debug.Log("[LevelSelect] mouse " + UIManager.m_mouse_pos + " pos " + pos + " size " + size);
                 if (new Rect(pos + Vector2.right * 130f - size, size * 2).Contains(UIManager.m_mouse_pos)) // right button clicked?
                     return;
 

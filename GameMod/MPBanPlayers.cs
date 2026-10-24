@@ -62,7 +62,7 @@ namespace GameMod {
             if (id != null) {
                 // check validity of the ID
                 if (id.Length < 8 || id == NullId) {
-                    Debug.LogFormat("BAN ENTRY: invalid player id {0}, ignoring", id);
+                    Debug.LogFormat("[Ban] entry: invalid player id {0}, ignoring", id);
                     id = null;
                 }
             }
@@ -75,7 +75,7 @@ namespace GameMod {
             if (connection_id >= 0 && connection_id < NetworkServer.connections.Count && NetworkServer.connections[connection_id] != null) {
                 addr = NetworkServer.connections[connection_id].address;
             } else {
-                Debug.LogFormat("BAN ENTRY: failed to find connection for connection ID {0}", connection_id);
+                Debug.LogFormat("[Ban] entry: failed to find connection for connection ID {0}", connection_id);
             }
             Set(playerName, addr, playerId);
         }
@@ -121,7 +121,7 @@ namespace GameMod {
                 }
             }
             if (matchFlags > 0) {
-                Debug.LogFormat("{0}player {1} matches entry {2} (flags: {3}, checked: {4})", prefix, candidate.Describe(), Describe(),matchFlags , checkFlags);
+                Debug.LogFormat("[Ban] {0}player {1} matches entry {2} (flags: {3}, checked: {4})", prefix, candidate.Describe(), Describe(),matchFlags , checkFlags);
                 return true;
             }
 
@@ -157,7 +157,7 @@ namespace GameMod {
             if (!matches(candidate, ref checkFlags, ref matchFlags, prefix)) {
                 return 0;
             }
-            Debug.LogFormat("{0}{1} aliases entry {2}, attempting to trim", prefix, Describe(), candidate.Describe());
+            Debug.LogFormat("[Ban] {0}{1} aliases entry {2}, attempting to trim", prefix, Describe(), candidate.Describe());
             if ( (matchFlags & 1) != 0) {
                 name = null;
             } else if ( (matchFlags & 2) != 0) {
@@ -166,11 +166,11 @@ namespace GameMod {
                 id = null;
             } else {
                 // some other bit flag is still set
-                Debug.LogFormat("{0}invalid matching field detected", prefix);
+                Debug.LogFormat("[Ban] {0}invalid matching field detected", prefix);
                 return -2;
             }
             if (!IsValid()) {
-                Debug.LogFormat("{0}ban entry invalidated to prevent aliasing {1}", prefix, candidate.Describe());
+                Debug.LogFormat("[Ban] {0}ban entry invalidated to prevent aliasing {1}", prefix, candidate.Describe());
                 return -1;
             }
             // try again with the removed field...
@@ -228,7 +228,7 @@ namespace GameMod {
             if (p != null) {
                 if (p.m_spectator == false) {
                     p.m_spectator = true;
-                    Debug.LogFormat("BAN ANNOY player {0}",p.m_mp_name);
+                    Debug.LogFormat("[Ban] annoy player {0}",p.m_mp_name);
                     if (p.connectionToClient != null) {
                         MPChatTools.SendTo(String.Format("ANNOY-BANNING player {0}",p.m_mp_name), -1, p.connectionToClient.connectionId, true);
                     }
@@ -381,7 +381,7 @@ namespace GameMod {
                 }
             }
             banList.Add(candidate);
-            Debug.LogFormat("BAN: player {0} is NOW banned in mode: {1}", candidate.Describe(), mode);
+            Debug.LogFormat("[Ban] player {0} is NOW banned in mode: {1}", candidate.Describe(), mode);
             OnUpdate(mode, true);
             return true;
         }
@@ -420,7 +420,7 @@ namespace GameMod {
         // Reset the MPBanPlayers state
         // Removes all non-permanent bans of all modes
         public static void Reset() {
-            Debug.Log("MPBanPlayers: resetting all non-permanent bans");
+            Debug.Log("[Ban] resetting all non-permanent bans");
             for (MPBanMode mode = (MPBanMode)0; mode < MPBanMode.Count; mode++) {
                 UnbanAllNonPermanent(mode);
             }
@@ -442,11 +442,11 @@ namespace GameMod {
     {
         static void SetCreatorId(string id) {
             MPBanPlayers.PlayerWithPrivateMatchData = new MPBanEntry(null, null, id);
-            //Debug.LogFormat("MPBanPlayers: FindGameCreator: player with private match data is id {0}",id);
+            //Debug.LogFormat("[Ban] FindGameCreator: player with private match data is id {0}",id);
         }
         static void SetCreatorUId(string uid) {
             MPBanPlayers.PlayerWithPrivateMatchDataUId = uid;
-            //Debug.LogFormat("MPBanPlayers: FindGameCreator: player with private match data is uid {0}",uid);
+            //Debug.LogFormat("[Ban] FindGameCreator: player with private match data is uid {0}",uid);
         }
 
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
@@ -517,7 +517,7 @@ namespace GameMod {
                 yield return code;
             }
             if (state != 5) {
-                Debug.LogFormat("MPBanPlayers_FindGameCreator: transpiler failed at state {0}",state);
+                Debug.LogFormat("[Ban] FindGameCreator: transpiler failed at state {0}",state);
             }
         }
     }
@@ -556,7 +556,7 @@ namespace GameMod {
                 }
                 if (hasCreatorID) {
                     if (hasCreatorUID || String.IsNullOrEmpty(MPBanPlayers.PlayerWithPrivateMatchDataUId)) {
-                        Debug.LogFormat("MPBanPlayers: Match creator entered the lobby: {0}",player_name);
+                        Debug.LogFormat("[Ban] Match creator entered the lobby: {0}",player_name);
                         MPBanPlayers.MatchCreatorConnectionId = connection_id;
                         isCreator = true;
                         if (!MPBanPlayers.MatchCreatorIsInGame) {
@@ -568,7 +568,7 @@ namespace GameMod {
                 if (!isCreator && connection_id >= 0 && MPBanPlayers.MatchCreatorConnectionId == connection_id) {
                     // another player joined the connection id which was used for the match creator before
                     // invalidate the ID, as there is no match creator in game now
-                    Debug.LogFormat("MPBanPlayers: non-creator {0} entered on the same connection previously used by the creator, invalidating",player_name);
+                    Debug.LogFormat("[Ban] non-creator {0} entered on the same connection previously used by the creator, invalidating",player_name);
                     MPBanPlayers.MatchCreatorConnectionId = -1;
                 }
                 // check if player is banned
@@ -583,7 +583,7 @@ namespace GameMod {
                     // NOTE: we cannot just say __accept = false, because this causes all sorts of troubles later
                     MPBanPlayers.KickPlayer(connection_id, player_name, true);
                     if (isCreator) {
-                        Debug.LogFormat("Creator for this match {0} is BANNED, ending match", candidate.name);
+                        Debug.LogFormat("[Ban] creator for this match {0} is BANNED, ending match", candidate.name);
                         GameManager.m_gm.StartCoroutine(DelayedEndMatch());
                     }
                 } else {
@@ -592,12 +592,12 @@ namespace GameMod {
                         bool haveModifiedState = MPBanPlayers.HasModifiedState() || MPChatCommand.HasModifiedState();
                         bool doReset = true;
                         if (MPChatCommand.CheckPermission(candidate,-1)) {
-                            Debug.Log("MPBanPlayers: same game creator as last match, or with permissions");
+                            Debug.Log("[Ban] same game creator as last match, or with permissions");
                             doReset = false;
                         }
                         MPBanPlayers.MatchCreator = candidate;
                         if (doReset) {
-                            Debug.Log("MPBanPlayers: new game creator, resetting bans and permissions");
+                            Debug.Log("[Ban] new game creator, resetting bans and permissions");
                             MPBanPlayers.Reset();
                             MPChatCommand.Reset();
                             if (haveModifiedState) {

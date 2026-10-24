@@ -221,9 +221,9 @@ namespace GameMod {
                     Player player = Server.FindPlayerByConnectionId(keyValuePair.Value.m_id);
                     if (!player || player.m_spectator)
                         continue;
-                    Debug.LogFormat("Enabling spectator for {0}", player.m_mp_name);
+                    Debug.LogFormat("[Observer] enabling spectator for {0}", player.m_mp_name);
                     player.Networkm_spectator = true;
-                    Debug.LogFormat("Enabled spectator for {0}", player.m_mp_name);
+                    Debug.LogFormat("[Observer] enabled spectator for {0}", player.m_mp_name);
                 }
         }
     }
@@ -305,7 +305,8 @@ namespace GameMod {
                     break;
                 }
             }
-            Debug.Log("Patched FixedUpdateProcessControlsInternal n=" + n);
+            if (n != 2)
+                Debug.LogErrorFormat("[Observer] FixedUpdateProcessControlsInternal: patched {0} sites, expected 2", n);
             return codes;
         }
     }

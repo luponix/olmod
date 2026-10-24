@@ -1289,7 +1289,7 @@ END_ENTRY
             set
             {
                 MPServerOptimization.enabled = value;
-                Debug.Log("Client-side physics optimizations are " + (value ? "ENABLED" : "DISABLED") + " this round");
+                Debug.Log("[PrivateData] client-side physics optimizations are " + (value ? "ENABLED" : "DISABLED") + " this round");
             }
         }
 
@@ -1299,7 +1299,7 @@ END_ENTRY
             set
             {
                 MPServerOptimization.RoundRollSpeedLimit = value;
-                Debug.Log("Roll speed limit is set to +" + (value - 3) + " for this round");
+                Debug.Log("[PrivateData] roll speed limit is set to +" + (value - 3) + " for this round");
             }
         }
 
@@ -1407,7 +1407,7 @@ END_ENTRY
         }
         public static void OnReceived(string data)
         {
-            Debug.LogFormat("MPModPrivateData: received {0}", data);
+            Debug.LogFormat("[PrivateData] received {0}", data);
             MPModPrivateData.Deserialize(JToken.Parse(data));
         }
     }
@@ -1697,7 +1697,7 @@ END_ENTRY
                 }
                 catch (Exception)
                 {
-                    Debug.Log("Unable to read custom projdata file: " + Menus.mms_mp_projdata_fn);
+                    Debug.LogError("[PrivateData] cannot read the custom projdata file: " + Menus.mms_mp_projdata_fn);
                     MPModPrivateData.CustomProjdata = String.Empty;
                 }
             }
