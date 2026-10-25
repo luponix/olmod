@@ -100,6 +100,11 @@ namespace GameMod.VersionHandling
 
             ui.TestMouseInRect(pos, 134.5f, 24f, SEL_UPDATE);
             ui.DrawSmallItemOrange(label, pos, UIManager.m_menu_selection == SEL_UPDATE, false, 0.4f, 0.5f);
+
+            // which release the button would install, so pressing it is not the way to find out
+            if (SelfUpdate.State == SelfUpdateState.Available && SelfUpdate.Latest != null)
+                ui.DrawStringSmall(SelfUpdate.Latest.name + " AVAILABLE", pos - Vector2.up * 38f, 0.4f,
+                    StringOffset.CENTER, UIManager.m_col_hi5, 1f);
         }
 
         // ---- the popup ----
@@ -113,9 +118,12 @@ namespace GameMod.VersionHandling
                 changelog = null;
             }
 
-            // the stock items drew first and registered themselves; nothing behind a modal
-            // may be navigated to
+            // The stock items drew first and registered themselves; nothing behind a modal may
+            // be navigated to. Their TestMouseInRect also left m_mouse_menu_selection pointing at
+            // one of them, and MouseSelectUpdate reads that as a fresh hover -- sounding the move
+            // cue -- on every frame that UpdatePopup forces the selection back to a popup button.
             UIManager.ResetSelectionList();
+            UIManager.m_mouse_menu_selection = -1;
 
             // The menu behind is dimmed rather than hidden, so the popup reads as sitting on
             // top of it. A black fill never reaches opaque over this material, which is why
@@ -145,10 +153,12 @@ namespace GameMod.VersionHandling
         {
             Color edge = UIManager.m_col_ui3;
             float a = 0.9f * ui.m_alpha;
-            UIManager.DrawQuadUI(new Vector2(0f, -BOX_HALF_HEIGHT), BOX_HALF_WIDTH, 1.5f, edge, a, 12);
-            UIManager.DrawQuadUI(new Vector2(0f, BOX_HALF_HEIGHT), BOX_HALF_WIDTH, 1.5f, edge, a, 12);
-            UIManager.DrawQuadUI(new Vector2(-BOX_HALF_WIDTH, 0f), 1.5f, BOX_HALF_HEIGHT, edge, a, 12);
-            UIManager.DrawQuadUI(new Vector2(BOX_HALF_WIDTH, 0f), 1.5f, BOX_HALF_HEIGHT, edge, a, 12);
+            // 11 is the flat fill the engine's own DrawBackdrop bars use; 12 fades towards its
+            // edges, which on a bar this long leaves the rectangle open at the corners
+            UIManager.DrawQuadUI(new Vector2(0f, -BOX_HALF_HEIGHT), BOX_HALF_WIDTH, 1.5f, edge, a, 11);
+            UIManager.DrawQuadUI(new Vector2(0f, BOX_HALF_HEIGHT), BOX_HALF_WIDTH, 1.5f, edge, a, 11);
+            UIManager.DrawQuadUI(new Vector2(-BOX_HALF_WIDTH, 0f), 1.5f, BOX_HALF_HEIGHT, edge, a, 11);
+            UIManager.DrawQuadUI(new Vector2(BOX_HALF_WIDTH, 0f), 1.5f, BOX_HALF_HEIGHT, edge, a, 11);
         }
 
         private static void DrawChangelog(UIElement ui)
