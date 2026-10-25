@@ -1602,8 +1602,8 @@ namespace GameMod
         [HarmonyPatch(typeof(UIElement), "DrawHUDWeaponReticle")]
         class MatchModeInstareap_UIElement_DrawHUDWeaponReticle
         {
-            private const float STROKE_INNER_RADIUS = 7f;
-            private const float STROKE_OUTER_RADIUS = 46f;
+            private const float STROKE_INNER_RADIUS = 4f;
+            private const float STROKE_OUTER_RADIUS = 25f;
 
             // right, down, left - the engine's reticle convention, NOT the usual maths one:
             // UI +y points down and outward is (sin a, -cos a), so 0 is UP and a runs
