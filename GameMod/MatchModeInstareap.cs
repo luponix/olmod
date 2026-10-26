@@ -12,21 +12,74 @@ namespace GameMod
 {
     class MatchModeInstareap
     {
-        private const float MD_COOLDOWN_TIME = 1.5f;            // the time in seconds that needs to pass after firing a shot to be able to fire again
-        private const float MD_TIME_TILL_ZOOM_KICKS_IN = 0.5f;    // the time in seconds between pressing the fire button and the camera starting to zoom in
-        private const float MD_RANGE = 100f;                    // how far the beam reaches, in meters
+        // Ships[].static_wb[6].gp_fire_wait is 1.5 s on the Pyro-GL and Phoenix, 1.2 on the Magnum
+        private const float MD_COOLDOWN_TIME = 1.5f;
+        private const float MD_TIME_TILL_ZOOM_KICKS_IN = 0.5f;  // seconds after the press, not at it
+        // metres. D3 caps the slug by lifetime instead - 0.15 s at 15000 u/s, far enough that
+        // no indoor level reaches the end of it.
+        private const float MD_RANGE = 100f;
 
+        // A D3 unit is not an Overload metre, and no single factor converts both lengths and
+        // speeds: D3 flies 1.38x faster relative to its own ship, so the two anchors differ by
+        // 1.81x (mdhall-port/doc/SCALE.md). Each constant below takes the anchor for whatever
+        // it is judged against in play -
+        //
+        //   beam thickness, ring size   the ship you see beside it, Pyro visible half-width
+        //   hit radius                  the radius D3 adds it to, Pyro collision size
+        //   knockback, recoil           each game's own trichord speed
+        //
+        // - and angles and times need no conversion, being degrees and seconds in both.
         private const float D3_SHIP_HALF_WIDTH = 4.563f;
+        private const float D3_SHIP_COLLISION_RADIUS = 6.67608f;
         private const float OVERLOAD_SHIP_RADIUS = 1.2f;
         private const float D3_UNIT = OVERLOAD_SHIP_RADIUS / D3_SHIP_HALF_WIDTH;
+
+        // Speeds convert by the distance they move you rather than by their magnitude: a D3
+        // impulse decays with tau = mass/drag and so travels dv*tau, and Overload's drag of 2.5
+        // gives tau 0.4 s against the Phoenix's 0.3. With the trichord factor
+        // 16.87 / (67 * sqrt 3) = 0.14537 that makes v_overload = dv * 0.3 * 0.14537 / 0.4.
+        // Every D3 figure below is the Phoenix's.
+
+        // bump_two_objects (collide.cpp:1707) on a 0.8-mass slug at a fixed 15000 u/s,
+        // restitution 0.1: 1.1 * 15000 / (1/24 + 1/0.8) / 24 = 532.3 u/s, plus the 0.02 s
+        // shockwave the impact spawns, impact_force 2500 / 24 = 104.2 u/s at distance zero,
+        // which a direct victim always takes in full. Matching the speed rather than the
+        // distance would give 92.5 m/s - a third further thrown, Overload holding a kick longer.
+        private const float MD_KNOCKBACK_SPEED = 69.4f;
+
+        // recoil_force 1500 / mass 24 = 62.5 u/s, the formula D3 applies to its robots
+        // (robotfire.cpp:158). Its player fire path never uses it - WBFireBattery touches no
+        // velocity at all - so this one is ours, not Descent 3's.
+        private const float MD_RECOIL_SPEED = 6.8f;
+
+        // WeaponFire.cpp:2910 adds ship_mass * 2 when a zoom weapon fires, and ShakePlayer
+        // (damage.cpp:1436) spends it as a fresh random angle on pitch, yaw AND roll every
+        // rendered frame, bleeding off linearly at MAX_SHAKE_MAGNITUDE/3 per second. Each axis
+        // takes (rand()%5 - 2) * magnitude D3 angle units, so +-0.53 degrees at the Phoenix's
+        // 48, which is spent after 1.2 s.
+        private const float MD_SHAKE_MAGNITUDE = 24f * 2f;
+        private const float MD_SHAKE_DECAY = 120f / 3f;
+        private const float D3_ANGLE_TO_DEGREES = 360f / 65536f;
+
+        // Weapons[].size, the radius of the swept sphere D3 moves the slug with. What decides
+        // whether a shot connects is that radius against the one D3 adds it to - still_size +
+        // rad on the target's full size, players being excluded from the anim_size branch
+        // (findintersection.cpp:1760/1792) - which is why this takes the collision anchor and
+        // the beam above does not. The slug is 0.337 ship radii, the pair reach 1.337, in
+        // either game. PF_POINT_COLLIDE_WALLS then drops the radius to zero against level
+        // geometry alone (findintersection.cpp:2694): forgiving against ships, still unable to
+        // clip a corner you shot past.
+        private const float MD_HIT_RADIUS = 2.2503459f * (OVERLOAD_SHIP_RADIUS / D3_SHIP_COLLISION_RADIUS);
 
         private const float BEAM_LIFETIME = 1.5f;
         private const float BEAM_PEAK_ALPHA = 0.5f;
         private const float BEAM_CORE_RADIUS = 0.0625f * D3_UNIT;
         private const float BEAM_GLOW_RADIUS = 0.25f * D3_UNIT;
         private const float RING_SPACING = 3f * D3_UNIT;
-        private const float RING_RADIUS = 0.5f * D3_UNIT;
-        private const float RING_RADIUS_PULSE = 0.15f * D3_UNIT;
+        // g3_DrawPlanarRotatedBitmap takes half-extents, so D3's 1.0 +- 0.3 is a radius. The
+        // rings are four times wider than the glow tube and are what reads as "the beam".
+        private const float RING_RADIUS = 1f * D3_UNIT;
+        private const float RING_RADIUS_PULSE = 0.3f * D3_UNIT;
         private const float RING_SPIN_TURNS_PER_SECOND = 4f;
         private const float RING_PHASE_STEP_TURNS = 9000f / 65536f;
         private const float TUBE_MESH_RADIUS = 0.2f;
@@ -35,6 +88,7 @@ namespace GameMod
         private static readonly Color BEAM_GLOW_COLOR = new Color(96f / 255f, 96f / 255f, 168f / 255f);
 
         private static float massdriver_refire_time = 0f;
+        private static float fire_shake_magnitude = 0f;
         private static bool active_shot = false;
         private static bool has_the_zoom_sound_effect_been_played = false;
         private static float start_time = 0f;
@@ -150,7 +204,6 @@ namespace GameMod
             private static void OnMassdriverProjectilePacket(NetworkMessage rawMsg)
             {
                 MassdriverProjectilePacket rs = rawMsg.ReadMessage<MassdriverProjectilePacket>();
-                // display the shot in the scene
                 AddProjectile(rs);
             }
         }
@@ -207,19 +260,33 @@ namespace GameMod
                     return;
                 }
 
-                // Step 4: everyone else draws the beam
+                // Step 4: relay to everyone but the shooter, who drew it the moment they fired
                 foreach (NetworkConnection networkConnection in NetworkServer.connections)
                 {
                     if (networkConnection != null && networkConnection.connectionId != connection_id)
                         networkConnection.SendByChannel(MessageTypes.MsgMassdriverProjectilePacket, shot, 0);
                 }
 
-                // Step 5: a claimed kill only lands if the server can confirm it for itself
+                // Step 5: the shot shoves the shooter back, hit or miss. The beam's own line is
+                // what pushes, not the packet's forward vector - the two agree for an honest
+                // client, and this is the one the checks above already bounded.
+                ApplyVelocity(shooter, -(shot.end - shot.start).normalized * MD_RECOIL_SPEED);
+
+                // Step 6: a claimed hit only lands if the server can confirm it for itself
                 if (shot.victimNetId == 0)
                     return;
 
                 Player victim = FindPlayerByNetId(shot.victimNetId);
-                if (victim == null || !CanShotKill(shooter, victim, shot))
+                if (victim == null || !CanShotHit(shooter, victim, shot))
+                    return;
+
+                // Descent 3 knocks the victim around from the collision itself and asks nothing
+                // about damage on the way - collide_player_and_weapon's bump_two_objects runs
+                // whatever ApplyDamageToPlayer did. So a spawn-protected ship gets thrown just
+                // the same; it simply survives to fly out of it.
+                ApplyVelocity(victim, KnockbackDirection(victim, shot) * MD_KNOCKBACK_SPEED);
+
+                if (victim.m_invulnerable)
                     return;
 
                 victim.c_player_ship.ApplyDamage(new DamageInfo
@@ -234,14 +301,50 @@ namespace GameMod
                 });
             }
 
+            // D3 drives the kick along the collision normal rather than along the beam, which is
+            // most of why its knockback reads as physical: a centre hit throws you straight back,
+            // a graze shoves you aside. For a sphere sweep that normal runs from where the slug's
+            // centre sat at contact to the ship's centre, so it falls out of the miss distance.
+            private static Vector3 KnockbackDirection(Player victim, MassdriverProjectilePacket shot)
+            {
+                Vector3 beamDirection = (shot.end - shot.start).normalized;
+                Vector3 toVictim = victim.c_player_ship.transform.position - shot.start;
+                Vector3 closest = shot.start + beamDirection * Vector3.Dot(toVictim, beamDirection);
+                Vector3 offset = victim.c_player_ship.transform.position - closest;
+
+                float reach = MD_HIT_RADIUS + OVERLOAD_SHIP_RADIUS;
+                float miss = offset.magnitude;
+                if (miss < 0.001f || miss >= reach)
+                    return beamDirection;
+
+                // where the slug's centre was when the two spheres touched
+                Vector3 contact = closest - beamDirection * Mathf.Sqrt(reach * reach - miss * miss);
+                return (victim.c_player_ship.transform.position - contact).normalized;
+            }
+
+            // The server owns every ship's physics and hands each client its own velocity back in
+            // PlayerStateToClientMessage, so a kick applied here reaches the player it happened to
+            // through their next rewind-and-replay and everyone else through the snapshot stream.
+            // Nothing extra has to be sent. Only the linear half of D3's impulse is ported: the
+            // engine clamps angular velocity to the ship's turn speed limit every tick while the
+            // player is flying (PlayerShip.cs:3886), so a spin would be erased before it was seen.
+            private static void ApplyVelocity(Player player, Vector3 delta)
+            {
+                Rigidbody body = player.c_player_ship == null ? null : player.c_player_ship.c_rigidbody;
+                if (body == null || body.isKinematic)
+                    return;
+
+                body.velocity += delta;
+            }
+
             // The beam is traced on the shooter's machine, so the server re-checks everything it can
             // see for itself: the victim fit to fight, the beam no longer than the weapon reaches,
             // fired from the shooter's own ship, passing close to the victim, and not stopped by the
             // level on the way. Player-to-player blocking stays the shooter's call - only the client
             // knows where everyone stood when the trigger came up.
-            private static bool CanShotKill(Player shooter, Player victim, MassdriverProjectilePacket shot)
+            private static bool CanShotHit(Player shooter, Player victim, MassdriverProjectilePacket shot)
             {
-                if (victim == shooter || !IsAlive(victim) || victim.m_invulnerable)
+                if (victim == shooter || !IsAlive(victim))
                     return false;
 
                 Vector3 beam = shot.end - shot.start;
@@ -295,13 +398,13 @@ namespace GameMod
             }
         }
 
-        // cooldown stamps are per match
         [HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
         class MatchModeInstareap_NetworkMatch_InitBeforeEachMatch
         {
             static void Postfix()
             {
                 lastShotTimeByConnection.Clear();
+                fire_shake_magnitude = 0f;
             }
         }
 
@@ -315,7 +418,9 @@ namespace GameMod
             }
         }
 
-        // Block Firing inputs to avoid setting off a bunch of the original logic and handle firing the massdriver yourself instead
+        // The massdriver is not a WeaponType, so the engine's fire path would charge energy,
+        // spawn a projectile and drive the weapon HUD for a weapon that does not exist. The
+        // prefix takes the input instead of filtering its effects afterwards.
         [HarmonyPatch(typeof(Controls), "UpdateKey")]
         class MatchModeInstareap_Controls_UpdateKey
         {
@@ -330,7 +435,8 @@ namespace GameMod
                     {
                         if(IsFiringInputPressed(KeyPressed(cc_type), Controls.JoyButtonPressed(cc_type)) )
                         {
-                            // Initial stage: we start the shooting process by pressing the firing button but we dont actually shoot till we release the trigger again
+                            // Fire on release, as D3 does for every SFF_ZOOM battery: the press
+                            // only opens the charge, and holding is what zooms.
                             if(!active_shot)
                             {
                                 active_shot = true;
@@ -356,11 +462,10 @@ namespace GameMod
                 if (cc_type == CCInput.FIRE_MISSILE & (KeyPressed(cc_type) | Controls.JoyButtonPressed(cc_type)) & GameplayManager.m_gameplay_state == GameplayState.PLAYING)
                     return false;
 
-                return true; // Dont block other inputs
+                return true;
             }
 
 
-            // a shot can only be charged while the local ship is alive in a running match
             public static bool CanChargeShot()
             {
                 PlayerShip ship = GameManager.m_local_player == null ? null : GameManager.m_local_player.c_player_ship;
@@ -452,7 +557,6 @@ namespace GameMod
 
         }
 
-        // Prepare the client-side massdriver assets when a ship enters an instareap match
         [HarmonyPatch(typeof(PlayerShip), "Awake")]
         class MatchModeInstareap_PlayerShip_Awake
         {
@@ -538,12 +642,34 @@ namespace GameMod
             if (MassdriverProjectile.mesh_beam != null)
                 return;
 
-            // create beam mesh
-            MassdriverProjectile.mesh_beam = MassdriverProjectile.GenerateBeamMesh();
-            // create halo mesh
-            MassdriverProjectile.mesh_halo = MassdriverProjectile.GenerateHaloMesh();
-            // create torus mesh
-            MassdriverProjectile.mesh_torus = MassdriverProjectile.GenerateTorusMesh();
+            MassdriverProjectile.mesh_beam = PrepareBeamMesh(MassdriverProjectile.GenerateBeamMesh());
+            MassdriverProjectile.mesh_halo = PrepareBeamMesh(MassdriverProjectile.GenerateHaloMesh());
+            MassdriverProjectile.mesh_torus = PrepareBeamMesh(MassdriverProjectile.GenerateTorusMesh());
+        }
+
+        // Descent 3 draws the beam with no back-face rejection, so looking down it you get the
+        // far wall of each tube over the near one and the additive core clips to white. Unity
+        // culls back faces, so the winding is mirrored into the mesh instead. The white vertex
+        // colours are for the unlit shader, which tints by them.
+        private static Mesh PrepareBeamMesh(Mesh mesh)
+        {
+            int[] front = mesh.triangles;
+            int[] both = new int[front.Length * 2];
+            Array.Copy(front, both, front.Length);
+            for (int i = 0; i < front.Length; i += 3)
+            {
+                both[front.Length + i] = front[i];
+                both[front.Length + i + 1] = front[i + 2];
+                both[front.Length + i + 2] = front[i + 1];
+            }
+            mesh.triangles = both;
+
+            Color[] colors = new Color[mesh.vertexCount];
+            for (int i = 0; i < colors.Length; i++)
+                colors[i] = Color.white;
+            mesh.colors = colors;
+
+            return mesh;
         }
 
    
@@ -597,9 +723,9 @@ namespace GameMod
 
                 if (mat_beam == null | mat_halo == null | mat_torus == null)
                 {
-                    this.mat_beam = GenerateBeamMaterial();
-                    this.mat_halo = GenerateHaloMaterial();
-                    this.mat_torus = GenerateTorusMaterial();
+                    this.mat_beam = GenerateBeamMaterial(3001);
+                    this.mat_halo = GenerateBeamMaterial(3001);
+                    this.mat_torus = GenerateBeamMaterial(3000);
                 }
 
                 ApplyFade(0f);
@@ -609,7 +735,7 @@ namespace GameMod
 
                 ExplosionManager.CreateSimpleExplosion(end_position);
                 PlayClipAtPoint(md_fire_audio, start_position, 1f, shot_by_non_local_player);
-                if(!shot_by_non_local_player) GameManager.m_local_player.PlayCameraShake(CameraShakeType.FIRE_DEVASTATOR, 1.5f, 1.3f);
+                if (!shot_by_non_local_player) fire_shake_magnitude = Mathf.Min(fire_shake_magnitude + MD_SHAKE_MAGNITUDE, 120f);
                 Draw();
             }
 
@@ -631,16 +757,31 @@ namespace GameMod
 
             private void CalculateAndSetEndPosition()
             {
-                // Do a raycast in the scene to figure out at what position this shot should end
+                // Descent 3 runs two traces and so does this. The beam you see is a zero-radius
+                // line (WeaponFire.cpp:1972) and draws to wherever the shot was actually pointed;
+                // the slug that does the damage is swept as a sphere (physics.cpp:983), so a
+                // graze still counts and the beam still passes behind the ship it grazed.
                 const int layerMask = (1 << (int)UnityObjectLayers.LEVEL) | (1 << (int)UnityObjectLayers.DOOR) | (1 << (int)UnityObjectLayers.LAVA) | (1 << (int)UnityObjectLayers.PLAYER_MESH);
                 RaycastHit hitInfo;
                 bool hitSomething = Physics.Raycast(start_position, forward, out hitInfo, MD_RANGE, layerMask, QueryTriggerInteraction.Ignore);
                 end_position = hitSomething ? hitInfo.point : start_position + forward * MD_RANGE;
 
-                // hitInfo is only filled in on a hit - reading its collider after a miss throws
-                PlayerMeshCollider pmc = hitSomething ? hitInfo.collider.GetComponentInParent<PlayerMeshCollider>() : null;
+                // whatever stopped the line also stops the sphere, so the sweep never reaches
+                // through a wall for a ship standing behind it
+                RaycastHit sweepInfo;
+                bool sweptSomeone = Physics.SphereCast(start_position, MD_HIT_RADIUS, forward, out sweepInfo,
+                    hitSomething ? hitInfo.distance : MD_RANGE,
+                    1 << (int)UnityObjectLayers.PLAYER_MESH, QueryTriggerInteraction.Ignore);
 
-                // the server decides whether this counts as a kill; it only needs to know who was claimed
+                // sweepInfo is only filled in on a hit - reading its collider after a miss throws
+                PlayerMeshCollider pmc = sweptSomeone ? sweepInfo.collider.GetComponentInParent<PlayerMeshCollider>() : null;
+
+                // a sphere cast reports nothing for a collider it already overlaps where it
+                // starts, so point blank falls back to the line, which has no such blind spot
+                if (pmc == null && hitSomething)
+                    pmc = hitInfo.collider.GetComponentInParent<PlayerMeshCollider>();
+
+                // the server rules on the hit itself; it only needs to know who was claimed
                 MassdriverProjectilePacket mpp = new MassdriverProjectilePacket
                 {
                     victimNetId = pmc != null && pmc.c_player != null ? pmc.c_player.netId.Value : 0u,
@@ -667,9 +808,18 @@ namespace GameMod
             {
                 float alpha = BEAM_PEAK_ALPHA * Mathf.Clamp01(1f - elapsed / BEAM_LIFETIME);
 
-                mat_beam.SetColor("_Color", new Color(BEAM_CORE_COLOR.r, BEAM_CORE_COLOR.g, BEAM_CORE_COLOR.b, alpha));
-                mat_halo.SetColor("_Color", new Color(BEAM_GLOW_COLOR.r, BEAM_GLOW_COLOR.g, BEAM_GLOW_COLOR.b, alpha));
-                mat_torus.SetColor("_Color", new Color(BEAM_GLOW_COLOR.r, BEAM_GLOW_COLOR.g, BEAM_GLOW_COLOR.b, alpha));
+                SetBeamColor(mat_beam, BEAM_CORE_COLOR, alpha);
+                SetBeamColor(mat_halo, BEAM_GLOW_COLOR, alpha);
+                SetBeamColor(mat_torus, BEAM_GLOW_COLOR, alpha);
+            }
+
+            // The colour is premultiplied because the blend is additive: nothing reads the alpha
+            // channel, so fading the beam means fading the colour itself. Both properties are
+            // written, since which one carries the beam depends on which shader resolved.
+            private static void SetBeamColor(Material material, Color color, float alpha)
+            {
+                material.SetColor("_Color", new Color(color.r * alpha, color.g * alpha, color.b * alpha, alpha));
+                material.SetColor("_EmissionColor", new Color(color.r * alpha, color.g * alpha, color.b * alpha, 1f));
             }
 
 
@@ -704,47 +854,34 @@ namespace GameMod
                 }
             }
 
-            private Material GenerateTorusMaterial()
-            {
-                Material material = new Material(Shader.Find("Standard"));//"Transparent/Diffuse"));
-                material.color = new Color(BEAM_GLOW_COLOR.r, BEAM_GLOW_COLOR.g, BEAM_GLOW_COLOR.b, BEAM_PEAK_ALPHA);
-                material.SetFloat("_Mode", 3);
-                material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
-                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
-                material.SetInt("_ZWrite", 0);
-                material.DisableKeyword("_ALPHATEST_ON");
-                material.DisableKeyword("_ALPHABLEND_ON");
-                material.EnableKeyword("_ALPHAPREMULTIPLY_ON");
-                material.renderQueue = 3000;
+            // Descent 3 draws every part of the beam unlit - LS_FLAT_GOURAUD on the tubes,
+            // LS_NONE on the rings - so the colour in its source is the colour on screen.
+            // Unity's Standard shader is lit and an Overload corridor swallows it, which is
+            // why the port read dim. Hidden/Internal-Colored is the one unlit shader every
+            // Unity build carries: the engine draws with it itself, so asset stripping cannot
+            // remove it. If it ever cannot be resolved, Standard still gets the colour through
+            // _EmissionColor, which its forward pass adds after the BRDF.
+            private static Shader beam_shader;
 
-                return material;
-            }
-            private Material GenerateBeamMaterial()
+            private static Material GenerateBeamMaterial(int render_queue)
             {
-                Material material = new Material(Shader.Find("Standard"));
-                material.color = new Color(BEAM_CORE_COLOR.r, BEAM_CORE_COLOR.g, BEAM_CORE_COLOR.b, BEAM_PEAK_ALPHA);
+                if (beam_shader == null)
+                    beam_shader = Shader.Find("Hidden/Internal-Colored") ?? Shader.Find("Standard");
+
+                Material material = new Material(beam_shader);
                 material.SetFloat("_Mode", 3);
                 material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
                 material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
                 material.SetInt("_ZWrite", 0);
+                // the meshes already carry both faces; Internal-Colored would otherwise draw
+                // them a second time and double the brightness
+                material.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Back);
                 material.DisableKeyword("_ALPHATEST_ON");
                 material.DisableKeyword("_ALPHABLEND_ON");
                 material.EnableKeyword("_ALPHAPREMULTIPLY_ON");
-                material.renderQueue = 3001;
-                return material;
-            }
-            private Material GenerateHaloMaterial()
-            {
-                Material material = new Material(Shader.Find("Standard"));
-                material.color = new Color(BEAM_GLOW_COLOR.r, BEAM_GLOW_COLOR.g, BEAM_GLOW_COLOR.b, BEAM_PEAK_ALPHA);
-                material.SetFloat("_Mode", 3);
-                material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.One);
-                material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One);
-                material.SetInt("_ZWrite", 0);
-                material.DisableKeyword("_ALPHATEST_ON");
-                material.DisableKeyword("_ALPHABLEND_ON");
-                material.EnableKeyword("_ALPHAPREMULTIPLY_ON");
-                material.renderQueue = 3001;
+                material.EnableKeyword("_EMISSION");
+                material.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
+                material.renderQueue = render_queue;
                 return material;
             }
 
@@ -1484,7 +1621,7 @@ namespace GameMod
 
         // decodes a 16 bit pcm riff/wave file; returns null and logs if the bytes are not one.
         // WWW would also read ogg, but it only reports completion per frame and the one caller
-        // runs outside the frame loop, which left the old code spinning the main thread.
+        // runs outside the frame loop, where waiting on it spins the main thread.
         private static AudioClip DecodeWav(byte[] wav, string name)
         {
             if (wav.Length < 12 || Encoding.ASCII.GetString(wav, 0, 4) != "RIFF" || Encoding.ASCII.GetString(wav, 8, 4) != "WAVE")
@@ -1540,7 +1677,8 @@ namespace GameMod
             return null;
         }
 
-        // Enable screenshake
+        // Instareap overrides the player's screenshake setting for the duration of Update,
+        // because the massdriver's own shake is the mode's main feedback for firing.
         [HarmonyPatch(typeof(PlayerShip), "Update")]
         class MatchModeInstareap_PlayerShip_Update
         {
@@ -1555,12 +1693,41 @@ namespace GameMod
                 MenuManager.opt_hud_shake = 2;
             }
 
-            static void Postfix()
+            static void Postfix(PlayerShip __instance)
             {
                 if (!IsActive)
                     return;
 
                 MenuManager.opt_hud_shake = option_screenshake;
+
+                if (__instance.isLocalPlayer)
+                    ShakeCamera(__instance);
+            }
+
+            // Descent 3's firing shake is the player object's own orientation, jittered fresh
+            // every rendered frame on pitch, yaw and roll alike and restored before the next one
+            // (damage.cpp:1436). Overload reaches the same place through c_cam_controller, which
+            // PlayerShip.Update has just finished writing, and its camera_shake is in degrees
+            // about the same three ship axes, so nothing has to fight the engine for the camera.
+            private static void ShakeCamera(PlayerShip ship)
+            {
+                if (fire_shake_magnitude <= 0f || ship.c_cam_controller == null)
+                    return;
+
+                Quaternion rotation = ship.c_transform_rotation;
+                ship.c_cam_controller.rotation =
+                    Quaternion.AngleAxis(ShakeAngle(), rotation * Vector3.up) *
+                    Quaternion.AngleAxis(ShakeAngle(), rotation * Vector3.right) *
+                    Quaternion.AngleAxis(ShakeAngle(), rotation * Vector3.forward) *
+                    ship.c_cam_controller.rotation;
+
+                fire_shake_magnitude = Mathf.Max(0f, fire_shake_magnitude - Time.deltaTime * MD_SHAKE_DECAY);
+            }
+
+            // (rand() % 5 - 2) * magnitude, in D3 angle units
+            private static float ShakeAngle()
+            {
+                return (UnityEngine.Random.Range(0, 5) - 2) * fire_shake_magnitude * D3_ANGLE_TO_DEGREES;
             }
         }
 
@@ -1581,7 +1748,6 @@ namespace GameMod
             }
         }
 
-        // Label the equipped weapon as a massdriver
         [HarmonyPatch(typeof(Player), "UpdateCurrentWeaponName")]
         class MatchModeInstareap_PlayerShip_UpdateCurrentWeaponName
         {
@@ -1635,12 +1801,11 @@ namespace GameMod
                 }
             }
 
-            // one radial segment of the fan, from radius to radius along the angle
-            static void DrawStroke(Vector2 center, float angle, float from, float to, Color color, float alpha)
+            static void DrawStroke(Vector2 center, float angle, float inner_radius, float outer_radius, Color color, float alpha)
             {
                 Vector2 outward = new Vector2(Mathf.Sin(angle), 0f - Mathf.Cos(angle));
-                Vector2 middle = center + outward * ((from + to) * 0.5f);
-                UIManager.DrawQuadUIRotated(middle, (to - from) * 0.5f, 2f, angle + Mathf.PI * 0.5f,
+                Vector2 middle = center + outward * ((inner_radius + outer_radius) * 0.5f);
+                UIManager.DrawQuadUIRotated(middle, (outer_radius - inner_radius) * 0.5f, 2f, angle + Mathf.PI * 0.5f,
                     color, alpha, 11);
             }
         }
