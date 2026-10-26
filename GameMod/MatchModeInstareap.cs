@@ -69,17 +69,27 @@ namespace GameMod
         // either game. PF_POINT_COLLIDE_WALLS then drops the radius to zero against level
         // geometry alone (findintersection.cpp:2694): forgiving against ships, still unable to
         // clip a corner you shot past.
-        private const float MD_HIT_RADIUS = 2.2503459f * (OVERLOAD_SHIP_RADIUS / D3_SHIP_COLLISION_RADIUS);
+        // 0.3: the converted figure let grazes land that nobody reads as a hit, playtested 2026-10-26
+        private const float MD_HIT_RADIUS = 0.3f * 2.2503459f * (OVERLOAD_SHIP_RADIUS / D3_SHIP_COLLISION_RADIUS);
+
+        // One hit kills here, so the lobby's three seconds are long enough to spend attacking:
+        // players were being shot twice, or killed twice, before their own shield ran out.
+        private const float SPAWN_INVULN_TIME = 1f;
 
         private const float BEAM_LIFETIME = 1.5f;
-        private const float BEAM_PEAK_ALPHA = 0.5f;
-        private const float BEAM_CORE_RADIUS = 0.0625f * D3_UNIT;
-        private const float BEAM_GLOW_RADIUS = 0.25f * D3_UNIT;
+        private const float BEAM_PEAK_ALPHA = 0.45f;
+        // The converted D3 widths overpower an Overload corridor, which is lit darker and
+        // framed tighter than the ones they were drawn for. Scales the beam's cross-section
+        // only: ring SPACING is a length along a beam whose length the shot fixes, so shrinking
+        // it would pack in more rings and make the thing read brighter, not smaller.
+        private const float BEAM_VISUAL_SCALE = 0.7f;
+        private const float BEAM_CORE_RADIUS = 0.0625f * D3_UNIT * BEAM_VISUAL_SCALE;
+        private const float BEAM_GLOW_RADIUS = 0.25f * D3_UNIT * BEAM_VISUAL_SCALE;
         private const float RING_SPACING = 3f * D3_UNIT;
         // g3_DrawPlanarRotatedBitmap takes half-extents, so D3's 1.0 +- 0.3 is a radius. The
         // rings are four times wider than the glow tube and are what reads as "the beam".
-        private const float RING_RADIUS = 1f * D3_UNIT;
-        private const float RING_RADIUS_PULSE = 0.3f * D3_UNIT;
+        private const float RING_RADIUS = 1f * D3_UNIT * BEAM_VISUAL_SCALE;
+        private const float RING_RADIUS_PULSE = 0.3f * D3_UNIT * BEAM_VISUAL_SCALE;
         private const float RING_SPIN_TURNS_PER_SECOND = 4f;
         private const float RING_PHASE_STEP_TURNS = 9000f / 65536f;
         private const float TUBE_MESH_RADIUS = 0.2f;
@@ -267,12 +277,17 @@ namespace GameMod
                         networkConnection.SendByChannel(MessageTypes.MsgMassdriverProjectilePacket, shot, 0);
                 }
 
-                // Step 5: the shot shoves the shooter back, hit or miss. The beam's own line is
+                // Step 5: firing gives up what is left of the spawn shield, the way the engine's
+                // own fire path does (PlayerShip.cs:6083). Server-side only, as there: the
+                // clients' invuln bars are local countdowns and nothing resets them early.
+                shooter.StopSpawnInvul();
+
+                // Step 6: the shot shoves the shooter back, hit or miss. The beam's own line is
                 // what pushes, not the packet's forward vector - the two agree for an honest
                 // client, and this is the one the checks above already bounded.
                 ApplyVelocity(shooter, -(shot.end - shot.start).normalized * MD_RECOIL_SPEED);
 
-                // Step 6: a claimed hit only lands if the server can confirm it for itself
+                // Step 7: a claimed hit only lands if the server can confirm it for itself
                 if (shot.victimNetId == 0)
                     return;
 
@@ -405,6 +420,23 @@ namespace GameMod
             {
                 lastShotTimeByConnection.Clear();
                 fire_shake_magnitude = 0f;
+            }
+        }
+
+        // The lobby's respawn shield setting is handed to StartInvul here and nowhere else, and
+        // StartInvul's own Rpc carries the duration to the clients, so replacing the argument
+        // is the whole change - the HUD bar and the shield bubble both follow.
+        [HarmonyPatch(typeof(NetworkSpawnPlayer), "StartSpawnInvul")]
+        class MatchModeInstareap_NetworkSpawnPlayer_StartSpawnInvul
+        {
+            static bool Prefix(Player player)
+            {
+                if (!IsActiveServer)
+                    return true;
+
+                player.m_spawn_invul_active = true;
+                player.StartInvul(SPAWN_INVULN_TIME, true);
+                return false;
             }
         }
 
