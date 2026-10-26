@@ -52,6 +52,9 @@ namespace GameMod.VersionHandling
         // every published release newer than the running one, newest first
         public static List<Release> NewReleases { get; private set; }
 
+        // everything the index published, newest first: what an explicit install can name
+        public static List<Release> PublishedReleases { get; private set; }
+
         public static Release Latest
         {
             get { return NewReleases == null || NewReleases.Count == 0 ? null : NewReleases[0]; }
@@ -70,6 +73,11 @@ namespace GameMod.VersionHandling
         private static bool checkStarted;
         private static bool checkRunning;
         private static bool cancelRequested;
+        private static bool installRunning;
+
+        // pyro_install reports on the console instead of through the menu item, which tracks
+        // what is published -- something installing an older build by hand does not change
+        private static bool installFromConsole;
 
         public class Release
         {
@@ -125,20 +133,54 @@ namespace GameMod.VersionHandling
 
         public static void StartInstall()
         {
-            if (State == SelfUpdateState.Downloading)
-            {
-                Debug.LogFormat("PYROUPDATE: install refused, one is already running");
-                return;
-            }
             if (Latest == null)
             {
                 Fail("no release has been found to install");
                 return;
             }
+            BeginInstall(Latest, false);
+        }
+
+        // Installs one named release, which need not be newer than the running one: pyro_install
+        // can walk back to an older build. Everything past this point is version-agnostic -- the
+        // swap only moves files -- and the release still comes from the signed index.
+        public static void InstallFromConsole(Release release)
+        {
+            BeginInstall(release, true);
+        }
+
+        // The coroutine is started last: its first steps run before the frame yields, so anything
+        // announced after it would overwrite the failure they report.
+        private static void BeginInstall(Release release, bool fromConsole)
+        {
+            if (installRunning)
+            {
+                Debug.LogFormat("PYROUPDATE: install refused, one is already running");
+                if (fromConsole)
+                    uConsole.Log("An install is already running");
+                return;
+            }
+            installRunning = true;
+            installFromConsole = fromConsole;
             cancelRequested = false;
-            State = SelfUpdateState.Downloading;
-            StatusDetail = "STARTING";
-            GameManager.m_gm.StartCoroutine(Install(Latest));
+            if (fromConsole)
+            {
+                uConsole.Log("Installing Pyro " + release.name + ", the game restarts when it is in");
+            }
+            else
+            {
+                State = SelfUpdateState.Downloading;
+                StatusDetail = "STARTING";
+            }
+            GameManager.m_gm.StartCoroutine(Install(release));
+        }
+
+        // the published release going by this exact version, or null
+        public static Release Published(string version)
+        {
+            if (PublishedReleases == null)
+                return null;
+            return PublishedReleases.Find(release => release.name == version);
         }
 
         // flags the running download; Install notices, cleans up and returns to Available
@@ -163,15 +205,17 @@ namespace GameMod.VersionHandling
                 if (index == null)
                     yield break; // an unreachable site stays Unknown; a bad signature already read as Failed
 
-                var newer = new List<Release>();
+                var published = new List<Release>();
                 foreach (JToken entry in index["releases"] ?? new JArray())
                 {
                     Release release = ReadRelease(entry);
-                    if (release != null && release.version > OlmodVersion.RunningVersion)
-                        newer.Add(release);
+                    if (release != null)
+                        published.Add(release);
                 }
-                newer.Sort((a, b) => b.version.CompareTo(a.version));
+                published.Sort((a, b) => b.version.CompareTo(a.version));
+                List<Release> newer = published.FindAll(r => r.version > OlmodVersion.RunningVersion);
 
+                PublishedReleases = published;
                 NewReleases = newer;
                 State = newer.Count > 0 ? SelfUpdateState.Available : SelfUpdateState.UpToDate;
                 StatusDetail = "";
@@ -246,8 +290,7 @@ namespace GameMod.VersionHandling
             {
                 cancelRequested = false;
                 TryDeleteDirectory(StagingDir);
-                State = SelfUpdateState.Available;
-                StatusDetail = "";
+                Settle(SelfUpdateState.Available, "");
                 Debug.LogFormat("PYROUPDATE: install of {0} cancelled", release.name);
                 yield break;
             }
@@ -259,7 +302,7 @@ namespace GameMod.VersionHandling
             }
 
             // Step 3: unpack beside the install, so a broken archive is found before a swap
-            StatusDetail = "UNPACKING";
+            Progress("UNPACKING");
             yield return null;
             string unpacked = Path.Combine(StagingDir, "files");
             List<string> files = Unpack(archive, unpacked);
@@ -271,7 +314,7 @@ namespace GameMod.VersionHandling
             }
 
             // Step 4: swap, and only now, with the whole release verified and on disk
-            StatusDetail = "INSTALLING";
+            Progress("INSTALLING");
             yield return null;
             if (!SwapInStagedFiles(unpacked, files))
             {
@@ -284,8 +327,7 @@ namespace GameMod.VersionHandling
 
             // Step 5: hand over to the new build. State is set first so that a relaunch which
             // does not come up leaves the player reading RESTART TO FINISH rather than a stall.
-            State = SelfUpdateState.Installed;
-            StatusDetail = "PYRO " + release.name + " INSTALLED";
+            Settle(SelfUpdateState.Installed, "PYRO " + release.name + " INSTALLED");
             Relaunch();
         }
 
@@ -327,8 +369,8 @@ namespace GameMod.VersionHandling
                         break;
                     }
 
-                    StatusDetail = "DOWNLOADING PYRO " + release.name + "   " +
-                        Mathf.RoundToInt(www.downloadProgress * 100f) + "%";
+                    Progress("DOWNLOADING PYRO " + release.name + "   " +
+                        Mathf.RoundToInt(www.downloadProgress * 100f) + "%");
                     yield return null;
                 }
                 if (failure == null && (www.isNetworkError || www.isHttpError))
@@ -861,9 +903,32 @@ namespace GameMod.VersionHandling
 
         private static void Fail(string reason)
         {
-            State = SelfUpdateState.Failed;
-            StatusDetail = reason;
             Debug.LogFormat("PYROUPDATE: {0}", reason);
+            Settle(SelfUpdateState.Failed, reason);
+        }
+
+        // How an install ends. Every exit from Install passes through here, which is what lets a
+        // console-driven one report there and leave the menu item reading what is published.
+        private static void Settle(SelfUpdateState state, string detail)
+        {
+            installRunning = false;
+            if (installFromConsole)
+            {
+                installFromConsole = false;
+                if (detail.Length > 0)
+                    uConsole.Log(detail);
+                return;
+            }
+            State = state;
+            StatusDetail = detail;
+        }
+
+        // what the popup reports while an install runs; a console-driven one stays quiet until
+        // it is done, since its progress would scroll the log away a frame at a time
+        private static void Progress(string detail)
+        {
+            if (!installFromConsole)
+                StatusDetail = detail;
         }
     }
 
@@ -882,9 +947,31 @@ namespace GameMod.VersionHandling
     {
         static void Postfix()
         {
+            uConsole.RegisterCommand("pyro_install",
+                "Install one published Pyro release, newer or older -- \"pyro_install 0.2.0\"",
+                new uConsole.DebugCommand(CmdPyroInstall));
             uConsole.RegisterCommand("pyro_update",
                 "Pyro self update -- \"pyro_update [check|install|url <index url>]\"",
                 new uConsole.DebugCommand(CmdPyroUpdate));
+        }
+
+        // pyro_install <version>: what it found and how it ended are said here, not on the
+        // main menu's update item, because the player is looking at the console.
+        private static void CmdPyroInstall()
+        {
+            if (uConsole.GetNumParameters() < 1)
+            {
+                uConsole.Log("Usage: pyro_install <version>, e.g. pyro_install 0.2.0");
+                return;
+            }
+            string version = uConsole.GetString();
+            SelfUpdate.Release release = SelfUpdate.Published(version);
+            if (release == null)
+            {
+                uConsole.Log("No release " + version + " is published; run \"pyro_update check\" first");
+                return;
+            }
+            SelfUpdate.InstallFromConsole(release);
         }
 
         private static void CmdPyroUpdate()
