@@ -24,6 +24,19 @@ namespace GameMod.VersionHandling
         private const int VISIBLE_LINES = 12;
         private const float BOX_HALF_WIDTH = 470f;
         private const float BOX_HALF_HEIGHT = 250f;
+        private const float EDGE_HALF = 1.5f;
+
+        // DrawQuadUI stretches a whole atlas sprite across the quad, so a sprite's transparent
+        // antialiasing margin becomes a fraction of the bar rather than a fixed hairline: all
+        // three BOX_SOLID sprites fade over the outer ~2.5-3% of their 163x163, which on a bar
+        // 940 units wide is 23-29 units of nothing at each end -- that is what left the frame
+        // open at the corners, and picking the crispest of them only shortened it.
+        // 199 is AtlasIndex0.NONE, the sentinel RWInput returns for "this control has no icon"
+        // and the engine therefore never draws. It is 20x20 of pure opaque white with another
+        // opaque pixel of atlas around it, so it has no margin at any size and nothing for a
+        // bilinear tap at the quad's edge to blend towards. A flat fill is all this popup
+        // wants from the atlas.
+        private const int SOLID = 199;           // AtlasIndex0.NONE
 
         private static List<string> changelog;
         private static int firstLine;
@@ -33,12 +46,35 @@ namespace GameMod.VersionHandling
 
         public static bool PopupOpen { get; private set; }
 
+        // A preview opens the popup with nothing actually pending: it lists everything
+        // published rather than only what is newer, and its action button is inert. Without
+        // it this screen can only be seen by publishing a release, since running the newest
+        // one is exactly the case where the main menu offers no UPDATE item.
+        public static bool Preview { get; private set; }
+
+        // what the popup is reporting on
+        private static List<SelfUpdate.Release> Releases
+        {
+            get { return Preview ? SelfUpdate.PublishedReleases : SelfUpdate.NewReleases; }
+        }
+
+        private static SelfUpdate.Release Newest
+        {
+            get
+            {
+                List<SelfUpdate.Release> releases = Releases;
+                return releases == null || releases.Count == 0 ? null : releases[0];
+            }
+        }
+
         // the right-hand popup button: install, or retry whatever failed; null when there is
         // nothing to act on (a running download offers CANCEL through the BACK slot instead)
         private static string ActionLabel
         {
             get
             {
+                if (Preview)
+                    return "UPDATE";
                 switch (SelfUpdate.State)
                 {
                     case SelfUpdateState.Available: return "UPDATE";
@@ -48,9 +84,10 @@ namespace GameMod.VersionHandling
             }
         }
 
-        public static void OpenPopup()
+        public static void OpenPopup(bool preview = false)
         {
             PopupOpen = true;
+            Preview = preview;
             popupDrawn = false;
             firstLine = 0;
             selection = SEL_BACK;
@@ -61,6 +98,7 @@ namespace GameMod.VersionHandling
         public static void ClosePopup()
         {
             PopupOpen = false;
+            Preview = false;
             MenuManager.PlaySelectSound();
         }
 
@@ -129,11 +167,11 @@ namespace GameMod.VersionHandling
             // top of it. A black fill never reaches opaque over this material, which is why
             // the border is four bars rather than the engine's recipe of a smaller fill on
             // top of a coloured one (DrawBackdrop).
-            UIManager.DrawQuadUI(Vector2.zero, UIManager.UI_RIGHT, UIManager.UI_BOTTOM, Color.black, 0.8f * ui.m_alpha, 12);
-            UIManager.DrawQuadUI(Vector2.zero, BOX_HALF_WIDTH, BOX_HALF_HEIGHT, Color.black, ui.m_alpha, 12);
+            UIManager.DrawQuadUI(Vector2.zero, UIManager.UI_RIGHT, UIManager.UI_BOTTOM, Color.black, 0.8f * ui.m_alpha, SOLID);
+            UIManager.DrawQuadUI(Vector2.zero, BOX_HALF_WIDTH, BOX_HALF_HEIGHT, Color.black, ui.m_alpha, SOLID);
             DrawFrame(ui);
 
-            SelfUpdate.Release latest = SelfUpdate.Latest;
+            SelfUpdate.Release latest = Newest;
             string title = latest == null
                 ? "PYRO UPDATE"
                 : "DO YOU WANT TO UPDATE TO PYRO " + latest.name + "?";
@@ -153,12 +191,13 @@ namespace GameMod.VersionHandling
         {
             Color edge = UIManager.m_col_ui3;
             float a = 0.9f * ui.m_alpha;
-            // 11 is the flat fill the engine's own DrawBackdrop bars use; 12 fades towards its
-            // edges, which on a bar this long leaves the rectangle open at the corners
-            UIManager.DrawQuadUI(new Vector2(0f, -BOX_HALF_HEIGHT), BOX_HALF_WIDTH, 1.5f, edge, a, 11);
-            UIManager.DrawQuadUI(new Vector2(0f, BOX_HALF_HEIGHT), BOX_HALF_WIDTH, 1.5f, edge, a, 11);
-            UIManager.DrawQuadUI(new Vector2(-BOX_HALF_WIDTH, 0f), 1.5f, BOX_HALF_HEIGHT, edge, a, 11);
-            UIManager.DrawQuadUI(new Vector2(BOX_HALF_WIDTH, 0f), 1.5f, BOX_HALF_HEIGHT, edge, a, 11);
+            // The horizontal bars run the full outer width and the vertical ones butt into
+            // them, rather than all four crossing: the bars are translucent, so an overlap
+            // would leave each corner brighter than the sides it joins.
+            UIManager.DrawQuadUI(new Vector2(0f, -BOX_HALF_HEIGHT), BOX_HALF_WIDTH + EDGE_HALF, EDGE_HALF, edge, a, SOLID);
+            UIManager.DrawQuadUI(new Vector2(0f, BOX_HALF_HEIGHT), BOX_HALF_WIDTH + EDGE_HALF, EDGE_HALF, edge, a, SOLID);
+            UIManager.DrawQuadUI(new Vector2(-BOX_HALF_WIDTH, 0f), EDGE_HALF, BOX_HALF_HEIGHT - EDGE_HALF, edge, a, SOLID);
+            UIManager.DrawQuadUI(new Vector2(BOX_HALF_WIDTH, 0f), EDGE_HALF, BOX_HALF_HEIGHT - EDGE_HALF, edge, a, SOLID);
         }
 
         private static void DrawChangelog(UIElement ui)
@@ -219,7 +258,9 @@ namespace GameMod.VersionHandling
                 return;
             if (UIManager.m_menu_selection == SEL_INSTALL && ActionLabel != null)
             {
-                if (SelfUpdate.Latest != null)
+                if (Preview)
+                    MenuManager.PlaySelectSound(); // a preview installs nothing
+                else if (SelfUpdate.Latest != null)
                     SelfUpdate.StartInstall();
                 else
                     SelfUpdate.StartCheck(); // a failed check is retried rather than installed
@@ -262,10 +303,10 @@ namespace GameMod.VersionHandling
         private static List<string> WrapChangelog(float width)
         {
             var lines = new List<string>();
-            if (SelfUpdate.NewReleases == null)
+            if (Releases == null)
                 return lines;
 
-            foreach (SelfUpdate.Release release in SelfUpdate.NewReleases)
+            foreach (SelfUpdate.Release release in Releases)
             {
                 if (lines.Count > 0)
                     lines.Add("");

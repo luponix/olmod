@@ -951,7 +951,7 @@ namespace GameMod.VersionHandling
                 "Install one published Pyro release, newer or older -- \"pyro_install 0.2.0\"",
                 new uConsole.DebugCommand(CmdPyroInstall));
             uConsole.RegisterCommand("pyro_update",
-                "Pyro self update -- \"pyro_update [check|install|url <index url>]\"",
+                "Pyro self update -- \"pyro_update [check|install|preview|url <index url>]\"",
                 new uConsole.DebugCommand(CmdPyroUpdate));
         }
 
@@ -985,6 +985,15 @@ namespace GameMod.VersionHandling
                     break;
                 case "install":
                     SelfUpdate.StartInstall();
+                    break;
+                case "preview":
+                    if (MenuManager.m_menu_state != MenuState.MAIN_MENU)
+                    {
+                        uConsole.Log("The update popup only draws over the main menu");
+                        break;
+                    }
+                    UpdateMenu.OpenPopup(true);
+                    uConsole.Log("Update popup opened over the main menu; it installs nothing");
                     break;
                 case "url":
                     string url = uConsole.GetString();
