@@ -44,6 +44,11 @@ namespace GameMod.VersionHandling
         private static bool popupDrawn;
         private static SelfUpdateState drawnState;
 
+        private static readonly string[] STEP_LABELS =
+            { "DOWNLOADING", "CHECKING THE DOWNLOAD", "UNPACKING", "INSTALLING", "RESTARTING THE GAME" };
+
+        private static float previewInstallStart = -1f;
+
         public static bool PopupOpen { get; private set; }
 
         // A preview opens the popup with nothing actually pending: it lists everything
@@ -58,6 +63,44 @@ namespace GameMod.VersionHandling
             get { return Preview ? SelfUpdate.PublishedReleases : SelfUpdate.NewReleases; }
         }
 
+        private static bool PreviewInstalling
+        {
+            get { return Preview && previewInstallStart >= 0f; }
+        }
+
+        private static bool Installing
+        {
+            get { return PreviewInstalling || (!Preview && SelfUpdate.State == SelfUpdateState.Downloading); }
+        }
+
+        private static bool StepsShown
+        {
+            get { return PreviewInstalling || (!Preview && SelfUpdate.Step != InstallStep.None); }
+        }
+
+        private static InstallStep ShownStep
+        {
+            get
+            {
+                if (!Preview)
+                    return SelfUpdate.Step;
+                float elapsed = Time.unscaledTime - previewInstallStart;
+                if (elapsed < 3f)
+                    return InstallStep.Download;
+                return (InstallStep)Mathf.Min((int)InstallStep.Verify + (int)(elapsed - 3f), (int)InstallStep.Restart);
+            }
+        }
+
+        private static int ShownDownloadPercent
+        {
+            get
+            {
+                if (!Preview)
+                    return SelfUpdate.DownloadPercent;
+                return Mathf.Min(100, Mathf.RoundToInt((Time.unscaledTime - previewInstallStart) / 3f * 100f));
+            }
+        }
+
         private static SelfUpdate.Release Newest
         {
             get
@@ -68,7 +111,7 @@ namespace GameMod.VersionHandling
         }
 
         // the right-hand popup button: install, or retry whatever failed; null when there is
-        // nothing to act on (a running download offers CANCEL through the BACK slot instead)
+        // nothing to act on
         private static string ActionLabel
         {
             get
@@ -92,6 +135,7 @@ namespace GameMod.VersionHandling
             firstLine = 0;
             selection = SEL_BACK;
             changelog = null;
+            previewInstallStart = -1f;
             MenuManager.PlaySelectSound();
         }
 
@@ -171,20 +215,78 @@ namespace GameMod.VersionHandling
             UIManager.DrawQuadUI(Vector2.zero, BOX_HALF_WIDTH, BOX_HALF_HEIGHT, Color.black, ui.m_alpha, SOLID);
             DrawFrame(ui);
 
-            SelfUpdate.Release latest = Newest;
-            string title = latest == null
-                ? "PYRO UPDATE"
-                : "DO YOU WANT TO UPDATE TO PYRO " + latest.name + "?";
-            ui.DrawStringSmall(title, new Vector2(0f, -205f), 0.6f, StringOffset.CENTER, UIManager.m_col_hi5, 1f);
+            ui.DrawStringSmall(Title, new Vector2(0f, -205f), 0.6f, StringOffset.CENTER, UIManager.m_col_hi5, 1f);
 
-            DrawChangelog(ui);
+            if (StepsShown)
+                DrawInstallSteps(ui);
+            else
+                DrawChangelog(ui);
 
-            if (!string.IsNullOrEmpty(SelfUpdate.StatusDetail))
-                ui.DrawStringSmall(SelfUpdate.StatusDetail, new Vector2(0f, 110f), 0.45f, StringOffset.CENTER,
+            bool restartFailed = !Preview && SelfUpdate.State == SelfUpdateState.Installed;
+            string detail = restartFailed ? "RESTART THE GAME TO FINISH" : SelfUpdate.StatusDetail;
+            if (!string.IsNullOrEmpty(detail) && !PreviewInstalling)
+                ui.DrawStringSmall(detail, new Vector2(0f, 110f), 0.45f, StringOffset.CENTER,
                     SelfUpdate.State == SelfUpdateState.Failed ? UIManager.m_col_em4 : UIManager.m_col_ui4, 1f);
 
-            DrawPopupButtons(ui);
+            if (!Installing)
+                DrawPopupButtons(ui);
             popupDrawn = true;
+        }
+
+        private static string Title
+        {
+            get
+            {
+                SelfUpdate.Release latest = Newest;
+                if (latest == null)
+                    return "PYRO UPDATE";
+                if (!StepsShown)
+                    return "DO YOU WANT TO UPDATE TO PYRO " + latest.name + "?";
+                if (Preview)
+                    return "UPDATING TO PYRO " + latest.name;
+                switch (SelfUpdate.State)
+                {
+                    case SelfUpdateState.Failed: return "UPDATING TO PYRO " + latest.name + " FAILED";
+                    case SelfUpdateState.Installed: return "PYRO " + latest.name + " IS INSTALLED";
+                    default: return "UPDATING TO PYRO " + latest.name;
+                }
+            }
+        }
+
+        private static void DrawInstallSteps(UIElement ui)
+        {
+            int current = (int)ShownStep;
+            bool stopped = !Preview &&
+                (SelfUpdate.State == SelfUpdateState.Failed || SelfUpdate.State == SelfUpdateState.Installed);
+            float pulse = 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 5f);
+
+            for (int i = 0; i < STEP_LABELS.Length; i++)
+            {
+                int step = i + 1;
+                Color color = UIManager.m_col_ui0;
+                string status = "";
+                float alpha = 1f;
+                if (step < current)
+                {
+                    color = UIManager.m_col_ui2;
+                    status = "DONE";
+                }
+                else if (step == current && stopped)
+                {
+                    color = UIManager.m_col_em4;
+                    status = SelfUpdate.State == SelfUpdateState.Failed ? "FAILED" : "DID NOT RESTART";
+                }
+                else if (step == current)
+                {
+                    color = UIManager.m_col_hi5;
+                    status = ShownStep == InstallStep.Download ? ShownDownloadPercent + "%" : "...";
+                    alpha = pulse;
+                }
+
+                float y = -130f + 40f * i;
+                ui.DrawStringSmall(STEP_LABELS[i], new Vector2(-220f, y), 0.5f, StringOffset.LEFT, color, alpha);
+                ui.DrawStringSmall(status, new Vector2(220f, y), 0.5f, StringOffset.RIGHT, color, alpha);
+            }
         }
 
         private static void DrawFrame(UIElement ui)
@@ -220,12 +322,11 @@ namespace GameMod.VersionHandling
 
         private static void DrawPopupButtons(UIElement ui)
         {
-            bool downloading = SelfUpdate.State == SelfUpdateState.Downloading;
             string action = ActionLabel;
 
             Vector2 back = new Vector2(action == null ? 0f : -150f, 180f);
             ui.TestMouseInRect(back, 134.5f, 24f, SEL_BACK);
-            ui.DrawSmallItem(downloading ? "CANCEL" : "BACK", back, selection == SEL_BACK, false, 0.4f, 0.5f);
+            ui.DrawSmallItem("BACK", back, selection == SEL_BACK, false, 0.4f, 0.5f);
 
             if (action == null)
                 return;
@@ -240,6 +341,11 @@ namespace GameMod.VersionHandling
         {
             // the selection list still holds the stock items until the popup has drawn once
             if (!popupDrawn)
+                return;
+
+            if (PreviewInstalling && Time.unscaledTime - previewInstallStart > 7.5f)
+                previewInstallStart = -1f;
+            if (Installing)
                 return;
 
             if (ActionLabel == null)
@@ -259,7 +365,7 @@ namespace GameMod.VersionHandling
             if (UIManager.m_menu_selection == SEL_INSTALL && ActionLabel != null)
             {
                 if (Preview)
-                    MenuManager.PlaySelectSound(); // a preview installs nothing
+                    previewInstallStart = Time.unscaledTime; // a preview installs nothing
                 else if (SelfUpdate.Latest != null)
                     SelfUpdate.StartInstall();
                 else
@@ -269,8 +375,6 @@ namespace GameMod.VersionHandling
             }
             else
             {
-                if (SelfUpdate.State == SelfUpdateState.Downloading)
-                    SelfUpdate.CancelInstall();
                 ClosePopup();
             }
         }

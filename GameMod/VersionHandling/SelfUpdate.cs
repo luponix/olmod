@@ -27,6 +27,16 @@ namespace GameMod.VersionHandling
         Failed
     }
 
+    public enum InstallStep
+    {
+        None,
+        Download,
+        Verify,
+        Unpack,
+        Install,
+        Restart
+    }
+
     /// <summary>
     /// Installs a newer Pyro release over the running one and relaunches the game with the
     /// arguments it was started with. A release is one zip on the project's own site, listed
@@ -46,8 +56,11 @@ namespace GameMod.VersionHandling
 
         public static SelfUpdateState State { get; private set; }
 
-        // what the popup reports under its buttons: download progress, or why an install stopped
+        // what the popup reports under its buttons: why an install or a check stopped
         public static string StatusDetail { get; private set; }
+
+        public static InstallStep Step { get; private set; }
+        public static int DownloadPercent { get; private set; }
 
         // every published release newer than the running one, newest first
         public static List<Release> NewReleases { get; private set; }
@@ -72,7 +85,6 @@ namespace GameMod.VersionHandling
 
         private static bool checkStarted;
         private static bool checkRunning;
-        private static bool cancelRequested;
         private static bool installRunning;
 
         // pyro_install reports on the console instead of through the menu item, which tracks
@@ -162,7 +174,8 @@ namespace GameMod.VersionHandling
             }
             installRunning = true;
             installFromConsole = fromConsole;
-            cancelRequested = false;
+            Step = InstallStep.Download;
+            DownloadPercent = 0;
             if (fromConsole)
             {
                 uConsole.Log("Installing Pyro " + release.name + ", the game restarts when it is in");
@@ -170,7 +183,7 @@ namespace GameMod.VersionHandling
             else
             {
                 State = SelfUpdateState.Downloading;
-                StatusDetail = "STARTING";
+                StatusDetail = "";
             }
             GameManager.m_gm.StartCoroutine(Install(release));
         }
@@ -183,13 +196,6 @@ namespace GameMod.VersionHandling
             return PublishedReleases.Find(release => release.name == version);
         }
 
-        // flags the running download; Install notices, cleans up and returns to Available
-        public static void CancelInstall()
-        {
-            if (State == SelfUpdateState.Downloading)
-                cancelRequested = true;
-        }
-
         internal static IEnumerator ReadPublishedReleases()
         {
             if (checkRunning || State == SelfUpdateState.Downloading)
@@ -198,6 +204,7 @@ namespace GameMod.VersionHandling
                 yield break;
             }
             checkRunning = true;
+            Step = InstallStep.None;
             try
             {
                 JObject index = null;
@@ -286,14 +293,6 @@ namespace GameMod.VersionHandling
             // Step 2: fetch the release, and refuse it unless it hashes to what the site published
             string archive = Path.Combine(StagingDir, release.name + ".zip");
             yield return Download(release, archive);
-            if (cancelRequested)
-            {
-                cancelRequested = false;
-                TryDeleteDirectory(StagingDir);
-                Settle(SelfUpdateState.Available, "");
-                Debug.LogFormat("PYROUPDATE: install of {0} cancelled", release.name);
-                yield break;
-            }
             if (!File.Exists(archive))
             {
                 Fail("DOWNLOAD FAILED");
@@ -302,7 +301,7 @@ namespace GameMod.VersionHandling
             }
 
             // Step 3: unpack beside the install, so a broken archive is found before a swap
-            Progress("UNPACKING");
+            Step = InstallStep.Unpack;
             yield return null;
             string unpacked = Path.Combine(StagingDir, "files");
             List<string> files = Unpack(archive, unpacked);
@@ -314,7 +313,7 @@ namespace GameMod.VersionHandling
             }
 
             // Step 4: swap, and only now, with the whole release verified and on disk
-            Progress("INSTALLING");
+            Step = InstallStep.Install;
             yield return null;
             if (!SwapInStagedFiles(unpacked, files))
             {
@@ -327,12 +326,14 @@ namespace GameMod.VersionHandling
 
             // Step 5: hand over to the new build. State is set first so that a relaunch which
             // does not come up leaves the player reading RESTART TO FINISH rather than a stall.
+            Step = InstallStep.Restart;
+            yield return null;
             Settle(SelfUpdateState.Installed, "PYRO " + release.name + " INSTALLED");
             Relaunch();
         }
 
         // Fetches the release zip to destination, refusing it unless it hashes to the sha256
-        // the signed index published; on any failure or cancel nothing is left at destination.
+        // the signed index published; on any failure nothing is left at destination.
         private static IEnumerator Download(Release release, string destination)
         {
             string partial = destination + ".part";
@@ -355,9 +356,7 @@ namespace GameMod.VersionHandling
 
                     long declaredBytes;
                     string contentLength = www.GetResponseHeader("Content-Length");
-                    if (cancelRequested)
-                        failure = "cancelled";
-                    else if (Time.unscaledTime - lastReceivedTime > 30f)
+                    if (Time.unscaledTime - lastReceivedTime > 30f)
                         failure = "no data for 30 seconds"; // a hung connection must not hold the menu
                     else if (receivedBytes > MAX_ARCHIVE_BYTES || // checked per frame: DownloadHandlerFile itself cannot refuse bytes, so a frame's worth may land past the cap
                         (contentLength != null && long.TryParse(contentLength, out declaredBytes) &&
@@ -369,8 +368,7 @@ namespace GameMod.VersionHandling
                         break;
                     }
 
-                    Progress("DOWNLOADING PYRO " + release.name + "   " +
-                        Mathf.RoundToInt(www.downloadProgress * 100f) + "%");
+                    DownloadPercent = Mathf.RoundToInt(www.downloadProgress * 100f);
                     yield return null;
                 }
                 if (failure == null && (www.isNetworkError || www.isHttpError))
@@ -383,6 +381,8 @@ namespace GameMod.VersionHandling
                 yield break;
             }
 
+            Step = InstallStep.Verify;
+            yield return null;
             bool keep = false;
             try
             {
@@ -921,14 +921,6 @@ namespace GameMod.VersionHandling
             }
             State = state;
             StatusDetail = detail;
-        }
-
-        // what the popup reports while an install runs; a console-driven one stays quiet until
-        // it is done, since its progress would scroll the log away a frame at a time
-        private static void Progress(string detail)
-        {
-            if (!installFromConsole)
-                StatusDetail = detail;
         }
     }
 
