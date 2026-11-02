@@ -110,6 +110,7 @@
     <Compile Include="Hooks\Player.cs" />
     <Compile Include="Hooks\PlayerShip.cs" />
     <Compile Include="Hooks\Viewer.cs" />
+    <Compile Include="Hooks\NetworkMatch.cs" />
     <Compile Include="Logging\LogRewrite.cs" />
     <Compile Include="Logging\LevelScanLog.cs" />
     <Compile Include="Logging\EngineLogNoise.cs" />
@@ -196,7 +197,6 @@
     <Compile Include="MPPickupCheck.cs" />
     <Compile Include="MPPrimaries.cs" />
     <Compile Include="MPReduceJoinTimeout.cs" />
-    <Compile Include="MPRespawn.cs" />
     <Compile Include="MPScoreboards.cs" />
     <Compile Include="MPServerBrowser.cs" />
     <Compile Include="MPSmash.cs" />

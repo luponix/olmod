@@ -41,51 +41,6 @@ namespace GameMod {
                 }
             }
         }
-
-        static void DrawSpawnPoints() {
-            if (!Debugging.Enabled || spawn_scores.Count == 0) {
-                return;
-            }
-
-            Vector3 shipPos = GameManager.m_player_ship.c_transform_position;
-            Vector3 forward = GameManager.m_player_ship.c_camera_transform.forward;
-            Quaternion shipQuat = GameManager.m_player_ship.c_transform.localRotation;
-
-            var max = spawn_scores.Select(s => s.Value).Max();
-
-            foreach (var score in spawn_scores) {
-                Vector3 spawnPos = score.Key.position;
-                Vector3 vector;
-                vector.x = spawnPos.x - shipPos.x;
-                vector.y = spawnPos.y - shipPos.y;
-                vector.z = spawnPos.z - shipPos.z;
-                float dist = Mathf.Max(0.1f, vector.magnitude);
-
-                int quad_index = UIManager.m_quad_index;
-                Vector2 offset = Vector2.zero;
-
-                Color color = UIManager.m_col_red;
-
-                // offset.y = -80f / dist;
-                offset.y = 2f;
-                UIManager.DrawStringAlignCenter($"Spawn", offset, 1f, color, -1f);
-                WorldText.PreviousQuadsTransformText(spawnPos, shipQuat, dist, quad_index);
-            }
-        }
-
-        private static FieldInfo _NetworkSpawnPoints_m_player_pos_Field = typeof(NetworkSpawnPoints).GetField("m_player_pos", BindingFlags.NonPublic | BindingFlags.Static);
-        private static MethodInfo _NetworkSpawnPoints_GetRespawnPointCandidates_Method = typeof(NetworkSpawnPoints).GetMethod("GetRespawnPointCandidates", BindingFlags.NonPublic | BindingFlags.Static);
-        private static FieldInfo _NetworkSpawnPoints_m_player_team_Field = typeof(NetworkSpawnPoints).GetField("m_player_team", BindingFlags.NonPublic | BindingFlags.Static);
-
-        private static Dictionary<LevelData.SpawnPoint, float> spawn_scores = new Dictionary<LevelData.SpawnPoint, float>();
-        static void CalculateSpawnScores() {
-            if (!Debugging.Enabled) {
-                return;
-            }
-
-            var respawnPointCandidates = MPRespawn_ChooseSpawnPoint.GetRespawnPointCandidates(GameManager.m_local_player.m_mp_team);
-            spawn_scores = MPRespawn_ChooseSpawnPoint.GetRespawnPointScores(GameManager.m_local_player.m_mp_team, respawnPointCandidates);
-        }
     }
 
     /// <summary>
@@ -125,9 +80,7 @@ namespace GameMod {
 
                 if (state == 1 && code.opcode == OpCodes.Call && code.operand == AccessTools.Method(typeof(UIManager), "EndDrawing")) {
                     state = 2;
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Debugging), "CalculateSpawnScores"));
                     yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Debugging), "DrawSegmentNums")) { labels = code.labels };
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Debugging), "DrawSpawnPoints"));
                     code.labels = null;
                 }
                 yield return code;
