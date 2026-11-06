@@ -215,22 +215,6 @@ namespace GameMod
     }
 
     // Update lobby status display
-    [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
-    class PresetData_MenuManager_MpMatchSetup
-    {
-        static void Postfix()
-        {
-            if (MenuManager.m_menu_sub_state == MenuSubState.ACTIVE)
-            {
-                if (MenuManager.m_menu_micro_state != 2)
-                {
-                    PresetData.UpdateLobbyStatus();
-                }
-            }
-        }
-    }
-
-    // Update lobby status display
     [HarmonyPatch(typeof(NetworkMatch), "OnAcceptedToLobby")]
     class MPModifiers_NetworkMatch_OnAcceptedToLobby
     {

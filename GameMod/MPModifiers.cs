@@ -82,87 +82,42 @@ namespace GameMod
             return result;
         }
 
-        // UI for new "Allowed Modifiers" section in MP Create
-        [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-        class MPModifiers_UIElement_DrawMpMatchSetup
+        public static void DrawAllowedModifiersPage(UIElement uie)
         {
-            /*
-            static void ModifierSettings(UIElement uie, ref Vector2 position)
+            Player local_player = GameManager.m_local_player;
+            Vector2 position = uie.m_position;
+            uie.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("ALLOWED MODIFIERS"), 250f, 24f, 1f);
+            position.y = -133f;
+            uie.DrawMenuSeparator(position - Vector2.up * 40f);
+
+            position.x = -310f;
+            position.y = -90f;
+            for (int i = 0; i < 4; i++)
             {
-                position.y += 62f;
-                uie.SelectAndDrawItem("ALLOWED MODIFIERS", position, 8, false, 1f, 0.75f);
+                DrawMpModifier(uie, position, i, true, local_player);
+                position.y += 95f;
             }
-
-            [HarmonyPriority(Priority.Normal - 2)] // set global order of transpilers for this function
-            private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
+            position.x = 310f;
+            position.y = -90f;
+            for (int j = 0; j < 4; j++)
             {
-                int state = 0;
-
-                foreach (var code in codes)
-                {
-                    if (state == 0 && code.opcode == OpCodes.Ldstr && (string)code.operand == "CUSTOM MODIFIER 2")
-                        state = 1;
-
-                    if (state == 1 && code.opcode == OpCodes.Call && code.operand == AccessTools.Method(typeof(UIElement), "SelectAndDrawStringOptionItem"))
-                    {
-                        state = 2;
-                        yield return code;
-                        yield return new CodeInstruction(OpCodes.Ldarg_0);
-                        yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                        yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MPModifiers_UIElement_DrawMpMatchSetup), "ModifierSettings"));
-                        continue;
-                    }
-
-                    yield return code;
-                }
-            }*/
-
-            private static void Postfix(UIElement __instance)
-            {
-                switch (MenuManager.m_menu_micro_state)
-                {
-                    case 9:
-                        Player local_player = GameManager.m_local_player;
-                        Vector2 position = __instance.m_position;
-                        __instance.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("ALLOWED MODIFIERS"), 250f, 24f, 1f);
-                        position.y = -133f;
-                        __instance.DrawMenuSeparator(position - Vector2.up * 40f);
-                        position.y += 40f;
-
-                        position.x = -310f;
-                        position.y = -90f;
-                        for (int i = 0; i < 4; i++)
-                        {
-                            DrawMpModifier(__instance, position, i, true, local_player);
-                            position.y += 95f;
-                        }
-                        position.x = 310f;
-                        position.y = -90f;
-                        for (int j = 0; j < 4; j++)
-                        {
-                            DrawMpModifier(__instance, position, j, false, local_player);
-                            position.y += 95f;
-                        }
-                        break;
-                    default:
-                        break;
-                }
+                DrawMpModifier(uie, position, j, false, local_player);
+                position.y += 95f;
             }
+        }
 
-            private static void DrawMpModifier(UIElement uie, Vector2 pos, int idx, bool mod1, Player player)
-            {
-                float num = 535f;
-                float middle_h = 55f;
-                Color col_ub = UIManager.m_col_ub0;
-                col_ub.a = uie.m_alpha;
-                UIManager.DrawFrameEmptyCenter(pos, 17f, 17f, num, middle_h, col_ub, 7);
-                bool flag = mms_modifier_filter[idx + ((!mod1) ? 4 : 0)];
-                uie.SelectAndDrawCheckboxItem(Player.GetMpModifierName(idx, mod1), pos - Vector2.up * 10f, idx + ((!mod1) ? 4 : 0), flag, false, 1f, Player.GetMpModifierIcon(idx, mod1));
-                pos.x -= num * 0.5f + 10f;
-                pos.y += 30f;
-                uie.DrawStringSmall(Player.GetMpModifierDesc(idx, mod1), pos, 0.4f, StringOffset.LEFT, (!flag) ? UIManager.m_col_ub1 : UIManager.m_col_ui1, 1f, num - 40f);
-            }
-
+        private static void DrawMpModifier(UIElement uie, Vector2 pos, int idx, bool mod1, Player player)
+        {
+            float num = 535f;
+            float middle_h = 55f;
+            Color col_ub = UIManager.m_col_ub0;
+            col_ub.a = uie.m_alpha;
+            UIManager.DrawFrameEmptyCenter(pos, 17f, 17f, num, middle_h, col_ub, 7);
+            bool flag = mms_modifier_filter[idx + ((!mod1) ? 4 : 0)];
+            uie.SelectAndDrawCheckboxItem(Player.GetMpModifierName(idx, mod1), pos - Vector2.up * 10f, idx + ((!mod1) ? 4 : 0), flag, false, 1f, Player.GetMpModifierIcon(idx, mod1));
+            pos.x -= num * 0.5f + 10f;
+            pos.y += 30f;
+            uie.DrawStringSmall(Player.GetMpModifierDesc(idx, mod1), pos, 0.4f, StringOffset.LEFT, (!flag) ? UIManager.m_col_ub1 : UIManager.m_col_ui1, 1f, num - 40f);
         }
 
         // Disable checking modifiers which aren't allowed
@@ -188,70 +143,12 @@ namespace GameMod
             }
         }
 
-        // Handle new "Allowed Modifiers" UI
-        [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
-        class MPModifiers_MenuManager_MpMatchSetup
+        public static void SelectOnAllowedModifiersPage(int selection)
         {
-            static void Postfix()
-            {
-                if (MenuManager.m_menu_sub_state == MenuSubState.ACTIVE)
-                {
-
-                    // Add status if your modifiers aren't allowed
-                    if (MenuManager.m_menu_micro_state != 2)
-                    {
-                        MPModifiers.UpdateLobbyStatus();
-                    }
-
-
-                    if (!UIManager.PushedSelect(100) && (!MenuManager.option_dir || !UIManager.PushedDir()))
-                        return;
-
-                    switch (MenuManager.m_menu_micro_state)
-                    {
-                        // Allowed modifiers button
-                        case 6:
-                            switch (UIManager.m_menu_selection)
-                            {
-                                case 8:
-                                    MenuManager.m_menu_micro_state = 9;
-                                    MenuManager.UIPulse(2f);
-                                    MenuManager.PlaySelectSound(1f);
-                                    return;
-                                case 100:
-                                    MenuManager.m_menu_micro_state = 6;
-                                    MenuManager.UIPulse(2f);
-                                    MenuManager.PlaySelectSound(1f);
-                                    return;
-                                default:
-                                    return;
-                            }
-                        // Allowed modifiers window
-                        case 9:
-                            switch (UIManager.m_menu_selection)
-                            {
-                                case 0:
-                                case 1:
-                                case 2:
-                                case 3:
-                                case 4:
-                                case 5:
-                                case 6:
-                                case 7:
-                                    MPModifiers.mms_modifier_filter[UIManager.m_menu_selection] = !MPModifiers.mms_modifier_filter[UIManager.m_menu_selection];
-                                    MenuManager.PlaySelectSound(1f);
-                                    return;
-                                case 100:
-                                    MenuManager.m_menu_micro_state = 6;
-                                    MenuManager.UIPulse(2f);
-                                    MenuManager.PlaySelectSound(1f);
-                                    return;
-                                default:
-                                    return;
-                            }
-                    }
-                }
-            }
+            if (selection < 0 || selection > 7)
+                return;
+            mms_modifier_filter[selection] = !mms_modifier_filter[selection];
+            MenuManager.PlaySelectSound(1f);
         }
 
         // Update lobby status display

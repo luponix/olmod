@@ -1017,49 +1017,6 @@ namespace GameMod
         }
     }
 
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-    class MPTeamsMenuDraw
-    {
-        [HarmonyPriority(Priority.Normal - 8)] // set global order of transpilers for this function
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> cs)
-        {
-            var vector2_y_Field = AccessTools.Field(typeof(Vector2), "y");
-
-            int lastAdv = 0;
-            foreach (var c in cs)
-            {
-                if (lastAdv == 0 && c.opcode == OpCodes.Ldstr && (string)c.operand == "ADVANCED SETTINGS")
-                {
-                    yield return new CodeInstruction(OpCodes.Ldloca_S, 0);
-                    yield return new CodeInstruction(OpCodes.Dup);
-                    yield return new CodeInstruction(OpCodes.Ldfld, vector2_y_Field);
-                    yield return new CodeInstruction(OpCodes.Ldc_R4, 62f);
-                    yield return new CodeInstruction(OpCodes.Add);
-                    yield return new CodeInstruction(OpCodes.Stfld, vector2_y_Field);
-                    lastAdv = 1;
-                }
-                else if ((lastAdv == 1 || lastAdv == 2) && c.opcode == OpCodes.Call)
-                {
-                    lastAdv++;
-                }
-                else if (lastAdv == 3)
-                {
-                    if (c.opcode != OpCodes.Ldloca_S)
-                        continue;
-                    lastAdv = 4;
-                    yield return new CodeInstruction(OpCodes.Ldloca_S, 0);
-                    yield return new CodeInstruction(OpCodes.Dup);
-                    yield return new CodeInstruction(OpCodes.Ldfld, vector2_y_Field);
-                    yield return new CodeInstruction(OpCodes.Ldc_R4, 62f - 93f);
-                    yield return new CodeInstruction(OpCodes.Add);
-                    yield return new CodeInstruction(OpCodes.Stfld, vector2_y_Field);
-                }
-                yield return c;
-            }
-        }
-
-    }
-
     [HarmonyPatch(typeof(PlayerShip), "UpdateShipColors")]
     class MPTeamsShipColors
     {

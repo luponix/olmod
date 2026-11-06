@@ -74,6 +74,23 @@ namespace GameMod {
                 player.c_player_ship.DeactivateLights();
             }
         }
+
+        public static void DrawCreateOpenMatch(UIElement uie, ref Vector2 position)
+        {
+            if (!MenuManager.m_mp_lan_match)
+                return;
+            uie.SelectAndDrawItem(Loc.LS("CREATE OPEN MATCH"), position, 2, false);
+            position.y += 62f;
+            if (UIManager.m_menu_selection == 2)
+            {
+                UIElement.ToolTipActive = true;
+                UIElement.ToolTipTitle = "CREATE OPEN MATCH";
+                UIElement.ToolTipDescription = "CREATE MATCH AND ALLOW OTHERS TO JOIN AFTER STARTING";
+            }
+            else
+                UIElement.ToolTipActive = false;
+            uie.DrawMenuToolTip(position + Vector2.up * 40f);
+        }
     }
 
     public class JIPJustJoinedMessage : MessageBase
@@ -621,100 +638,6 @@ namespace GameMod {
         }
     }
     */
-
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-    class JIPMatchSetup
-    {
-        public static void DrawMpMatchJIP(UIElement uie, ref Vector2 position)
-        {
-            uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW JOIN IN PROGRESS"), position, 7,
-                MenuManager.GetToggleSetting(MPJoinInProgress.MenuManagerEnabled || MPJoinInProgress.SingleMatchEnable ? 1 : 0),
-                Loc.LS("ALLOW PLAYERS TO JOIN MATCH AFTER IT HAS STARTED"), 1f, !MenuManager.m_mp_lan_match || MPJoinInProgress.SingleMatchEnable);
-            position.y += 62f;
-#if false // waits on olmod server detection
-            uie.SelectAndDrawStringOptionItem(Loc.LS("REAR VIEW MIRROR"), position, 8,
-                MenuManager.GetToggleSetting(RearView.MPMenuManagerEnabled ? 1 : 0),
-                Loc.LS("ENABLE REAR VIEW MIRROR"), 1.5f, !MenuManager.m_mp_lan_match);
-            position.y += 62f;
-#endif
-        }
-
-        public static void DrawMpMatchCreateOpen(UIElement uie, ref Vector2 position)
-        {
-            if (!MenuManager.m_mp_lan_match)
-                return;
-            uie.SelectAndDrawItem(Loc.LS("CREATE OPEN MATCH"), position, 2, false);
-            position.y += 62f;
-            if (UIManager.m_menu_selection == 2)
-            {
-                UIElement.ToolTipActive = true;
-                UIElement.ToolTipTitle = "CREATE OPEN MATCH";
-                UIElement.ToolTipDescription = "CREATE MATCH AND ALLOW OTHERS TO JOIN AFTER STARTING";
-            }
-            else
-                UIElement.ToolTipActive = false;
-            uie.DrawMenuToolTip(position + Vector2.up * 40f);
-        }
-
-        [HarmonyPriority(Priority.Normal - 7)] // set global order of transpilers for this function
-        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
-        {
-            var jipMatchSetup_DrawMpMatchCreateOpen_Method = AccessTools.Method(typeof(JIPMatchSetup), "DrawMpMatchCreateOpen");
-            var jipMatchSetup_DrawMpMatchJIP_Method = AccessTools.Method(typeof(JIPMatchSetup), "DrawMpMatchJIP");
-
-            int state = 0;
-            foreach (var code in codes)
-            {
-                if (state == 0 && code.opcode == OpCodes.Ldstr && (string)code.operand == "CREATE MATCH")
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                    yield return new CodeInstruction(OpCodes.Call, jipMatchSetup_DrawMpMatchCreateOpen_Method);
-                    state = 1;
-                }
-                if (state == 1 && code.opcode == OpCodes.Ldc_R4 && (float)code.operand == 155f)
-                    code.operand = 155f + 62f;
-                if (state == 1 && code.opcode == OpCodes.Ldstr && (string)code.operand == "POWERUP SETTINGS")
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                    yield return new CodeInstruction(OpCodes.Call, jipMatchSetup_DrawMpMatchJIP_Method);
-                    state = 2;
-                }
-                yield return code;
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
-    class JIPMatchSetupHandle
-    {
-        static void Postfix()
-        {
-            if (MenuManager.m_menu_micro_state == 0)
-                MPJoinInProgress.SingleMatchEnable = false;
-            var prev_dir = UIManager.m_select_dir;
-            if (MenuManager.m_menu_sub_state != MenuSubState.ACTIVE ||
-                (!UIManager.PushedSelect(100) && (!MenuManager.option_dir || !UIManager.PushedDir())))
-                return;
-
-            if (MenuManager.m_menu_micro_state == 3 &&
-                (UIManager.m_menu_selection == 7 || UIManager.m_menu_selection == 8))
-            {
-                if (UIManager.m_menu_selection == 7)
-                    MPJoinInProgress.MenuManagerEnabled = !MPJoinInProgress.MenuManagerEnabled;
-                MenuManager.PlayCycleSound(1f, (float)prev_dir);
-            }
-            else if (MenuManager.m_menu_micro_state == 0 && UIManager.m_menu_selection == 2) // create open match
-            {
-                MenuManager.m_menu_micro_state = 2;
-                MenuManager.UIPulse(2f);
-                MenuManager.PlaySelectSound();
-                MenuManager.SetDefaultSelection(7);
-                MPJoinInProgress.SingleMatchEnable = true;
-            }
-        }
-    }
 
     // Send min_num_players 1 instead of 2 for creating join-in-progress match. Depends on FindPrivateMatchGrouping patch in MPMaxPlayer
     [HarmonyPatch(typeof(NetworkMatch), "StartMatchMakerRequest")]

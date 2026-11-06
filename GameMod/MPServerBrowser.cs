@@ -339,6 +339,134 @@ namespace GameMod
                 public bool inLobby { get; set; }
             }
         }
+
+        public static void OpenSelectedServerPage()
+        {
+            if (selectedItem == null)
+                return;
+            MenuManager.m_menu_micro_state = selectedItem.maxPlayers > 0 ? 1 : 2;
+        }
+
+        public static void DrawMatchNotes(UIElement uie, Vector2 position)
+        {
+            SelectAndDrawTextEntry(uie, "MATCH NOTES", mms_match_notes, position, 303, 1.5f, false);
+        }
+
+        public static bool UpdateMatchNotes(ref float menuStateTimer)
+        {
+            return ProcessInputField(ref mms_match_notes, Loc.LS("MATCH NOTES"), false, ref menuStateTimer);
+        }
+
+
+        private static bool ProcessInputField(ref string s, string title, bool hide, ref float m_menu_state_timer)
+        {
+            foreach (char c in Input.inputString)
+            {
+                if (c == '\b')
+                {
+                    if (s.Length != 0)
+                    {
+                        s = s.Substring(0, s.Length - 1);
+                        SFXCueManager.PlayRawSoundEffect2D(SoundEffect.hud_notify_bot_died, 0.4f, UnityEngine.Random.Range(-0.15f, -0.05f), 0f, false);
+                    }
+                }
+                else
+                {
+                    if (c == '\n' || c == '\r')
+                    {
+                        m_menu_state_timer = 0f;
+                        s = s.Trim();
+                        MenuManager.SetDefaultSelection((MenuManager.m_menu_micro_state != 1) ? 1 : 0);
+                        MenuManager.PlayCycleSound(1f, 1f);
+                        return true;
+                    }
+                    if (MenuManager.IsPrintableChar(c) && s.Length < 64)
+                    {
+                        s += c;
+                        SFXCueManager.PlayRawSoundEffect2D(SoundEffect.hud_notify_bot_died, 0.5f, UnityEngine.Random.Range(0.1f, 0.2f), 0f, false);
+                    }
+                }
+            }
+            return false;
+        }
+
+        private static FieldInfo _UIElement_m_cursor_blink_timer_Field = AccessTools.Field(typeof(UIElement), "m_cursor_blink_timer");
+        private static FieldInfo _UIElement_m_cursor_on_Field = AccessTools.Field(typeof(UIElement), "m_cursor_on");
+        private static void SelectAndDrawTextEntry(UIElement uie, string label, string text, Vector2 pos, int selection, float width_scale = 1.5f, bool fade = false)
+        {
+            float width = 500f * width_scale;
+            int quad_index = UIManager.m_quad_index;
+            if (!fade)
+            {
+                uie.TestMouseInRect(pos, width * 0.5f + 22f, 24f, selection, true);
+            }
+            bool selected = UIManager.m_menu_selection == selection;
+
+            Color label_color;
+            var text_width = 244f;
+            var text_right = 2f;
+            float alpha8 = 1f - Mathf.Pow(1f - uie.m_alpha, 8f);
+            if (selected)
+            {
+                Color bar_color = Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.2f * UIElement.FLICKER) + UIManager.m_select_flash * 0.3f);
+                bar_color.a = alpha8;
+                var bar_width = width - text_width - text_right;
+                var rest_width = width - bar_width;
+                // highlight left
+                UIManager.DrawQuadBarHorizontal(pos - Vector2.right * (width - bar_width + 22f + 18f - 3f) * 0.5f, 0f, 22f, bar_width + 4f, bar_color, 12);
+                // highlight around text field
+                UIManager.DrawQuadBarHorizontal(pos + Vector2.right * (bar_width + 22f - 18f) * 0.5f - Vector2.up * 18f, 0f, 2f, rest_width + 22f + 18f, bar_color, 12);
+                UIManager.DrawQuadBarHorizontal(pos + Vector2.right * (bar_width + 22f - 18f) * 0.5f + Vector2.up * 18f, 0f, 2f, rest_width + 22f + 18f, bar_color, 12);
+                UIManager.DrawQuadBarHorizontal(pos + Vector2.right * (width - text_right + 20f * 2) * 0.5f, 0f, 22f, text_right + 4f, bar_color, 12);
+                label_color = UIManager.m_col_ub3;
+                label_color.a = alpha8;
+            }
+            else
+            {
+                label_color = UIManager.m_col_ui0;
+                label_color.a = uie.m_alpha;
+            }
+
+            float alpha6 = 1f - Mathf.Pow(1f - uie.m_alpha, 6f);
+            Color border_color = Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.5f * UIElement.FLICKER));
+            border_color.a = alpha6;
+            UIManager.DrawQuadBarHorizontal(pos, 22f, 22f, width, border_color, 7);
+
+            Color text_color = UIManager.m_col_ui2;
+            text_color.a = uie.m_alpha;
+            uie.DrawStringSmallOverrideAlpha(label, pos - Vector2.right * (width * 0.5f + 15f), 0.75f, StringOffset.LEFT, label_color, width - 270f);
+            pos.x += (width - text_width - text_right) * 0.5f;
+            uie.DrawOutlineBackdrop(pos, 17f, text_width, text_color, 2);
+
+            float m_cursor_blink_timer = (float)_UIElement_m_cursor_blink_timer_Field.GetValue(uie);
+            bool m_cursor_on = (bool)_UIElement_m_cursor_on_Field.GetValue(uie);
+            m_cursor_blink_timer -= RUtility.FRAMETIME_UI;
+            if (m_cursor_blink_timer < 0f)
+            {
+                m_cursor_blink_timer += 0.25f;
+                m_cursor_on = !m_cursor_on;
+                _UIElement_m_cursor_on_Field.SetValue(uie, m_cursor_on);
+            }
+            _UIElement_m_cursor_blink_timer_Field.SetValue(uie, m_cursor_blink_timer);
+            bool show_cursor = m_cursor_on && selected;
+
+            float scale = 0.5f * 20f;
+            var textCursor = text + "_";
+            float stringWidth = UIManager.GetStringWidth(textCursor, scale);
+            DrawStringAlignCenterWidth(show_cursor ? textCursor : text, pos, scale, text_color, stringWidth, 200f + 22f * 2 + 22f);
+
+            if (fade)
+            {
+                UIManager.PreviousQuadsAlpha(quad_index, 0.3f);
+            }
+        }
+
+        private static void DrawStringAlignCenterWidth(string s, Vector2 position, float scale, Color c, float stringWidth, float max_width = -1f)
+        {
+            Vector2 scl_pos = position;
+            position.x -= ((!(max_width > 0f)) ? stringWidth : ((!(max_width < stringWidth)) ? stringWidth : max_width)) * 0.5f;
+            UIManager.DrawStringScaled(s, position, scl_pos, scale, c, max_width, stringWidth, 0.5f);
+        }
     }
 
     public class MPServerBrowserItem
@@ -837,267 +965,4 @@ namespace GameMod
 
     }
 
-    [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
-    class MPServerBrowser_MenuManager_MpMatchSetup
-    {
-
-        private static void MpMatchSetupMicrostate()
-        {
-            if (MPServerBrowser.selectedItem != null)
-            {
-                if (MPServerBrowser.selectedItem.maxPlayers > 0)
-                {
-                    // Join
-                    MenuManager.m_menu_micro_state = 1;
-                }
-                else
-                {
-                    // Create
-                    MenuManager.m_menu_micro_state = 2;
-                }
-            }
-        }
-
-        private static FieldInfo _MenuManager_m_back_stack_Field = AccessTools.Field(typeof(MenuManager), "m_back_stack");
-        private static FieldInfo _MenuManager_m_menu_state_timer_Field = AccessTools.Field(typeof(MenuManager), "m_menu_state_timer");
-        private static void MpBackButton()
-        {
-            switch (MenuManager.m_menu_sub_state)
-            {
-                case MenuSubState.BACK:
-                    if (UIManager.PushedSelect(100))
-                    {
-                        Debug.Log("[Browser] pushed back");
-                        Stack<MenuState> m_back_stack = (Stack<MenuState>)_MenuManager_m_back_stack_Field.GetValue(null);
-                        _MenuManager_m_menu_state_timer_Field.SetValue(null, 0f);
-                        UIManager.DestroyAll(false);
-                        if (m_back_stack.Peek() == MenuState.MP_MENU)
-                        {
-                            MenuManager.ChangeMenuState(MenuState.MP_MENU, false);
-                        }
-                        else
-                        {
-                            MenuManager.ChangeMenuState(MPServerBrowser.msServerBrowser, false);
-                            MenuManager.m_menu_state = 0;
-                            MenuManager.m_menu_sub_state = 0;
-                            MenuManager.m_menu_micro_state = 0;
-                        }
-
-                    }
-                    return;
-            }
-
-        }
-
-        private static void Postfix(ref float ___m_menu_state_timer)
-        {
-            switch (MenuManager.m_menu_sub_state)
-            {
-                case MenuSubState.ACTIVE:
-                    switch (UIManager.m_menu_selection)
-                    {
-                        case 303:
-                            Controls.m_disable_menu_letter_keys = false;
-                            Controls.m_disable_menu_letter_keys = true;
-                            ProcessInputField(ref MPServerBrowser.mms_match_notes, Loc.LS("MATCH NOTES"), false, ref ___m_menu_state_timer);
-                            break;
-                    }
-                    break;
-            }
-        }
-
-        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
-        {
-            var mpServerBrowser_MenuManager_MpMatchSetup_MpBackButton_Method = AccessTools.Method(typeof(MPServerBrowser_MenuManager_MpMatchSetup), "MpBackButton");
-            var mpServerBrowser_MenuManager_MpMatchSetup_MpMatchSetupMicrostate_Method = AccessTools.Method(typeof(MPServerBrowser_MenuManager_MpMatchSetup), "MpMatchSetupMicrostate");
-
-            int state = 0;
-            foreach (var code in codes)
-            {
-                // Allow back button to return to browser if cancelling
-                if (code.opcode == OpCodes.Ldsfld && ((FieldInfo)code.operand).Name == "m_updating_pm_settings")
-                {
-                    List<Label> labels = code.labels;
-                    code.labels = new List<Label>();
-                    yield return new CodeInstruction(OpCodes.Call, mpServerBrowser_MenuManager_MpMatchSetup_MpBackButton_Method) { labels = labels };
-                }
-
-                // MpMatchSetup init always sets m_menu_micro_state = 0, override if initiated by browser select
-                if (state == 0 && code.opcode == OpCodes.Ldsfld &&
-                    (((FieldInfo)code.operand).Name == "_mms_match_password" || ((FieldInfo)code.operand).Name == "mms_match_password"))
-                {
-                    state = 1;
-                    yield return new CodeInstruction(OpCodes.Call, mpServerBrowser_MenuManager_MpMatchSetup_MpMatchSetupMicrostate_Method);
-                }
-
-                yield return code;
-            }
-        }
-
-        private static bool ProcessInputField(ref string s, string title, bool hide, ref float m_menu_state_timer)
-        {
-            foreach (char c in Input.inputString)
-            {
-                if (c == '\b')
-                {
-                    if (s.Length != 0)
-                    {
-                        s = s.Substring(0, s.Length - 1);
-                        SFXCueManager.PlayRawSoundEffect2D(SoundEffect.hud_notify_bot_died, 0.4f, UnityEngine.Random.Range(-0.15f, -0.05f), 0f, false);
-                    }
-                }
-                else
-                {
-                    if (c == '\n' || c == '\r')
-                    {
-                        m_menu_state_timer = 0f;
-                        s = s.Trim();
-                        MenuManager.SetDefaultSelection((MenuManager.m_menu_micro_state != 1) ? 1 : 0);
-                        MenuManager.PlayCycleSound(1f, 1f);
-                        return true;
-                    }
-                    if (MenuManager.IsPrintableChar(c) && s.Length < 64)
-                    {
-                        s += c;
-                        SFXCueManager.PlayRawSoundEffect2D(SoundEffect.hud_notify_bot_died, 0.5f, UnityEngine.Random.Range(0.1f, 0.2f), 0f, false);
-                    }
-                }
-            }
-            return false;
-        }
-    }
-
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-    class MPServerBrowser_UIElement_DrawMpMatchSetup
-    {
-        private static void DrawMatchNotes(UIElement uie, ref Vector2 position)
-        {
-            position.y += 62f;
-            SelectAndDrawTextEntry(uie, "MATCH NOTES", MPServerBrowser.mms_match_notes, position, 303, 1.5f, false);
-        }
-
-        private static void DrawFriendlyFire(UIElement uie, ref Vector2 position)
-        {
-            uie.SelectAndDrawStringOptionItem(Loc.LS("FRIENDLY FIRE"), position, 3, MenuManager.GetMMSFriendlyFire(), string.Empty, 1f, MenuManager.mms_mode == MatchMode.ANARCHY);
-            position.y += 62f;
-        }
-
-        [HarmonyPriority(Priority.Normal - 3)] // set global order of transpilers for this function
-        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
-        {
-            var mpServerBrowser_UIElement_DrawMpMatchSetup_DrawMatchNotes_Method = AccessTools.Method(typeof(MPServerBrowser_UIElement_DrawMpMatchSetup), "DrawMatchNotes");
-            var mpServerBrowser_UIElement_DrawMpMatchSetup_DrawFriendlyFire_Method = AccessTools.Method(typeof(MPServerBrowser_UIElement_DrawMpMatchSetup), "DrawFriendlyFire");
-
-            int state = 0;
-
-            foreach (var code in codes)
-            {
-
-                // Check for Friendly Fire select
-                if (code.opcode == OpCodes.Ldstr && (string)code.operand == "FRIENDLY FIRE")
-                    state = 1;
-
-                // Skip up until Time Limit (move FF to Advanced)
-                if (state == 1 && !(code.opcode == OpCodes.Ldstr && (string)code.operand == "TIME LIMIT"))
-                    continue;
-
-                if (code.opcode == OpCodes.Ldstr && (string)code.operand == "TIME LIMIT")
-                    state = 2;
-
-                // Add Match Notes above Advanced
-                if (code.opcode == OpCodes.Ldstr && (string)code.operand == "ADVANCED SETTINGS")
-                {
-                    state = 3;
-                    yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                    yield return new CodeInstruction(OpCodes.Call, mpServerBrowser_UIElement_DrawMpMatchSetup_DrawMatchNotes_Method);
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                }
-
-                // Move Advanced Match section up slightly
-                if (code.opcode == OpCodes.Ldc_R4 && (float)code.operand == 155)
-                    code.operand = 250f;
-
-                yield return code;
-            }
-        }
-
-        private static FieldInfo _UIElement_m_cursor_blink_timer_Field = AccessTools.Field(typeof(UIElement), "m_cursor_blink_timer");
-        private static FieldInfo _UIElement_m_cursor_on_Field = AccessTools.Field(typeof(UIElement), "m_cursor_on");
-        private static void SelectAndDrawTextEntry(UIElement uie, string label, string text, Vector2 pos, int selection, float width_scale = 1.5f, bool fade = false)
-        {
-            float width = 500f * width_scale;
-            int quad_index = UIManager.m_quad_index;
-            if (!fade)
-            {
-                uie.TestMouseInRect(pos, width * 0.5f + 22f, 24f, selection, true);
-            }
-            bool selected = UIManager.m_menu_selection == selection;
-
-            Color label_color;
-            var text_width = 244f;
-            var text_right = 2f;
-            float alpha8 = 1f - Mathf.Pow(1f - uie.m_alpha, 8f);
-            if (selected)
-            {
-                Color bar_color = Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.2f * UIElement.FLICKER) + UIManager.m_select_flash * 0.3f);
-                bar_color.a = alpha8;
-                var bar_width = width - text_width - text_right;
-                var rest_width = width - bar_width;
-                // highlight left
-                UIManager.DrawQuadBarHorizontal(pos - Vector2.right * (width - bar_width + 22f + 18f - 3f) * 0.5f, 0f, 22f, bar_width + 4f, bar_color, 12);
-                // highlight around text field
-                UIManager.DrawQuadBarHorizontal(pos + Vector2.right * (bar_width + 22f - 18f) * 0.5f - Vector2.up * 18f, 0f, 2f, rest_width + 22f + 18f, bar_color, 12);
-                UIManager.DrawQuadBarHorizontal(pos + Vector2.right * (bar_width + 22f - 18f) * 0.5f + Vector2.up * 18f, 0f, 2f, rest_width + 22f + 18f, bar_color, 12);
-                UIManager.DrawQuadBarHorizontal(pos + Vector2.right * (width - text_right + 20f * 2) * 0.5f, 0f, 22f, text_right + 4f, bar_color, 12);
-                label_color = UIManager.m_col_ub3;
-                label_color.a = alpha8;
-            }
-            else
-            {
-                label_color = UIManager.m_col_ui0;
-                label_color.a = uie.m_alpha;
-            }
-
-            float alpha6 = 1f - Mathf.Pow(1f - uie.m_alpha, 6f);
-            Color border_color = Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.5f * UIElement.FLICKER));
-            border_color.a = alpha6;
-            UIManager.DrawQuadBarHorizontal(pos, 22f, 22f, width, border_color, 7);
-
-            Color text_color = UIManager.m_col_ui2;
-            text_color.a = uie.m_alpha;
-            uie.DrawStringSmallOverrideAlpha(label, pos - Vector2.right * (width * 0.5f + 15f), 0.75f, StringOffset.LEFT, label_color, width - 270f);
-            pos.x += (width - text_width - text_right) * 0.5f;
-            uie.DrawOutlineBackdrop(pos, 17f, text_width, text_color, 2);
-
-            float m_cursor_blink_timer = (float)_UIElement_m_cursor_blink_timer_Field.GetValue(uie);
-            bool m_cursor_on = (bool)_UIElement_m_cursor_on_Field.GetValue(uie);
-            m_cursor_blink_timer -= RUtility.FRAMETIME_UI;
-            if (m_cursor_blink_timer < 0f)
-            {
-                m_cursor_blink_timer += 0.25f;
-                m_cursor_on = !m_cursor_on;
-                _UIElement_m_cursor_on_Field.SetValue(uie, m_cursor_on);
-            }
-            _UIElement_m_cursor_blink_timer_Field.SetValue(uie, m_cursor_blink_timer);
-            bool show_cursor = m_cursor_on && selected;
-
-            float scale = 0.5f * 20f;
-            var textCursor = text + "_";
-            float stringWidth = UIManager.GetStringWidth(textCursor, scale);
-            DrawStringAlignCenterWidth(show_cursor ? textCursor : text, pos, scale, text_color, stringWidth, 200f + 22f * 2 + 22f);
-
-            if (fade)
-            {
-                UIManager.PreviousQuadsAlpha(quad_index, 0.3f);
-            }
-        }
-
-        private static void DrawStringAlignCenterWidth(string s, Vector2 position, float scale, Color c, float stringWidth, float max_width = -1f)
-        {
-            Vector2 scl_pos = position;
-            position.x -= ((!(max_width > 0f)) ? stringWidth : ((!(max_width < stringWidth)) ? stringWidth : max_width)) * 0.5f;
-            UIManager.DrawStringScaled(s, position, scl_pos, scale, c, max_width, stringWidth, 0.5f);
-        }
-
-    }
 }

@@ -21,9 +21,15 @@ namespace GameMod
         static List<MPMatchPreset> presets = new List<MPMatchPreset>();
         static int mms_match_preset = 0;
 
-        static string GetMatchPreset()
+        public static string GetMatchPreset()
         {
             return presets[mms_match_preset].title;
+        }
+
+        public static void CyclePreset()
+        {
+            mms_match_preset = (mms_match_preset + presets.Count + UIManager.m_select_dir) % presets.Count;
+            presets[mms_match_preset].Apply();
         }
 
         static MPMatchPresets()
@@ -350,90 +356,6 @@ namespace GameMod
                         }
                         presets.Add(preset);
                     }
-                }
-            }
-        }
-        
-        [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-        class MPMatchPresetDrawMpMatchSetup
-        {
-            private static void DrawItem(UIElement uie, ref Vector2 position)
-            {
-                uie.SelectAndDrawStringOptionItem("MATCH PRESET", position, 9, GetMatchPreset(), "PRECONFIGURED SETTINGS FOR MATCHES", 1.5f, false);
-                position.y += 62f;
-            }
-
-            // rewrite call to empty method to avoid needing to remove pushing the arguments in the IL code
-            private static void NoDrawLabelSmall(UIElement self, Vector2 pos, string s, float w = 200f, float h = 24f, float alpha = 1f)
-            {
-            }
-
-            [HarmonyPriority(Priority.Normal - 1)] // set global order of transpilers for this function
-            private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
-            {
-                int state = 0;
-                foreach (var code in codes)
-                {
-                    if (state == 0 && code.opcode == OpCodes.Ldstr && (string)code.operand == "MATCH SETTINGS")
-                    {
-                        state = 1;
-                    }
-                    else if (state == 1 && code.opcode == OpCodes.Call && ((MethodInfo)code.operand).Name == "DrawLabelSmall")
-                    {
-                        yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MPMatchPresetDrawMpMatchSetup), "NoDrawLabelSmall"));
-                        continue;
-                    }
-                    else if (state == 1 && code.opcode == OpCodes.Ldc_R4 && (float)code.operand == 217f)
-                    {
-                        code.operand = 277f;
-                        state = 2;
-                    }
-                    else if (state == 2 && code.opcode == OpCodes.Call && ((MethodInfo)code.operand).Name == "DrawMenuSeparator")
-                    {
-                        state = 3;
-                    }
-                    else if (state == 3)
-                    {
-                        state = 4;
-                        yield return new CodeInstruction(OpCodes.Ldarg_0);
-                        yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                        yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MPMatchPresetDrawMpMatchSetup), "DrawItem"));
-                    }
-                    yield return code;
-                }
-            }
-
-        }
-        
-        // Process slider input
-        [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
-        class MPMatchPresets_MenuManager_MpMatchSetup
-        {
-            static void HandleMatchPreset()
-            {
-                if (MenuManager.m_menu_sub_state == MenuSubState.ACTIVE &&
-                    MenuManager.m_menu_micro_state == 2 &&
-                    UIManager.m_menu_selection == 9)
-                {
-                    mms_match_preset = (mms_match_preset + presets.Count + UIManager.m_select_dir) % presets.Count;
-                    presets[mms_match_preset].Apply();
-                    MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                }
-            }
-
-            // Patch in input check after the sole MaybeReverseOption()
-            static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
-            {
-                foreach (var code in codes)
-                {
-                    if (code.opcode == OpCodes.Call && ((MethodInfo)code.operand).Name == "MaybeReverseOption")
-                    {
-                        yield return code;
-                        yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(MPMatchPresets_MenuManager_MpMatchSetup), "HandleMatchPreset"));
-                        continue;
-                    }
-
-                    yield return code;
                 }
             }
         }

@@ -111,6 +111,7 @@
     <Compile Include="Hooks\PlayerShip.cs" />
     <Compile Include="Hooks\Viewer.cs" />
     <Compile Include="Hooks\NetworkMatch.cs" />
+    <Compile Include="Hooks\MenuManager.cs" />
     <Compile Include="Logging\LogRewrite.cs" />
     <Compile Include="Logging\LevelScanLog.cs" />
     <Compile Include="Logging\EngineLogNoise.cs" />
@@ -154,6 +155,7 @@
     <Compile Include="JoystickRotationFix.cs" />
     <Compile Include="LevelError.cs" />
     <Compile Include="MatchModeRace.cs" />
+    <Compile Include="MatchSetupMenu.cs" />
     <Compile Include="MessageTypes.cs" />
     <Compile Include="MoreAudio.cs" />
     <Compile Include="MPAlwaysCloaked.cs" />

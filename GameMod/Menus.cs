@@ -311,238 +311,41 @@ namespace GameMod {
         public static int mms_taunt_scroll_offset = 0;
         public const int SCROLL_ELEMENT_PAGE_VISIBLE_ROWS = 10;
         public static bool mms_super_countdown = false;
+
+        public static void DrawScrollbar(UIElement uie, ref int scroll_offset, ref bool dragging, float scrollbar_center_x, float first_row_y, float row_pitch, int visible_rows, int total_rows)
+        {
+            int max_scroll_offset = total_rows - visible_rows;
+            float track_top_y = first_row_y - 10f;
+            float track_bottom_y = first_row_y + (visible_rows - 1) * row_pitch + 10f;
+            float track_height = track_bottom_y - track_top_y;
+            float thumb_height = track_height * visible_rows / total_rows;
+
+            bool mouse_on_track = Mathf.Abs(UIManager.m_mouse_pos.x - scrollbar_center_x) <= 14f
+                && UIManager.m_mouse_pos.y >= track_top_y - 6f && UIManager.m_mouse_pos.y <= track_bottom_y + 6f;
+            if (Input.GetMouseButtonDown(0) && mouse_on_track)
+                dragging = true;
+            if (!Input.GetMouseButton(0))
+                dragging = false;
+            if (dragging)
+            {
+                float drag_range = track_height - thumb_height;
+                float drag_fraction = drag_range > 0f ? Mathf.Clamp01((UIManager.m_mouse_pos.y - track_top_y - thumb_height * 0.5f) / drag_range) : 0f;
+                scroll_offset = Mathf.RoundToInt(drag_fraction * max_scroll_offset);
+            }
+
+            Vector2 track_center = new Vector2(scrollbar_center_x, (track_top_y + track_bottom_y) * 0.5f);
+            UIManager.DrawQuadUI(track_center, 6f, track_height * 0.5f + 4f, UIManager.m_col_ub0, uie.m_alpha * 0.1f, 12);
+            UIManager.DrawQuadUI(track_center, 1.2f, track_height * 0.5f, UIManager.m_col_ui0, uie.m_alpha * 0.5f, 12);
+
+            float thumb_top_y = track_top_y + scroll_offset * (track_height - thumb_height) / max_scroll_offset;
+            Vector2 thumb_center = new Vector2(scrollbar_center_x, thumb_top_y + thumb_height * 0.5f);
+            Color thumb_color = (dragging || mouse_on_track)
+                ? Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.2f * UIElement.FLICKER))
+                : UIManager.m_col_ui2;
+            UIManager.DrawQuadUIInner(thumb_center, 5f, thumb_height * 0.5f, thumb_color, uie.m_alpha, 11, 0.75f);
+        }
     }
 
-
-    /// <summary>
-    /// Restructure Create Match -> Advanced to two columns
-    /// </summary>
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-    class Menus_UIElement_DrawMpMatchSetup
-    {
-
-        private static float col_top;
-        private static float col_bot;
-
-        private static void AdjustAdvancedPositionLeftColumn(ref Vector2 position)
-        {
-            position.x -= 300f;
-            col_top = position.y;
-        }
-
-        private static void DrawRightColumn(UIElement uie, ref Vector2 position)
-        {
-            col_bot = position.y;
-            position.x += 600f;
-            position.y = col_top - 250f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW REAR VIEW CAMERA"), position, 11, Menus.GetMMSRearViewPIP(), Loc.LS("CLIENTS CAN CHOOSE TO HAVE REAR VIEW"), 1f, false);
-            position.y += 45f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("ALWAYS CLOAKED"), position, 15, Menus.GetMMSAlwaysCloaked(), Loc.LS("SHIPS ARE ALWAYS CLOAKED"), 1f, false);
-            position.y += 45f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("CLASSIC SPAWNS"), position, 13, Menus.GetMMSClassicSpawns(), Loc.LS("SPAWN WITH IMPULSE+ DUALS AND FALCONS"), 1f, false);
-            position.y += 45f;
-
-            if (MenuManager.mms_mode == ExtMatchMode.CTF)
-            {
-                uie.SelectAndDrawStringOptionItem(Loc.LS("CTF CARRIER BOOSTING"), position, 14, Menus.GetMMSCtfCarrierBoost(), Loc.LS("FLAG CARRIER CAN USE BOOST IN CTF"), 1f, false);
-            }
-            else
-            {
-                uie.SelectAndDrawStringOptionItem(Loc.LS("ASSISTS"), position, 18, Menus.GetMMSAssistScoring(), Loc.LS("AWARD POINTS FOR ASSISTING WITH KILLS"), 1f, false);
-            }
-
-            position.y += 45f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("PROJECTILE DATA"), position, 16, Menus.mms_mp_projdata_fn == "STOCK" ? "STOCK" : System.IO.Path.GetFileName(Menus.mms_mp_projdata_fn), string.Empty, 1f, false);
-            position.y += 45f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW SMASH ATTACK"), position, 17, Menus.GetMMSAllowSmash(), Loc.LS("ALLOWS PLAYERS TO USE THE SMASH ATTACK"), 1f, false);
-            position.y += 45f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("TB PENETRATION"), position, 20, MPThunderboltPassthrough.isAllowed ? "ON" : "OFF", Loc.LS("ALLOWS THUNDERBOLT SHOTS TO PENETRATE SHIPS"), 1f, false);
-            position.y += 45f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("DAMAGE NUMBERS"), position, 21, Menus.GetMMSDamageNumbers(), Loc.LS("SHOWS THE DAMAGE YOU DO TO OTHER SHIPS"), 1f, false);
-            position.y += 45f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("CLIENT-SIDE PHYSICS"), position, 23, MPServerOptimization.prefEnabled ? "ENABLED" : "DISABLED", Loc.LS("ALLOWS CLIENTS TO PASS PRE-PROCESSED PHYSICS RATHER THAN RESIMULATING INPUTS ON THE SERVER"), 1f, false);
-            position.y += 45f;
-            //uie.SelectAndDrawStringOptionItem(Loc.LS("SERVER INPUT BUFFER LENGTH"), position, 24, MPServerOptimization.InputBufferLength.ToString(), Loc.LS("NUMBER OF FRAMES TO BUFFER BEFORE SERVER PROCESSES INPUT IT HAS RECEIVED (OVERLOAD STOCK IS 3, TESTING VERSION IS 2)"), 1f, false); // TESTING
-            uie.SelectAndDrawStringOptionItem(Loc.LS("ROLL SPEED LIMIT"), position, 24, "+" + (MPServerOptimization.RollSpeedLimit - 3), Loc.LS("MAXIMUM ROLL SPEED MODIFIER TO ALLOW FOR THIS ROUND"), 1f, false);
-            position.y += 45f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("COLLISION MESH"), position, 22, Menus.GetMMSCollisionMesh(), Loc.LS("COLLIDER TO USE FOR PROJECTILE->SHIP COLLISIONS"), 1f, false);
-            position.y += 45f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("DESTRUCTIBLE MISSILES"), position, 25, Menus.GetMMSDestructibleMissiles(), Loc.LS("ALLOWS MISSILES TO BE SHOT DOWN IN FLIGHT"), 1f, false);
-
-          }
-
-        private static void AdjustAdvancedPositionCenterColumn(ref Vector2 position)
-        {
-            position.x -= 600f;
-            position.y = col_bot;
-        }
-
-        private static void DrawTeamSettings(UIElement uie, ref Vector2 position)
-        {
-            position.y += 12f;
-            uie.SelectAndDrawItem(Loc.LS("TEAM SETTINGS"), position, 19, false, 1f, 0.75f);
-            position.y += 62f;
-        }
-
-        private static void DrawLoadoutRestrictionOptions(UIElement uie, ref Vector2 position)
-        {
-            position.y += 12f;
-            uie.SelectAndDrawItem("ALLOWED LOADOUT WEAPONS", position, 23, false, 1f, 0.75f);
-            position.y += 62f;
-            uie.SelectAndDrawItem("ALLOWED MODIFIERS", position, 8, false, 1f, 0.75f);
-            position.y += 31f;
-            uie.DrawMenuSeparator(position);
-            position.y += 31f;
-        }
-
-
-        private static void DrawBacklinkButtonInPowerupMenu(UIElement uie)
-        {
-            uie.SelectAndDrawHalfItem2("ALLOWED LOADOUTS", new Vector2(-473f, 214), 30, false);
-        }
-
-        private static void ResetCenter(UIElement uie, ref Vector2 position)
-        {
-            position.x += 300f;
-        }
-
-        [HarmonyPriority(Priority.Normal - 9)] // set global order of transpilers for this function
-        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
-        {
-            MethodInfo targetMethod = AccessTools.Method(typeof(UIElement), "DrawMenuSeparator", new[] { typeof(Vector2) });
-
-            int state = 0;
-            int loadout_specific_state = 0; // this is used to find the place where to add the loadout menu
-            int loadout_powerup_menulink_button_state = 0; // this is used to find the entrypoint to the original powerup menu to insert a button that links back to the new loadout menu
-            foreach (var code in codes)
-            {
-                // Adjust x position
-                if (state == 0 && code.opcode == OpCodes.Stsfld && code.operand == AccessTools.Field(typeof(UIElement), "ToolTipActive"))
-                {
-                    state = 1;
-                    yield return code;
-                    yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Menus_UIElement_DrawMpMatchSetup), "AdjustAdvancedPositionLeftColumn"));
-                    continue;
-                }
-
-                // Readjust select width from 1.5 to 1.0
-                if (state == 1 && code.opcode == OpCodes.Ldc_R4 && (float)code.operand == 1.5f)
-                    code.operand = 1f;
-
-                // Stop processing changes
-                if (state == 1 && code.opcode == OpCodes.Ldstr && (string)code.operand == "POWERUP SETTINGS")
-                {
-                    state = 2;
-                    // Draw things for right column
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Menus_UIElement_DrawMpMatchSetup), "DrawRightColumn"));
-                    // Revert to center column
-                    yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Menus_UIElement_DrawMpMatchSetup), "AdjustAdvancedPositionCenterColumn"));
-                    // Add Team Settings
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Menus_UIElement_DrawMpMatchSetup), "DrawTeamSettings"));
-                }
-
-                // Reset center
-                if (state == 2 && code.opcode == OpCodes.Call && code.operand == AccessTools.Method(typeof(UIElement), "SelectAndDrawItem"))
-                {
-                    state = 3;
-                    yield return code;
-                    continue;
-                }
-
-                // FOR MpLoadouts:
-                // Skip the state till we are at the second occurence of "LOADOUT SETTINGS"
-                if (loadout_specific_state <= 1 && code.opcode == OpCodes.Ldstr && (string)code.operand == "LOADOUT SETTINGS")
-                {
-                    loadout_specific_state++;
-                    yield return code;
-                    continue;
-                }
-
-                // FOR MpLoadouts:
-                // Changes the spacing of the menu to make room for the loadout/modifier menu buttons
-                if (loadout_specific_state == 2 && code.opcode == OpCodes.Ldc_R4)
-                {
-                    if( (float)code.operand == 186f )
-                        code.operand = 270f;
-                    if( (float)code.operand == 40f)
-                        code.operand = 19f;
-                }
-
-                // FOR MpLoadouts:
-                // Adds the restricted loadout/modifier menu buttons
-                if (loadout_specific_state == 2 && code.opcode == OpCodes.Call &&  code.operand is MethodInfo method && method == targetMethod)
-                {
-                    loadout_specific_state = 3;
-                    yield return code;
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Menus_UIElement_DrawMpMatchSetup), "DrawLoadoutRestrictionOptions"));
-                    continue;
-                }
-
-                // look for the second appearance of "ALLOWED POWERUPS" to add the loadout menu button in the powerup menu. this would not work if this patch was not always the first to execute
-                if( code.opcode == OpCodes.Ldstr && (string)code.operand == "ALLOWED POWERUPS")
-                    loadout_powerup_menulink_button_state++;   
-                if(loadout_powerup_menulink_button_state == 2 && code.opcode == OpCodes.Ldc_R4 && (float)code.operand == 80.6f)
-                {
-                    loadout_powerup_menulink_button_state++;
-                    yield return code;
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Menus_UIElement_DrawMpMatchSetup), "DrawBacklinkButtonInPowerupMenu"));
-                    continue;
-                }
-
-                if (state == 3 && code.opcode == OpCodes.Call && code.operand == AccessTools.Method(typeof(UIElement), "SelectAndDrawItem"))
-                {
-                    state = 4;
-                    yield return code;
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Ldloca, 0);
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Menus_UIElement_DrawMpMatchSetup), "ResetCenter"));
-                    continue;
-                }
-
-                yield return code;
-            }
-        }
-
-        private static void Postfix(UIElement __instance)
-        {
-            switch (MenuManager.m_menu_micro_state)
-            {
-                case 10:
-                    Player local_player = GameManager.m_local_player;
-                    Vector2 position = __instance.m_position;
-                    __instance.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("TEAM SETTINGS"), 250f, 24f, 1f);
-                    position.y -= 280f;
-
-                    __instance.DrawMenuSeparator(position);
-                    position.y += 40f;
-
-                    __instance.SelectAndDrawStringOptionItem(Loc.LS("FRIENDLY FIRE"), position, 3, MenuManager.GetMMSFriendlyFire(), string.Empty, 1.5f, MenuManager.mms_mode == MatchMode.ANARCHY);
-                    position.y += 62f;
-
-                    __instance.SelectAndDrawStringOptionItem("TEAM COUNT", position, 8, MPTeams.MenuManagerTeamCount.ToString(), string.Empty, 1.5f,
-                        MenuManager.mms_mode == MatchMode.ANARCHY || !MenuManager.m_mp_lan_match);
-                    position.y += 62f;
-
-                    __instance.SelectAndDrawStringOptionItem(Loc.LS("SCALE RESPAWN TO TEAM SIZE"), position, 12, Menus.GetMMSScaleRespawnTime(), Loc.LS("AUTOMATICALLY SCALE RESPAWN TIME TO TEAM SIZE (e.g. 4 = 4 seconds)"), 1.5f, !(MenuManager.mms_mode == ExtMatchMode.TEAM_ANARCHY || MenuManager.mms_mode == ExtMatchMode.CTF || MenuManager.mms_mode == ExtMatchMode.MONSTERBALL));
-                    position.y += 62f;
-
-                    position.x = -310f;
-                    position.y = -90f;
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
 
     /// <summary>
     /// Add Rear View, Ship Velocity, Frame Rate options to Options -> Cockpit & HUD Options
@@ -609,213 +412,6 @@ namespace GameMod {
         }
     }
 
-
-    [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
-    class Menus_MenuManager_MpMatchSetup
-    {
-        // Handle match time limit
-        static void ProcessMatchTimeLimit()
-        {
-            Menus.mms_match_time_limit = ((Menus.mms_match_time_limit / 60 + 21 + UIManager.m_select_dir) % 21) * 60;
-            MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-        }
-
-        // Handle additional options, Team Settings menu etc
-        static void ProcessAdditional()
-        {
-            if (MenuManager.m_menu_micro_state == 3)
-            {
-                switch (UIManager.m_menu_selection)
-                {
-                    case 11:
-                        RearView.MPMenuManagerEnabled = !RearView.MPMenuManagerEnabled;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 13:
-                        Menus.mms_classic_spawns = !Menus.mms_classic_spawns;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        // Re-enables Reflex drops in classic spawn mode by default. 
-                        if (Menus.mms_classic_spawns)
-                        {
-                            MenuManager.mms_powerup_filter[2] = true;
-                        }
-                        break;
-                    case 14:
-                        Menus.mms_ctf_boost = !Menus.mms_ctf_boost;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 15:
-                        Menus.mms_always_cloaked = !Menus.mms_always_cloaked;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 16:
-                        if (UIManager.PushedSelect(100))
-                        {
-                            var files = new string[] { "STOCK" }.AddRangeToArray(Directory.GetFiles(Config.OLModDir, "projdata-*.txt"));
-                            for (int i = 0; i < files.Length; i++)
-                            {
-                                uConsole.Log(files[i] + ": " + files.Length.ToString());
-                                if (Menus.mms_mp_projdata_fn == files[i])
-                                {
-                                    if (i + 1 < files.Length)
-                                    {
-                                        Menus.mms_mp_projdata_fn = files[i + 1];
-                                    }
-                                    else
-                                    {
-                                        Menus.mms_mp_projdata_fn = files[0];
-                                    }
-                                    break;
-                                }
-                            }
-                            MenuManager.PlayCycleSound(1f, 1f);
-                        }
-                        break;
-                    case 17:
-                        Menus.mms_allow_smash = !Menus.mms_allow_smash;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-
-                    case 18:
-                        Menus.mms_assist_scoring = !Menus.mms_assist_scoring;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 19:
-                        MenuManager.m_menu_micro_state = 10;
-                        MenuManager.UIPulse(2f);
-                        MenuManager.PlaySelectSound(1f);
-                        break;
-                    case 20:
-                        MPThunderboltPassthrough.isAllowed = !MPThunderboltPassthrough.isAllowed;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 21:
-                        Menus.mms_damage_numbers = !Menus.mms_damage_numbers;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 22:
-                        Menus.mms_collision_mesh = (4 + Menus.mms_collision_mesh + UIManager.m_select_dir) % 4;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 23:
-                        MPServerOptimization.prefEnabled = !MPServerOptimization.prefEnabled;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 24:
-                        //MPServerOptimization.InputBufferLength = ((3 + MPServerOptimization.InputBufferLength + UIManager.m_select_dir) % 4) + 1; // TESTING
-                        MPServerOptimization.RollSpeedLimit = 3 + ((2 + MPServerOptimization.RollSpeedLimit + UIManager.m_select_dir) % 5);
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 25:
-                        Menus.mms_destructible_missiles = !Menus.mms_destructible_missiles;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-
-                }
-            }
-            else if (MenuManager.m_menu_micro_state == 10)
-            {
-                // Team Settings window
-                switch (UIManager.m_menu_selection)
-                {
-                    case 3:
-                        MenuManager.mms_friendly_fire = 1 - MenuManager.mms_friendly_fire;
-                        MenuManager.PlayCycleSound(1f, 1f);
-                        break;
-                    case 8:
-                        MPTeams.MenuManagerTeamCount = MPTeams.Min +
-                            (MPTeams.MenuManagerTeamCount - MPTeams.Min + (MPTeams.Max - MPTeams.Min + 1) + UIManager.m_select_dir) %
-                            (MPTeams.Max - MPTeams.Min + 1);
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 12:
-                        Menus.mms_scale_respawn_time = !Menus.mms_scale_respawn_time;
-                        MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
-                        break;
-                    case 100:
-                        MenuManager.m_menu_micro_state = 3;
-                        MenuManager.UIPulse(2f);
-                        MenuManager.PlaySelectSound(1f);
-                        return;
-                    default:
-                        return;
-                }
-            }
-        }
-
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
-        {
-            int state = 0;
-            List<Label> labels = new List<Label>();
-            foreach (var code in codes)
-            {
-                if (state == 0 && code.opcode == OpCodes.Ldsfld && code.operand == AccessTools.Field(typeof(MenuManager), "mms_time_limit"))
-                {
-                    state = 1;
-                    labels = code.labels;
-                }
-
-                if (state == 1 && code.opcode == OpCodes.Call && code.operand == AccessTools.Method(typeof(MenuManager), "PlayCycleSound"))
-                {
-                    code.operand = AccessTools.Method(typeof(Menus_MenuManager_MpMatchSetup), "ProcessMatchTimeLimit");
-                    code.labels = labels;
-                    state = 2;
-                }
-
-                if (state == 1)
-                    continue;
-
-                if (code.opcode == OpCodes.Call && code.operand == AccessTools.Method(typeof(MenuManager), "MaybeReverseOption"))
-                {
-                    yield return code;
-                    yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(Menus_MenuManager_MpMatchSetup), "ProcessAdditional"));
-                    continue;
-                }
-
-                // Remove processing of mms_friendly_fire, moved to ProcessAdditional()
-                if (code.opcode == OpCodes.Stsfld && code.operand == AccessTools.Field(typeof(MenuManager), "mms_friendly_fire"))
-                {
-                    yield return new CodeInstruction(OpCodes.Pop);
-                    continue;
-                }
-
-
-                yield return code;
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-    class Menus_UIElement_DrawMpMatchSetup_ScaleRespawnTime
-    {
-        // Change fade parameter on respawn slider from MenuManager.mms_mode == MatchMode.MONSTERBALL to Menus.mms_scale_respawn
-        [HarmonyPriority(Priority.Normal - 10)] // set global order of transpilers for this function
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
-        {
-            int state = 0;
-            foreach (var code in codes)
-            {
-                if (state == 0 && code.opcode == OpCodes.Ldstr && (string)code.operand == "RESPAWN TIME")
-                    state = 1;
-
-                if (state == 1 && code.opcode == OpCodes.Ldsfld && code.operand == AccessTools.Field(typeof(MenuManager), "mms_mode"))
-                {
-                    state = 2;
-                    code.opcode = OpCodes.Call;
-                    code.operand = AccessTools.Property(typeof(Menus), "mms_scale_respawn_time").GetGetMethod();
-                }
-
-                if (state == 2 && code.opcode == OpCodes.Ldc_I4_2)
-                {
-                    state = 3;
-                    code.opcode = OpCodes.Ldc_I4_1;
-                }
-
-                yield return code;
-            }
-        }
-    }
-
     [HarmonyPatch(typeof(UIElement), "DrawMpOptions")]
     class Menus_UIElement_DrawMpOptions
     {
@@ -871,7 +467,7 @@ namespace GameMod {
                     position.y -= 52f;
 
                     if (mp_general_tab_rows.Count > Menus.SCROLL_ELEMENT_PAGE_VISIBLE_ROWS)
-                        DrawScrollbar(__instance, ref Menus.mms_mp_general_scroll_offset, ref mp_general_tab_scrollbar_dragging,
+                        Menus.DrawScrollbar(__instance, ref Menus.mms_mp_general_scroll_offset, ref mp_general_tab_scrollbar_dragging,
                             440f, general_tab_first_row_y, 52f, general_tab_visible_rows, mp_general_tab_rows.Count);
                     break;
                 case 1:
@@ -993,7 +589,7 @@ namespace GameMod {
                         position.y -= taunt_row_pitch;
 
                         if (MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT > taunt_visible_rows)
-                            DrawScrollbar(__instance, ref Menus.mms_taunt_scroll_offset, ref taunt_tab_scrollbar_dragging,
+                            Menus.DrawScrollbar(__instance, ref Menus.mms_taunt_scroll_offset, ref taunt_tab_scrollbar_dragging,
                                 378f, // the gap between the joystick column and this tab's own buttons at x = 500
                                 taunt_first_row_y, taunt_row_pitch, taunt_visible_rows, MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT);
 
@@ -1046,39 +642,6 @@ namespace GameMod {
 
         private static bool mp_general_tab_scrollbar_dragging = false;
         private static bool taunt_tab_scrollbar_dragging = false;
-        private static void DrawScrollbar(UIElement uie, ref int scroll_offset, ref bool dragging, float scrollbar_center_x, float first_row_y, float row_pitch, int visible_rows, int total_rows)
-        {
-            int max_scroll_offset = total_rows - visible_rows;
-            float track_top_y = first_row_y - 10f;
-            float track_bottom_y = first_row_y + (visible_rows - 1) * row_pitch + 10f;
-            float track_height = track_bottom_y - track_top_y;
-            float thumb_height = track_height * visible_rows / total_rows;
-
-            bool mouse_on_track = Mathf.Abs(UIManager.m_mouse_pos.x - scrollbar_center_x) <= 14f
-                && UIManager.m_mouse_pos.y >= track_top_y - 6f && UIManager.m_mouse_pos.y <= track_bottom_y + 6f;
-            if (Input.GetMouseButtonDown(0) && mouse_on_track)
-                dragging = true;
-            if (!Input.GetMouseButton(0))
-                dragging = false;
-            if (dragging)
-            {
-                float drag_range = track_height - thumb_height;
-                float drag_fraction = drag_range > 0f ? Mathf.Clamp01((UIManager.m_mouse_pos.y - track_top_y - thumb_height * 0.5f) / drag_range) : 0f;
-                scroll_offset = Mathf.RoundToInt(drag_fraction * max_scroll_offset);
-            }
-
-            Vector2 track_center = new Vector2(scrollbar_center_x, (track_top_y + track_bottom_y) * 0.5f);
-            UIManager.DrawQuadUI(track_center, 6f, track_height * 0.5f + 4f, UIManager.m_col_ub0, uie.m_alpha * 0.1f, 12);
-            UIManager.DrawQuadUI(track_center, 1.2f, track_height * 0.5f, UIManager.m_col_ui0, uie.m_alpha * 0.5f, 12);
-
-            float thumb_top_y = track_top_y + scroll_offset * (track_height - thumb_height) / max_scroll_offset;
-            Vector2 thumb_center = new Vector2(scrollbar_center_x, thumb_top_y + thumb_height * 0.5f);
-            Color thumb_color = (dragging || mouse_on_track)
-                ? Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UnityEngine.Random.Range(0f, 0.2f * UIElement.FLICKER))
-                : UIManager.m_col_ui2;
-            UIManager.DrawQuadUIInner(thumb_center, 5f, thumb_height * 0.5f, thumb_color, uie.m_alpha, 11, 0.75f);
-        }
-
         public static void DrawTabs(UIElement uie, Vector2 pos, int tab_selected)
         {
             float w = 508f;

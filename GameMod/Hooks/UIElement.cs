@@ -17,4 +17,19 @@ namespace GameMod.Hooks
             MainMenuRows.DrawFallback(__instance);
         }
     }
+
+    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
+    class UIElement_DrawMpMatchSetup
+    {
+        static bool Prepare()
+        {
+            return Core.GameMod.HasInternetMatch();
+        }
+
+        static bool Prefix(UIElement __instance)
+        {
+            MatchSetupMenu.Draw(__instance);
+            return false;
+        }
+    }
 }

@@ -143,11 +143,7 @@ namespace GameMod {
             return (filterAll?"*":"") + filter + "*";
         }
 
-    }
 
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-    class MPLevelSelectDraw
-    {
         static Vector2 temp_pos;
 
         static void DrawPageArrows(UIElement uie, Vector2 pos, bool show_pgup, bool show_pgdn, float arrow_x)
@@ -171,11 +167,8 @@ namespace GameMod {
 
         private static MethodInfo _UIElement_DrawMiniLevelImage_Method = typeof(UIElement).GetMethod("DrawMiniLevelImage", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static MethodInfo _UIElement_DrawWrappedText_Method = typeof(UIElement).GetMethod("DrawWrappedText", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        static bool Prefix(UIElement __instance)
+        public static void DrawPage(UIElement uie)
         {
-            if (MenuManager.m_menu_micro_state != 8)
-                return true;
-            var uie = __instance;
             UIManager.X_SCALE = 0.35f;
             uie.DrawMenuBG();
             uie.DrawHeaderMedium(Vector2.up * (UIManager.UI_TOP + 30f), Loc.LS("MULTIPLAYER LEVEL SELECT"), 265f);
@@ -246,49 +239,34 @@ namespace GameMod {
             position.x = 0f;
             position.y = UIManager.UI_BOTTOM - 30f;
             uie.SelectAndDrawItem(Loc.LS("BACK"), position, 100, false, 1f, 0.75f);
-            return false;
         }
-    }
 
-    [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
-    class MPLevelSelectUpdate
-    {
-        private static void Postfix()
+        public static bool OpenOnLevelClick()
         {
-            // click on level name in match settings -> jump to level select screen
-            if (MenuManager.m_menu_sub_state == MenuSubState.ACTIVE &&
-                MenuManager.m_menu_micro_state == 2 &&
-                UIManager.m_menu_selection == 2 &&
-                Controls.JustPressed(CCInput.MENU_SELECT) &&
-                !UIManager.m_pushed_dir && !MenuManager.reversed_option)
-            {
-                float num = 500f * 1.5f;
-                Vector2 pos = UIManager.SCREEN_CENTER;
-                pos.y -= 217f;
-                pos.y += 62f + 62f;
-                pos.x += num * 0.5f - 123f;
-                var size = new Vector2(24f, 24f);
-                Debug.Log("[LevelSelect] mouse " + UIManager.m_mouse_pos + " pos " + pos + " size " + size);
-                if (new Rect(pos + Vector2.right * 130f - size, size * 2).Contains(UIManager.m_mouse_pos)) // right button clicked?
-                    return;
+            if (!Controls.JustPressed(CCInput.MENU_SELECT) || UIManager.m_pushed_dir || MenuManager.reversed_option)
+                return false;
+            float num = 500f * 1.5f;
+            Vector2 pos = UIManager.SCREEN_CENTER;
+            pos.y -= 217f;
+            pos.y += 62f + 62f;
+            pos.x += num * 0.5f - 123f;
+            var size = new Vector2(24f, 24f);
+            Debug.Log("[LevelSelect] mouse " + UIManager.m_mouse_pos + " pos " + pos + " size " + size);
+            if (new Rect(pos + Vector2.right * 130f - size, size * 2).Contains(UIManager.m_mouse_pos)) // right button clicked?
+                return false;
 
-                // workaround to undo that we have already selected the next level
-                MenuManager.mms_level_num = MenuManager.mms_level_num == 0 ? GameManager.MultiplayerMission.NumLevels - 1 : MenuManager.mms_level_num - 1;
-
-                MenuManager.SetDefaultSelection(0);
-                MPLevelSelect.ResetFilter();
-                MenuManager.m_menu_micro_state = 8;
-                MenuManager.UIPulse(2f);
-                MenuManager.PlaySelectSound(1f);
-            }
+            MenuManager.SetDefaultSelection(0);
+            ResetFilter();
+            MenuManager.m_menu_micro_state = 8;
+            MenuManager.UIPulse(2f);
+            MenuManager.PlaySelectSound(1f);
+            return true;
         }
 
         private static MethodInfo _MenuManager_CheckPaging_Method = typeof(MenuManager).GetMethod("CheckPaging", BindingFlags.NonPublic | BindingFlags.Static);
-        private static bool Prefix()
+        public static void UpdatePage()
         {
-            if (MenuManager.m_menu_micro_state != 8 || MenuManager.m_menu_sub_state != MenuSubState.ACTIVE)
-                return true;
-            MPLevelSelect.UpdateFilter(Input.inputString);
+            UpdateFilter(Input.inputString);
             UIManager.MouseSelectUpdate();
 
             UIManager.ControllerMenu();
@@ -296,15 +274,14 @@ namespace GameMod {
             {
                 int selIdx = UIManager.m_menu_selection - 1000;
                 int idx = -1;
-                if (selIdx < MPLevelSelect.LevelIndex.Length) {
-                    idx = MPLevelSelect.LevelIndex[selIdx];
+                if (selIdx < LevelIndex.Length) {
+                    idx = LevelIndex[selIdx];
                 }
                 if (idx >= 0)
                     UIManager.SetLevelTexture(GameManager.MultiplayerMission, idx);
                 else
                     UIManager.SetTexture((Texture)Resources.Load("Textures/default"));
             }
-            //bool flag = MenuManager.CheckPaging(ref MenuManager.m_list_items_first, ref MenuManager.m_list_items_last, MenuManager.m_selected_mission.NumLevels, 6);
             var args = new object[] {  MenuManager.m_list_items_first, MenuManager.m_list_items_last,
                 MenuManager.m_list_items_total_count, MenuManager.m_list_items_max_per_page };
             bool flag = (bool)_MenuManager_CheckPaging_Method.Invoke(null, args);
@@ -324,12 +301,12 @@ namespace GameMod {
                     else if (UIManager.m_menu_selection == 4)
                     {
                         MenuManager.PlayCycleSound(1f, 1f);
-                        MPLevelSelect.OTL = !MPLevelSelect.OTL;
-                        MPLevelSelect.InitList();
+                        OTL = !OTL;
+                        InitList();
                     }
                     else if (UIManager.m_menu_selection >= 1000) // level
                     {
-                        MenuManager.mms_level_num = MPLevelSelect.LevelIndex[UIManager.m_menu_selection - 1000];
+                        MenuManager.mms_level_num = LevelIndex[UIManager.m_menu_selection - 1000];
                         UIManager.SetLevelTexture(GameManager.MultiplayerMission, MenuManager.mms_level_num);
                         MenuManager.m_menu_micro_state = 2;
                         MenuManager.UIPulse(2f);
@@ -337,35 +314,6 @@ namespace GameMod {
                     }
                 }
             }
-            /*
-                    break;
-                }
-            case MenuSubState.BACK:
-                if (true) //MenuManager.m_menu_state_timer > 0.25f)
-                {
-                    //MenuManager.ChangeMenuState(MenuState.MAIN_MENU, false);
-                    MenuManager.m_menu_micro_state = 3;
-                    MenuManager.UIPulse(2f);
-                    MenuManager.PlaySelectSound(1f);
-                }
-                break;
-            /*
-            default:
-                if (menu_sub_state == MenuSubState.FADE_IN)
-                {
-                    if (true) // MenuManager.m_menu_state_timer > 0.25f)
-                    {
-                        UIManager.CreateUIElement(UIManager.SCREEN_CENTER, 7000, UIElementType.CHALLENGE_SELECT_MENU);
-                        MenuManager.m_menu_sub_state = MenuSubState.ACTIVE;
-                        MenuManager.SetDefaultSelection(1000);
-    
-                        MPLevelSelect.InitList();
-                        //NetworkManager.StartServerWithLocalConnection(); // ???
-                    }
-                }
-                break;
-            */
-            return false;
         }
     }
 }

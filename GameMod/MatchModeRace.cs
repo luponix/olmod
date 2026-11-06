@@ -1291,42 +1291,6 @@ namespace GameMod
         }
     }
 
-    [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
-    class MatchModeRace_MenuManager_MpMatchSetup
-    {
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes)
-        {
-            var menuManager_mms_respawn_time_Field = AccessTools.Field(typeof(MenuManager), "mms_respawn_time");
-
-            int state = 0;
-            foreach (var code in codes)
-            {
-                if (state == 0 && code.opcode == OpCodes.Ldsfld && code.operand == menuManager_mms_respawn_time_Field)
-                    state = 1;
-
-                else if (state == 1 && code.opcode == OpCodes.Ldc_I4_2)
-                {
-                    state = 2;
-                    code.opcode = OpCodes.Ldc_I4_0; // Patch in 0 as minimum clampf arg for respawn timer
-                }
-
-                yield return code;
-            }
-        }
-
-        static void Postfix()
-        {
-            if (MenuManager.m_menu_sub_state == MenuSubState.ACTIVE &&
-                (UIManager.PushedSelect(100) || UIManager.PushedDir()) &&
-                MenuManager.m_menu_micro_state == 2 &&
-                UIManager.m_menu_selection == 0)
-            {
-                // If mode changed, force race to 0s
-                MenuManager.mms_respawn_time = MenuManager.mms_mode == ExtMatchMode.RACE ? 0 : 2;
-            }
-        }
-    }
-
     // the level remains active, disable windtunnels to prevent continuous bumping in menus
     [HarmonyPatch(typeof(NetworkMatch), "NetSystemShutdown")]
     class DisableWindTunnels

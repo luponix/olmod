@@ -542,6 +542,77 @@ namespace GameMod
             }
             return ((allowedWeapons < 2) || (allowedMissiles < 2));
         }
+
+        public static void DrawAllowedLoadoutsPage(UIElement uie)
+        {
+            Vector2 position = Vector2.zero;
+            uie.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("ALLOWED LOADOUT WEAPONS"), 250f, 24f, 1f);
+            position.y = -133f;
+            uie.DrawMenuSeparator(position - Vector2.up * 40f);
+            position.y += 40f;
+            uie.DrawSmallHeader1(position - Vector2.up * 51f, Loc.LS("PRIMARY WEAPONS"), 300f);
+            for (int i = 0; i < 4; i++)
+            {
+                string weaponNameNoDefault = Player.GetWeaponNameNoDefault((WeaponType)i);
+                int num = i;
+                uie.SelectAndDrawCheckboxItem(weaponNameNoDefault, position + Vector2.right * (((float)i - 1.5f) * 320f), num, IsAllowed((WeaponType)num), false, 0.5f, -1);
+            }
+            position.y += 62f;
+            for (int j = 0; j < 4; j++)
+            {
+                string weaponNameNoDefault2 = Player.GetWeaponNameNoDefault(j + WeaponType.DRILLER);
+                int num2 = j + 4;
+                uie.SelectAndDrawCheckboxItem(weaponNameNoDefault2, position + Vector2.right * (((float)j - 1.5f) * 320f), num2, IsAllowed((WeaponType)num2), false, 0.5f, -1);
+            }
+            position.y += 62f;
+            position.y += 40f;
+            uie.DrawSmallHeader1(position - Vector2.up * 51f, Loc.LS("SECONDARY WEAPONS"), 300f);
+            for (int k = 0; k < 4; k++)
+            {
+                string missileNameNoDefault = Player.GetMissileNameNoDefault((MissileType)k);
+                int num3 = k + 8;
+                uie.SelectAndDrawCheckboxItem(missileNameNoDefault, position + Vector2.right * (((float)k - 1.5f) * 320f), num3, IsAllowed((MissileType)k), false, 0.5f, -1);
+            }
+            position.y += 62f;
+            for (int l = 0; l < 4; l++)
+            {
+                string missileNameNoDefault2 = Player.GetMissileNameNoDefault(l + MissileType.NOVA);
+                int num4 = l + 12;
+                uie.SelectAndDrawCheckboxItem(missileNameNoDefault2, position + Vector2.right * (((float)l - 1.5f) * 320f), num4, IsAllowed((MissileType)(l + MissileType.NOVA)), false, 0.5f, -1);
+            }
+            uie.DrawMenuSeparator(position + Vector2.up * 40f);
+            position.y += 80.6f;
+            uie.SelectAndDrawHalfItem2(Loc.LS("ALLOWED POWERUPS"), position - Vector2.right * 470f, 22, false);
+            uie.SelectAndDrawHalfItem2(Loc.LS("CLEAR"), position - Vector2.right * 160f, 20, false);
+            uie.SelectAndDrawHalfItem2(Loc.LS("RESET"), position + Vector2.right * 160f, 21, false);
+        }
+
+        public static void SelectOnAllowedLoadoutsPage(int selection)
+        {
+            if (selection >= 0 && selection < 8)
+                SetAllowed((WeaponType)selection, !IsAllowed((WeaponType)selection));
+            else if (selection >= 8 && selection < 16)
+                SetAllowed((MissileType)(selection - 8), !IsAllowed((MissileType)(selection - 8)));
+            else if (selection == 20)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    SetAllowed((WeaponType)i, false);
+                    SetAllowed((MissileType)i, false);
+                }
+            }
+            else if (selection == 21)
+                LoadoutFilterBitmask = MASK_DEFAULT;
+            else
+                return;
+            MenuManager.PlaySelectSound(1f);
+        }
+
+        public static void KeepReflexOutOfPowerups()
+        {
+            if (!Menus.mms_classic_spawns && IsAllowedByFilter(WeaponType.REFLEX, LoadoutFilterBitmask))
+                MenuManager.mms_powerup_filter[2] = false;
+        }
     }
 
     [HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
@@ -1232,231 +1303,6 @@ namespace GameMod
                 __instance.c_player_ship.WeaponSelectFX();
                 __instance.UpdateCurrentWeaponName();
             }
-        }
-    }
-
-    // Draw Selection Menu 
-    [HarmonyPatch(typeof(UIElement), "DrawMpMatchSetup")]
-    class MPLoadouts_UIElement_DrawMpMatchSetup {
-
-        [HarmonyPriority(Priority.Normal + 1)]
-        private static void Postfix(UIElement __instance)
-        {
-            
-            switch (MenuManager.m_menu_micro_state)
-            {
-                case 15:
-                    Vector2 position = Vector2.up * (UIManager.UI_TOP + 70f);
-                    position.y += 62f;
-                    __instance.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("ALLOWED LOADOUT WEAPONS"), 250f, 24f, 1f);
-                    position.y = -133f;
-                    __instance.DrawMenuSeparator(position - Vector2.up * 40f);
-                    position.y += 40f;
-                    __instance.DrawSmallHeader1(position - Vector2.up * 51f, Loc.LS("PRIMARY WEAPONS"), 300f);
-                    for (int i = 0; i < 4; i++)
-                    {
-                        string weaponNameNoDefault = Player.GetWeaponNameNoDefault((WeaponType)i);
-                        int num = i;
-                        __instance.SelectAndDrawCheckboxItem(weaponNameNoDefault, position + Vector2.right * (((float)i - 1.5f) * 320f), num, MPLoadouts.IsAllowed((WeaponType)num), false, 0.5f, -1);
-                    }
-                    position.y += 62f;
-                    for (int j = 0; j < 4; j++)
-                    {
-                        string weaponNameNoDefault2 = Player.GetWeaponNameNoDefault(j + WeaponType.DRILLER);
-                        int num2 = j + 4;
-                        __instance.SelectAndDrawCheckboxItem(weaponNameNoDefault2, position + Vector2.right * (((float)j - 1.5f) * 320f), num2, MPLoadouts.IsAllowed((WeaponType)num2), false, 0.5f, -1);
-                    }
-                    position.y += 62f;
-                    position.y += 40f;
-                    __instance.DrawSmallHeader1(position - Vector2.up * 51f, Loc.LS("SECONDARY WEAPONS"), 300f);
-                    for (int k = 0; k < 4; k++)
-                    {
-                        string missileNameNoDefault = Player.GetMissileNameNoDefault((MissileType)k);
-                        int num3 = k + 8;
-                        __instance.SelectAndDrawCheckboxItem(missileNameNoDefault, position + Vector2.right * (((float)k - 1.5f) * 320f), num3, MPLoadouts.IsAllowed((MissileType)k), false, 0.5f, -1);
-                    }
-                    position.y += 62f;
-                    for (int l = 0; l < 4; l++)
-                    {
-                        string missileNameNoDefault2 = Player.GetMissileNameNoDefault(l + MissileType.NOVA);
-                        int num4 = l + 12;
-                        __instance.SelectAndDrawCheckboxItem(missileNameNoDefault2, position + Vector2.right * (((float)l - 1.5f) * 320f), num4, MPLoadouts.IsAllowed((MissileType)(l + MissileType.NOVA)), false, 0.5f, -1);
-                    }
-                    __instance.DrawMenuSeparator(position + Vector2.up * 40f);
-                    position.y += 80.6f;
-                    __instance.SelectAndDrawHalfItem2(Loc.LS("ALLOWED POWERUPS"), position - Vector2.right * 470f, 22, false);
-                    __instance.SelectAndDrawHalfItem2(Loc.LS("CLEAR"), position - Vector2.right * 160f, 20, false);
-                    __instance.SelectAndDrawHalfItem2(Loc.LS("RESET"), position + Vector2.right * 160f, 21, false);
-                    break;
-                default:
-                    break;
-            }
-        }
-    }
-
-    // Handle Logic for Selection Menu
-    [HarmonyPatch(typeof(MenuManager), "MpMatchSetup")]
-    class MPLoadouts_MenuManager_MpMatchSetup
-    {
-        [HarmonyPriority(Priority.Normal + 1)]
-        static void Postfix()
-        {
-            //uConsole.Log("Fire: " + MenuManager.m_menu_micro_state + " : " + UIManager.m_menu_selection);
-
-            // Disables reflex powerups since it's provided as a standard sidearm now.
-            // But if Reflex is forbidden in the loadout settings, you may add it as powerup
-            if (!Menus.mms_classic_spawns && MPLoadouts.IsAllowedByFilter(WeaponType.REFLEX, MPLoadouts.LoadoutFilterBitmask))
-            {
-                MenuManager.mms_powerup_filter[2] = false;
-            }
-
-            if (!UIManager.PushedSelect(100) && (!MenuManager.option_dir || !UIManager.PushedDir()))
-                return;
-
-            switch (MenuManager.m_menu_micro_state)
-            {
-                case 6:
-                    switch (UIManager.m_menu_selection)
-                    {
-                        // Button to lead into the "Allowed Loadouts Weapon" Menu
-                        case 23:
-                            MenuManager.m_menu_micro_state = 15;
-                            MenuManager.UIPulse(2f);
-                            MenuManager.PlaySelectSound(1f);
-                            return;
-                        case 100:
-                            MenuManager.m_menu_micro_state = 6;
-                            MenuManager.UIPulse(2f);
-                            MenuManager.PlaySelectSound(1f);
-                            return;
-                        default:
-                            return;
-                    }
-                // Handling for the Backlink button in the allowed powerups menu
-                case 7:
-                    switch (UIManager.m_menu_selection)
-                    {
-                        case 30:
-                            MenuManager.m_menu_micro_state = 15;
-                            MenuManager.UIPulse(2f);
-                            MenuManager.PlaySelectSound(1f);
-                            return;
-                        default:
-                            return;
-                    }
-                // The "Allowed Loadout Weapons" Menu
-                case 15:
-                    switch (UIManager.m_menu_selection)
-                    {
-                        // Primary Weapons
-                        case 0:
-                        case 1:
-                        case 2:
-                        case 3:
-                        case 4:
-                        case 5:
-                        case 6:
-                        case 7:
-                            MPLoadouts.SetAllowed((WeaponType)UIManager.m_menu_selection, !MPLoadouts.IsAllowed((WeaponType)UIManager.m_menu_selection));
-                            MenuManager.PlaySelectSound(1f);
-                            return;
-                        // Secondary Weapons
-                        case 8:
-                        case 9:
-                        case 10:
-                        case 11:
-                        case 12:
-                        case 13:
-                        case 14:
-                        case 15:
-                            MPLoadouts.SetAllowed((MissileType)UIManager.m_menu_selection - 8, !MPLoadouts.IsAllowed((MissileType)UIManager.m_menu_selection - 8));
-                            MenuManager.PlaySelectSound(1f);
-                            return;
-                        // Clear All Button
-                        case 20:
-                            for (int i = 0; i < 8; i++)
-                            {
-                                MPLoadouts.SetAllowed((WeaponType)i, false);
-                                MPLoadouts.SetAllowed((MissileType)i, false);
-                            }
-                            MenuManager.PlaySelectSound(1f);
-                            return;
-                        // Set Default State Button
-                        case 21:
-                            MPLoadouts.LoadoutFilterBitmask = MPLoadouts.MASK_DEFAULT;
-                            MenuManager.PlaySelectSound(1f);
-                            return;
-                        // Switch to Powerup menu
-                        case 22:
-                            MenuManager.m_menu_micro_state = 7;
-                            MenuManager.UIPulse(2f);
-                            MenuManager.PlaySelectSound(1f);
-                            return;
-                        // Back to parent menu Button
-                        case 100:
-                            MenuManager.m_menu_micro_state = 6;
-                            MenuManager.UIPulse(2f);
-                            MenuManager.PlaySelectSound(1f);
-                            return;
-                        default:
-                            return;
-                    }
-            }
-        }
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            int state = 0;
-            int fail = 0;
-            Label jumpTarget = new Label();
-            List<CodeInstruction> instructionsSaved = new List<CodeInstruction>();
-
-            foreach (var code in instructions) {
-                if (state == 0) {
-                    if (code.opcode == OpCodes.Ldsfld && (code.operand as FieldInfo).Name == "mms_powerup_filter") {
-                        state++;
-                    }
-                } else if (state == 1) {
-                    if (code.opcode == OpCodes.Ldsfld && (code.operand as FieldInfo).Name == "m_menu_selection") {
-                        state++;
-                    } else {
-                        fail = state;
-                    }
-                } else if (state == 2) {
-                    if (code.opcode == OpCodes.Ldsfld && (code.operand as FieldInfo).Name == "mms_powerup_filter") {
-                        state++;
-                    } else {
-                        fail = state;
-                    }
-                } else if (state == 3) {
-                    if (code.opcode == OpCodes.Ldsfld && (code.operand as FieldInfo).Name == "m_menu_selection") {
-                        state++;
-                    } else {
-                        fail = state;
-                    }
-                } else if (state == 4) {
-                    if (code.opcode == OpCodes.Br) {
-                        jumpTarget = (Label)code.operand;
-                        // add additional branch
-                        yield return new CodeInstruction(OpCodes.Ldlen);
-                        yield return new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(UIManager), "m_menu_selection"));
-                        yield return new CodeInstruction(OpCodes.Ble, jumpTarget);
-                        yield return new CodeInstruction(OpCodes.Ldsfld, AccessTools.Field(typeof(MenuManager), "mms_powerup_filter"));
-
-                        // emit the saved instructions now
-                        foreach (var c in instructionsSaved) {
-                            yield return c;
-                        }
-                        state++;
-                    }
-                }
-                if (state > 1 && state < 5) {
-                    instructionsSaved.Add(code);
-                } else {
-                    yield return code;
-                }
-            }
-            if (state != 5 || fail > 0)
-                Debug.LogErrorFormat("[Loadouts] MpMatchSetup: transpiler failed at state {0} {1}", state, fail);
         }
     }
 }
