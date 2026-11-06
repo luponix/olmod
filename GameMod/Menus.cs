@@ -833,6 +833,16 @@ namespace GameMod {
                 MenuManager.PlayMoveSound();
         }
 
+        private const int TAB_COUNT = 4;
+
+        // Moves the selection onto the tab button, because the row it was on may not exist on the new tab.
+        private static void SelectTab(int tab)
+        {
+            MenuManager.m_menu_micro_state = tab;
+            UIManager.m_menu_selection = 200 + tab;
+            MenuManager.UIPulse(1f);
+            _MenuManager_PlayHighlightSound_Method.Invoke(null, new object[] { 0.4f, 0.07f });
+        }
 
         static bool Prefix(ref float ___m_menu_state_timer)
         {
@@ -853,6 +863,10 @@ namespace GameMod {
                         MenuManager.m_mp_status_minimized = !MenuManager.m_mp_status_minimized;
                         MenuManager.PlayCycleSound(1f, 1f);
                     }
+                    if (Controls.JustPressed(CCInput.MENU_PGUP))
+                        SelectTab((MenuManager.m_menu_micro_state + TAB_COUNT - 1) % TAB_COUNT);
+                    else if (Controls.JustPressed(CCInput.MENU_PGDN))
+                        SelectTab((MenuManager.m_menu_micro_state + 1) % TAB_COUNT);
                     if (UIManager.PushedSelect(100) || (MenuManager.option_dir && UIManager.PushedDir()))
                     {
                         MenuManager.MaybeReverseOption();
@@ -863,9 +877,7 @@ namespace GameMod {
                             case 201:
                             case 202:
                             case 203:
-                                MenuManager.m_menu_micro_state = UIManager.m_menu_selection - 200;
-                                MenuManager.UIPulse(1f);
-                                _MenuManager_PlayHighlightSound_Method.Invoke(null, new object[] { 0.4f, 0.07f });
+                                SelectTab(menu_selection - 200);
                                 break;
                             default:
                                 if (menu_selection == 100)

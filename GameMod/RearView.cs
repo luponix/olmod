@@ -30,6 +30,8 @@ namespace GameMod
         public static Camera rearCam;
         public static RenderTexture rearTex;
         static Quaternion m_rear_view_rotation = Quaternion.Euler(0f, 180f, 0f);
+        static UnityRenderLayer imageLayer;
+        static bool imageLayerDrawn;
 
         public static void Init()
         {
@@ -71,6 +73,63 @@ namespace GameMod
             else
                 Pause();
         }
+
+        public static void Draw()
+        {
+            if (RearView.rearTex == null || RearView.rearCam == null || RearView.rearCam.gameObject == null)
+                RearView.Init();
+            if (imageLayer == null)
+                CreateImageLayer();
+
+            if (GameManager.m_local_player.m_hitpoints <= 0) {
+                RearView.Pause();
+                return;
+            }
+
+            RearView.rearCam.enabled = true;
+            var pos = new Vector2(288f, 288f);
+            var posTile = new Vector2(pos.x, pos.y - 0.01f);
+            var size = 100f;
+            UIManager.DrawQuadUI(pos, size, size, UIManager.m_col_ui0, 1, 11);
+
+            UnityRenderLayer baseLayer = UIManager.url[(int)UIRenderLayer.BASE];
+            baseLayer.m_quad_index = UIManager.m_quad_index;
+            imageLayer.SetTexture(RearView.rearTex, false);
+            UIManager.StartDrawing(imageLayer, true, 750f);
+            UIManager.DrawTile(posTile, size * 0.93f, size * 0.93f, new Color(0.8f, 0.8f, 0.8f, 1.0f), 1, 0, 0, 1, 1);
+            UIManager.EndDrawing();
+            imageLayerDrawn = true;
+            UIManager.StartDrawing(baseLayer, false);
+            UIManager.m_quad_index = baseLayer.m_quad_index;
+        }
+
+        // The engine's IMAGE layer carries one texture for all its quads in a frame, so a cryotube
+        // mugshot drawn on it replaced the camera image. The rear view gets a copy of that layer.
+        static void CreateImageLayer()
+        {
+            UnityRenderLayer engineImageLayer = UIManager.url[(int)UIRenderLayer.IMAGE];
+            GameObject layerObject = new GameObject("RearViewImageLayer");
+            layerObject.layer = engineImageLayer.gameObject.layer;
+            layerObject.transform.SetParent(engineImageLayer.transform.parent, false);
+            layerObject.transform.localPosition = engineImageLayer.transform.localPosition;
+            layerObject.transform.localRotation = engineImageLayer.transform.localRotation;
+            layerObject.transform.localScale = engineImageLayer.transform.localScale;
+            imageLayer = layerObject.AddComponent<UnityRenderLayer>();
+            imageLayer.c_material = engineImageLayer.c_material;
+            imageLayer.m_atlas_index = engineImageLayer.m_atlas_index;
+            imageLayer.InitRenderLayer((int)UIRenderLayer.IMAGE); // the engine uses the layer index as render queue
+        }
+
+        // Runs once per frame after the engine flushed its own layers. A frame without Draw empties the layer.
+        public static void FlushImageLayer()
+        {
+            if (imageLayer == null)
+                return;
+            if (!imageLayerDrawn)
+                imageLayer.EndDrawing(0);
+            imageLayer.DrawFinal();
+            imageLayerDrawn = false;
+        }
     }
 
     [HarmonyPatch(typeof(Overload.GameplayManager), "ChangeGameplayState")]
@@ -100,24 +159,7 @@ namespace GameMod
             if (!GameplayManager.ShowHud || !RearView.Enabled)
                 return;
 
-            if (RearView.rearTex == null || RearView.rearCam == null || RearView.rearCam.gameObject == null)
-                RearView.Init();
-
-            if (GameManager.m_local_player.m_hitpoints <= 0) {
-                RearView.Pause();
-                return;
-            }
-
-            RearView.rearCam.enabled = true;
-            var pos = new Vector2(288f, 288f);
-            var posTile = new Vector2(pos.x, pos.y - 0.01f);
-            var size = 100f;
-            UIManager.DrawQuadUI(pos, size, size, UIManager.m_col_ui0, 1, 11);
-            UIManager.SetTexture(RearView.rearTex);
-            UIManager.PauseMainDrawing();
-            UIManager.StartDrawing(UIManager.url[1], false, 750f);
-            UIManager.DrawTile(posTile, size * 0.93f, size * 0.93f, new Color(0.8f, 0.8f, 0.8f, 1.0f), 1, 0, 0, 1, 1);
-            UIManager.ResumeMainDrawing();
+            RearView.Draw();
         }
     }
 }

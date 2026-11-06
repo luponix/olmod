@@ -23,4 +23,13 @@ namespace GameMod.Hooks
             LevelScanLog.ReportFolder(folder_path);
         }
     }
+
+    [HarmonyPatch(typeof(GameManager), "LateUpdate")]
+    class GameManager_LateUpdate
+    {
+        static void Postfix()
+        {
+            RearView.FlushImageLayer();
+        }
+    }
 }
