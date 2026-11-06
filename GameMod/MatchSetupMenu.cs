@@ -195,8 +195,8 @@ namespace GameMod
             uie.DrawMenuToolTip(bottom + Vector2.up * 40f);
         }
 
-        private const int ADVANCED_VISIBLE_ROWS = 12;
-        private const float ADVANCED_ROW_PITCH = 45f;
+        private const int ADVANCED_VISIBLE_ROWS = 10;
+        private const float ADVANCED_ROW_PITCH = 55f;
         private static readonly int[] advancedRowsCtf = { 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
         private static readonly int[] advancedRowsOtherModes = { 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
         private static int advancedScrollOffset;
@@ -220,7 +220,7 @@ namespace GameMod
                 position.y += ADVANCED_ROW_PITCH;
             }
             if (rows.Length > visibleRows)
-                Menus.DrawScrollbar(uie, ref advancedScrollOffset, ref advancedScrollbarDragging, position.x + 275f, firstRowY, ADVANCED_ROW_PITCH, visibleRows, rows.Length);
+                Menus.DrawScrollbar(uie, ref advancedScrollOffset, ref advancedScrollbarDragging, position.x + 300f, firstRowY, ADVANCED_ROW_PITCH, visibleRows, rows.Length);
         }
 
         private static void DrawAdvancedRow(UIElement uie, Vector2 position, int selection)
