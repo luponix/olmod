@@ -1310,6 +1310,12 @@ END_ENTRY
             set { MPDestructibleMissiles.Enabled = value; }
         }
 
+        public static bool BoostFireEnabled
+        {
+            get { return MPBoostFire.Enabled; }
+            set { MPBoostFire.Enabled = value; }
+        }
+
         public static float[] MissileTypeHealth
         {
             get { return MPDestructibleMissiles.MissileTypeHealth; }
@@ -1347,6 +1353,7 @@ END_ENTRY
             jobject["clientphysics"] = ClientPhysics;
             jobject["rollspeedlimit"] = RollSpeedLimit;
             jobject["destructiblemissiles"] = DestructibleMissiles;
+            jobject["boostfire"] = BoostFireEnabled;
             jobject["missiletypehealth"] = new JArray(MissileTypeHealth.Select(h => (JToken)(float)h));
             return jobject;
         }
@@ -1385,6 +1392,7 @@ END_ENTRY
             ClientPhysics = root["clientphysics"].GetBool(false);
             RollSpeedLimit = root["rollspeedlimit"].GetInt(7);
             DestructibleMissiles = root["destructiblemissiles"].GetBool(false);
+            BoostFireEnabled = root["boostfire"].GetBool(false);
             var hArr = root["missiletypehealth"] as JArray;
             if (hArr != null && hArr.Count == 8)
                 MissileTypeHealth = hArr.Select((t, i) => t?.Value<float>() ?? MPDestructibleMissiles.DefaultHealth[i]).ToArray();
@@ -1618,6 +1626,7 @@ END_ENTRY
             MPModPrivateData.ClientPhysics = MPServerOptimization.prefEnabled;
             MPModPrivateData.RollSpeedLimit = MPServerOptimization.RollSpeedLimit;
             MPModPrivateData.DestructibleMissiles = Menus.mms_destructible_missiles;
+            MPModPrivateData.BoostFireEnabled = Menus.mms_boost_fire;
             if (Menus.mms_mp_projdata_fn == "STOCK") {
                 MPModPrivateData.CustomProjdata = string.Empty;
             } else {

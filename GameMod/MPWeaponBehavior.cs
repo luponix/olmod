@@ -158,7 +158,8 @@ namespace GameMod
                 {
                     static void Postfix(PlayerShip __instance)
                     {
-                        if ((__instance.m_boosting || __instance.m_dead || __instance.m_dying) && GameplayManager.IsMultiplayerActive && __instance.isLocalPlayer)
+                        bool boostStopsFire = __instance.m_boosting && !MPBoostFire.Enabled;
+                        if ((boostStopsFire || __instance.m_dead || __instance.m_dying) && GameplayManager.IsMultiplayerActive && __instance.isLocalPlayer)
                         {
                             StopThunderboltSelfDamageLoop();
                         }

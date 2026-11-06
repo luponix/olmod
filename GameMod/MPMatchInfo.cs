@@ -124,6 +124,12 @@ namespace GameMod
                 uie.DrawStringSmall("DESTRUCTIBLE MISSILES ENABLED", position - Vector2.right * LEFT_OFFSET, TEXT_SIZE, StringOffset.LEFT, UIManager.m_col_ui1, 1f, 200f);
                 position.y += LINE_SIZE;
             }
+            if (MPModPrivateData.BoostFireEnabled)
+            {
+                show = true;
+                uie.DrawStringSmall("FIRE WHILE BOOSTING ENABLED", position - Vector2.right * LEFT_OFFSET, TEXT_SIZE, StringOffset.LEFT, UIManager.m_col_ui1, 1f, 200f);
+                position.y += LINE_SIZE;
+            }
             if (MPModPrivateData.CtfCarrierBoostEnabled)
             {
                 show = true;

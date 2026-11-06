@@ -7,11 +7,6 @@ namespace GameMod
     [HarmonyPatch(typeof(PlayerShip), "ProcessFiringControls")]
     internal class ProcessFiringControls
     {
-        private static bool CanFire(PlayerShip __instance)
-        {
-            return !__instance.m_boosting && __instance.m_wheel_select_state == WheelSelectState.NONE;
-        }
-
         private static void Prefix(PlayerShip __instance)
         {
             if (!GameplayManager.IsMultiplayer)
@@ -19,7 +14,7 @@ namespace GameMod
                 return;
             }
 
-            if (!(__instance.c_player.JustPressed(CCInput.FIRE_WEAPON) && CanFire(__instance)))
+            if (!(__instance.c_player.JustPressed(CCInput.FIRE_WEAPON) && MPBoostFire.AllowsFire(__instance)))
             {
                 return;
             }

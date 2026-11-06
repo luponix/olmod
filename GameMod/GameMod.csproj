@@ -112,6 +112,7 @@
     <Compile Include="Hooks\Viewer.cs" />
     <Compile Include="Hooks\NetworkMatch.cs" />
     <Compile Include="Hooks\MenuManager.cs" />
+    <Compile Include="Hooks\Client.cs" />
     <Compile Include="Logging\LogRewrite.cs" />
     <Compile Include="Logging\LevelScanLog.cs" />
     <Compile Include="Logging\EngineLogNoise.cs" />
@@ -176,6 +177,7 @@
     <Compile Include="MPCustomModeFile.cs" />
     <Compile Include="MPDamageEffects.cs" />
     <Compile Include="MPDestructibleMissiles.cs" />
+    <Compile Include="MPBoostFire.cs" />
     <Compile Include="MPDeathExplosion.cs" />
     <Compile Include="MPDeathReview.cs" />
     <Compile Include="MPDeathRollSync.cs" />

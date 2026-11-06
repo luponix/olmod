@@ -22,4 +22,16 @@ namespace GameMod.Hooks
             return EngineLogNoise.ReplaceCollisionLogging(instructions);
         }
     }
+
+    [HarmonyPatch(typeof(PlayerShip), "CanFire")]
+    class PlayerShip_CanFire
+    {
+        static bool Prefix(PlayerShip __instance, ref bool __result)
+        {
+            if (!MPBoostFire.Enabled)
+                return true;
+            __result = MPBoostFire.AllowsFire(__instance);
+            return false;
+        }
+    }
 }

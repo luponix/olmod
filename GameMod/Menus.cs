@@ -41,6 +41,7 @@ namespace GameMod {
         public static bool mms_allow_smash { get; set; }
         public static bool mms_damage_numbers { get; set; }
         public static bool mms_destructible_missiles { get; set; }
+        public static bool mms_boost_fire { get; set; }
         public static bool mms_client_damage_numbers { get; set; } = true;
         public static bool mms_assist_scoring { get; set; } = true;
         public static bool mms_team_color_default { get; set; } = true;
@@ -135,6 +136,11 @@ namespace GameMod {
         public static string GetMMSDestructibleMissiles()
         {
             return MenuManager.GetToggleSetting(Convert.ToInt32(mms_destructible_missiles));
+        }
+
+        public static string GetMMSBoostFire()
+        {
+            return MenuManager.GetToggleSetting(Convert.ToInt32(mms_boost_fire));
         }
 
         public static string GetMMSScaleRespawnTime()

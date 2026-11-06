@@ -197,8 +197,8 @@ namespace GameMod
 
         private const int ADVANCED_VISIBLE_ROWS = 12;
         private const float ADVANCED_ROW_PITCH = 45f;
-        private static readonly int[] advancedRowsCtf = { 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25 };
-        private static readonly int[] advancedRowsOtherModes = { 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25 };
+        private static readonly int[] advancedRowsCtf = { 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
+        private static readonly int[] advancedRowsOtherModes = { 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
         private static int advancedScrollOffset;
         private static bool advancedScrollbarDragging;
         private static int previousSelection = -1;
@@ -265,6 +265,9 @@ namespace GameMod
                     break;
                 case 25:
                     uie.SelectAndDrawStringOptionItem(Loc.LS("DESTRUCTIBLE MISSILES"), position, 25, Menus.GetMMSDestructibleMissiles(), Loc.LS("ALLOWS MISSILES TO BE SHOT DOWN IN FLIGHT"), 1f);
+                    break;
+                case 26:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("FIRE WHILE BOOSTING"), position, 26, Menus.GetMMSBoostFire(), Loc.LS("ALLOWS PLAYERS TO FIRE WEAPONS AND MISSILES WHILE BOOSTING"), 1f);
                     break;
             }
         }
@@ -860,6 +863,10 @@ namespace GameMod
                     break;
                 case 25:
                     Menus.mms_destructible_missiles = !Menus.mms_destructible_missiles;
+                    PlayCycleSound();
+                    break;
+                case 26:
+                    Menus.mms_boost_fire = !Menus.mms_boost_fire;
                     PlayCycleSound();
                     break;
                 case 100:
