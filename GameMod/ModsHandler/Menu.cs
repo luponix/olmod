@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
@@ -15,15 +16,19 @@ namespace GameMod.ModsHandler
 
         private const int SEL_BACK = 100;
         private const int SEL_APPLY = 110;
-        private const int SEL_LIST_BASE = 1000; // two buttons per row: +0 switches it on, +1 installs it
-        private const int ROWS_SHOWN = 7;
+        private const int SEL_SWITCH = 120;
+        private const int SEL_INSTALL = 130;
+        private const int SEL_LIST_BASE = 1000;
+        private const int ROWS_SHOWN = 8;
 
-        // A row is name, two buttons only as wide as their longest label, then the details
-        // panel the freed space pays for.
-        private const float NAME_LEFT = -480f;
-        private const float NAME_WIDTH = 380f;
-        private const float DETAILS_LEFT = 240f;
-        private const float DETAILS_WIDTH = 380f;
+        // The list on the left, the selected mod's details and actions on the right,
+        // laid out like the DEMOS menu.
+        private const float LIST_X = -330f;
+        private const float DETAILS_X = 330f;
+        private const float COLUMN_HALF_WIDTH = 212f;
+        private const float LIST_TOP = -279f;
+        private const float ROW_STRIDE = 62f;
+        private const float ITEM_SCALE = 0.85f;
 
         private enum FileCheck { Unknown, Published, Unlisted, Mismatched }
 
@@ -34,11 +39,13 @@ namespace GameMod.ModsHandler
             public bool Installed;
             public Catalog.Entry Listed;
             public FileCheck Check;
+            public string Description;
         }
 
         private static readonly List<Row> rows = new List<Row>();
         private static int seenChanges;
         private static int firstRow;
+        private static int selectedRow = -1;
         private static int previousSelection = -1;
 
         public static void ModsUpdate(ref float timer)
@@ -51,6 +58,7 @@ namespace GameMod.ModsHandler
                     {
                         seenChanges = Library.Changes;
                         firstRow = 0;
+                        selectedRow = 0;
                         RefreshRows();
                         UIManager.CreateUIElement(UIManager.SCREEN_CENTER, 7000, uiMods);
                         MenuManager.m_menu_sub_state = MenuSubState.ACTIVE;
@@ -76,6 +84,13 @@ namespace GameMod.ModsHandler
                         ScrollWithSelection();
                     }
 
+                    // The keyboard selects by moving onto a row, the mouse only by clicking:
+                    // hovering would re-select every row the pointer crosses on its way
+                    // to the actions.
+                    int pointedRow = UIManager.m_menu_selection - SEL_LIST_BASE;
+                    if (!UIManager.m_menu_use_mouse && pointedRow >= 0 && pointedRow < rows.Count)
+                        selectedRow = pointedRow;
+
                     if (timer > 0.25f && UIManager.PushedSelect(SEL_BACK))
                     {
                         int selection = UIManager.m_menu_selection;
@@ -94,13 +109,23 @@ namespace GameMod.ModsHandler
                                 Relaunch.Now();
                             }
                         }
-                        else if (selection >= SEL_LIST_BASE && selection < SEL_LIST_BASE + rows.Count * 2)
+                        else if (selection >= SEL_LIST_BASE && selection < SEL_LIST_BASE + rows.Count)
                         {
-                            int button = selection - SEL_LIST_BASE;
-                            if (button % 2 == 0)
-                                SwitchRow(rows[button / 2]);
-                            else
-                                InstallOrRemoveRow(rows[button / 2]);
+                            if (selectedRow != selection - SEL_LIST_BASE)
+                            {
+                                selectedRow = selection - SEL_LIST_BASE;
+                                MenuManager.PlayCycleSound(1f, 1f);
+                            }
+                        }
+                        else if (selection == SEL_SWITCH)
+                        {
+                            if (selectedRow >= 0 && selectedRow < rows.Count)
+                                SwitchRow(rows[selectedRow]);
+                        }
+                        else if (selection == SEL_INSTALL)
+                        {
+                            if (selectedRow >= 0 && selectedRow < rows.Count)
+                                InstallOrRemoveRow(rows[selectedRow]);
                         }
                     }
                     break;
@@ -116,26 +141,25 @@ namespace GameMod.ModsHandler
         // window, so the keyboard can reach the off-screen rows.
         private static void ScrollWithSelection()
         {
-            int button = previousSelection - SEL_LIST_BASE;
-            int row = button / 2;
-            if (button >= 0 && row < rows.Count && Controls.JustPressedMenuDirection())
+            int row = previousSelection - SEL_LIST_BASE;
+            if (row >= 0 && row < rows.Count && Controls.JustPressedMenuDirection())
             {
                 float menuDirY = Controls.MenuDirection().y;
                 if (menuDirY > 0.45f && row == firstRow + ROWS_SHOWN - 1 && row + 1 < rows.Count)
                 {
                     ScrollTo(firstRow + 1);
-                    SelectButton(previousSelection + 2);
+                    SelectRow(previousSelection + 1);
                 }
                 else if (menuDirY < -0.45f && row == firstRow && row > 0)
                 {
                     ScrollTo(firstRow - 1);
-                    SelectButton(previousSelection - 2);
+                    SelectRow(previousSelection - 1);
                 }
             }
             previousSelection = UIManager.m_menu_selection;
         }
 
-        private static void SelectButton(int selection)
+        private static void SelectRow(int selection)
         {
             bool engineAlreadyMoved = UIManager.m_menu_selection != previousSelection;
             UIManager.m_menu_selection = selection;
@@ -153,45 +177,42 @@ namespace GameMod.ModsHandler
             ui.DrawHeaderMedium(Vector2.up * (UIManager.UI_TOP + 30f), Loc.LS("MODS"), 265f);
             ui.DrawMenuSeparator(new Vector2(0f, UIManager.UI_TOP + 55f));
 
-            if (!Catalog.Loaded)
-                ui.DrawLabelSmall(new Vector2(0f, UIManager.UI_TOP + 105f),
-                    Loc.LS("MOD SITE ") + (Catalog.Status ?? Loc.LS("not checked")).ToUpper(), 600f);
-
-            float top = UIManager.UI_TOP + 150f;
-            float y = top;
+            Row selected = selectedRow >= 0 && selectedRow < rows.Count ? rows[selectedRow] : null;
             if (rows.Count == 0)
             {
-                ui.DrawLabelSmall(new Vector2(0f, y), Loc.LS("NO MODS INSTALLED OR AVAILABLE"), 500f);
+                ui.DrawLabelSmall(new Vector2(LIST_X, LIST_TOP), Loc.LS("NO MODS INSTALLED OR AVAILABLE"), COLUMN_HALF_WIDTH);
             }
             else
             {
-                Row underMouse = null;
-                Row selected = null;
+                float y = LIST_TOP;
                 for (int i = firstRow; i < rows.Count && i < firstRow + ROWS_SHOWN; i++)
                 {
                     DrawRow(ui, rows[i], i, y);
-                    if (MouseOverRow(y))
-                        underMouse = rows[i];
-                    int switchSelection = SEL_LIST_BASE + i * 2;
-                    if (UIManager.m_menu_selection == switchSelection ||
-                        UIManager.m_menu_selection == switchSelection + 1)
-                        selected = rows[i];
-                    y += 62f;
+                    y += ROW_STRIDE;
                 }
                 if (rows.Count > ROWS_SHOWN)
-                    ui.DrawLabelSmall(new Vector2(-140f, y),
-                        string.Format(Loc.LS("{0} - {1} OF {2}"), firstRow + 1,
-                            Math.Min(firstRow + ROWS_SHOWN, rows.Count), rows.Count), 500f);
-
-                // The mouse wins over the keyboard's selection: it can rest on a row
-                // without having moved the selection there.
-                Row details = underMouse ?? selected;
-                if (details != null)
-                    DrawDetails(ui, details, top);
+                    ui.DrawStringSmall(string.Format(Loc.LS("{0} - {1} OF {2}"), firstRow + 1,
+                            Math.Min(firstRow + ROWS_SHOWN, rows.Count), rows.Count),
+                        new Vector2(LIST_X + COLUMN_HALF_WIDTH, y - 26f), 0.35f, StringOffset.RIGHT,
+                        UIManager.m_col_ui0, 1f);
             }
 
-            Vector2 position = new Vector2(0f, UIManager.UI_BOTTOM - 150f);
-            ui.SelectAndDrawItem(Loc.LS("APPLY AND RESTART"), position, SEL_APPLY, !Mods.SelectionChanged);
+            if (selected != null)
+                DrawDetails(ui, selected);
+
+            bool downloading = selected != null && selected.File == Library.Downloading;
+            bool switchUsable = selected != null && selected.Installed;
+            bool installUsable = selected != null && !downloading &&
+                (selected.Installed || (selected.Listed != null && selected.Listed.Downloadable));
+            string switchLabel = selected != null && Mods.IsEnabled(selected.File) ? Loc.LS("DISABLE") : Loc.LS("ENABLE");
+            string installLabel = downloading ? Loc.LS("DOWNLOADING")
+                : selected != null && selected.Installed ? Loc.LS("DELETE")
+                : Loc.LS("INSTALL");
+            ui.SelectAndDrawItem(switchLabel, new Vector2(DETAILS_X, 65f), SEL_SWITCH, !switchUsable, ITEM_SCALE, 0.6f);
+            ui.SelectAndDrawItem(installLabel, new Vector2(DETAILS_X, 117f), SEL_INSTALL, !installUsable, ITEM_SCALE, 0.6f);
+
+            ui.SelectAndDrawItem(Loc.LS("APPLY AND RESTART"), new Vector2(DETAILS_X, 197f), SEL_APPLY,
+                !Mods.SelectionChanged, ITEM_SCALE, 0.6f);
             if (UIManager.m_menu_selection == SEL_APPLY && Mods.SelectionChanged)
             {
                 UIElement.ToolTipActive = true;
@@ -200,107 +221,144 @@ namespace GameMod.ModsHandler
                     Loc.LS("CLOSES OVERLOAD AND STARTS IT AGAIN SO THE SELECTED MODS LOAD");
             }
 
-            ui.DrawMenuSeparator(new Vector2(0f, UIManager.UI_BOTTOM - 110f));
+            ui.DrawMenuSeparator(new Vector2(0f, UIManager.UI_BOTTOM - 90f));
 
             // One line fits between the separator and BACK, and a failure matters more
             // than the hint for a button the player is already pointing at.
             string problem = Library.LastError ?? Relaunch.LastError;
             if (!string.IsNullOrEmpty(problem))
-                ui.DrawLabelSmallRed(new Vector2(0f, UIManager.UI_BOTTOM - 80f), problem, 900f);
-            else
-                ui.DrawMenuToolTip(new Vector2(0f, UIManager.UI_BOTTOM - 110f));
+                ui.DrawLabelSmallRed(new Vector2(0f, UIManager.UI_BOTTOM - 70f), problem, 900f);
+            else if (UIElement.ToolTipActive)
+                ui.DrawMenuToolTip(new Vector2(0f, UIManager.UI_BOTTOM - 85f));
+            else if (!Catalog.Loaded)
+                ui.DrawLabelSmall(new Vector2(0f, UIManager.UI_BOTTOM - 70f),
+                    Loc.LS("MOD SITE ") + (Catalog.Status ?? Loc.LS("not checked")).ToUpper(), 600f);
 
-            ui.SelectAndDrawItem(Loc.LS("BACK"), new Vector2(0f, UIManager.UI_BOTTOM - 30f), SEL_BACK, false);
+            ui.SelectAndDrawItem(Loc.LS("BACK"), new Vector2(0f, UIManager.UI_BOTTOM - 30f), SEL_BACK, false,
+                ITEM_SCALE, 0.6f);
         }
 
+        // Name and version stacked on the left, the state on the right. The engine draws
+        // a highlighted item's bar bright, so its text turns dark the way DrawSmallItem's does.
         private static void DrawRow(UIElement ui, Row row, int index, float y)
         {
-            int switchSelection = SEL_LIST_BASE + index * 2;
-            int installSelection = switchSelection + 1;
-            bool downloading = row.File == Library.Downloading;
+            Vector2 position = new Vector2(LIST_X, y);
+            if (index == selectedRow)
+            {
+                Vector2 boxHalf = new Vector2(500f * ITEM_SCALE * 0.5f + 32f, 28f);
+                Color boxColor = UIManager.m_col_ui2;
+                boxColor.a = ui.m_alpha;
+                UIManager.DrawBoxOutline(position - boxHalf, position + boxHalf, boxColor, 1.5f, 13);
+            }
+            ui.SelectAndDrawItem(string.Empty, position, SEL_LIST_BASE + index, false, ITEM_SCALE, 0.5f);
 
-            bool flagged = row.Check == FileCheck.Unlisted || row.Check == FileCheck.Mismatched;
-            ui.DrawStringSmall(row.Name, new Vector2(NAME_LEFT, flagged ? y - 9f : y), 0.5f, StringOffset.LEFT,
-                UIManager.m_col_ui1, 1f, NAME_WIDTH);
-            if (flagged)
-                ui.DrawStringSmall(CheckText(row.Check), new Vector2(NAME_LEFT, y + 15f), 0.3f, StringOffset.LEFT,
-                    row.Check == FileCheck.Mismatched ? UIManager.m_col_em5 : UIManager.m_col_ui0, 1f, NAME_WIDTH);
+            bool highlighted = UIManager.m_menu_selection == SEL_LIST_BASE + index;
+            Color stateColor;
+            string state = StateText(row, out stateColor);
+            Color nameColor = !row.Installed ? UIManager.m_col_ui0
+                : Mods.IsEnabled(row.File) ? UIManager.m_col_ui5
+                : UIManager.m_col_ui2;
+            Color lineColor = row.Check == FileCheck.Mismatched ? UIManager.m_col_em5 : UIManager.m_col_ui0;
+            if (highlighted)
+                nameColor = lineColor = stateColor = UIManager.m_col_ub3;
 
-            ui.SelectAndDrawItem(Mods.IsEnabled(row.File) ? Loc.LS("ON") : Loc.LS("OFF"),
-                new Vector2(-30f, y), switchSelection, !row.Installed, 0.14f, 0.5f);
-
-            string installLabel = downloading ? Loc.LS("DOWNLOADING")
-                : row.Installed ? Loc.LS("DELETE")
-                : Loc.LS("INSTALL");
-            bool installUsable = !downloading &&
-                (row.Installed || (row.Listed != null && row.Listed.Downloadable));
-            ui.SelectAndDrawItem(installLabel, new Vector2(120f, y), installSelection, !installUsable, 0.22f, 0.5f);
+            float left = LIST_X - COLUMN_HALF_WIDTH + 8f;
+            float right = LIST_X + COLUMN_HALF_WIDTH - 8f;
+            float stateWidth = UIManager.GetStringWidth(state, 20f * 0.4f);
+            float nameWidth = right - left - stateWidth - 16f;
+            ui.DrawStringSmall(row.Name, new Vector2(left, y - 8f), 0.5f, StringOffset.LEFT, nameColor, 1f, nameWidth);
+            ui.DrawStringSmall(RowLine(row), new Vector2(left, y + 11f), 0.3f, StringOffset.LEFT, lineColor, 1f, nameWidth);
+            ui.DrawStringSmall(state, new Vector2(right, y), 0.4f, StringOffset.RIGHT, stateColor, 1f);
         }
 
-        // The whole row answers for the pointer, not just its two hit boxes -- they are
-        // now too small to be the only way to read a mod's details.
-        private static bool MouseOverRow(float y)
+        // The selected mod's name and description, above its actions.
+        private static void DrawDetails(UIElement ui, Row row)
         {
-            Vector2 mouse = UIManager.m_mouse_pos;
-            return UIManager.m_menu_use_mouse &&
-                mouse.x > NAME_LEFT - 20f && mouse.x < DETAILS_LEFT - 40f &&
-                mouse.y > y - 31f && mouse.y < y + 31f;
-        }
+            float left = DETAILS_X - COLUMN_HALF_WIDTH + 6f;
+            float width = COLUMN_HALF_WIDTH * 2f - 12f;
+            ui.DrawStringSmall(row.Name, new Vector2(left, LIST_TOP - 6f), 0.6f, StringOffset.LEFT,
+                UIManager.m_col_ui5, 1f, width);
+            ui.DrawVariableSeparator(new Vector2(DETAILS_X, LIST_TOP + 18f), COLUMN_HALF_WIDTH);
 
-        // Everything about a mod the row has no room for. Replaces what the bottom
-        // tooltip used to say about the selected row.
-        private static void DrawDetails(UIElement ui, Row row, float y)
-        {
-            ui.DrawStringSmall(row.Name, new Vector2(DETAILS_LEFT, y), 0.5f, StringOffset.LEFT,
-                UIManager.m_col_ui1, 1f, DETAILS_WIDTH);
-            ui.DrawVariableSeparator(new Vector2(DETAILS_LEFT + DETAILS_WIDTH * 0.5f, y + 20f), DETAILS_WIDTH);
-            y += 48f;
-
-            ui.DrawStringSmall(Facts(row), new Vector2(DETAILS_LEFT, y), 0.35f, StringOffset.LEFT,
-                UIManager.m_col_ui0, 1f, DETAILS_WIDTH);
-            y += 32f;
-
+            Vector2 position = new Vector2(left, LIST_TOP + 42f);
             string warning = Warning(row);
             if (warning != null)
             {
-                ui.DrawStringSmall(warning, new Vector2(DETAILS_LEFT, y), 0.35f, StringOffset.LEFT,
-                    row.Check == FileCheck.Mismatched ? UIManager.m_col_em5 : UIManager.m_col_hi1, 1f, DETAILS_WIDTH);
-                y += 32f;
+                ui.DrawStringSmall(warning, position, 0.4f, StringOffset.LEFT,
+                    row.Check == FileCheck.Mismatched ? UIManager.m_col_em5 : UIManager.m_col_hi3, 1f, width);
+                position.y += 34f;
             }
 
-            if (row.Listed == null)
-                return;
-            foreach (string line in WrapToWidth(row.Listed.Description, 0.4f, DETAILS_WIDTH))
+            foreach (string line in WrapToWidth(row.Description, 0.4f, width))
             {
-                if (y > UIManager.UI_BOTTOM - 200f) // stay clear of APPLY AND RESTART
+                if (position.y > 30f) // stay clear of the action buttons
                     break;
-                ui.DrawStringSmall(line, new Vector2(DETAILS_LEFT, y), 0.4f, StringOffset.LEFT,
-                    UIManager.m_col_ui0, 1f);
-                y += 24f;
+                ui.DrawStringSmall(line, position, 0.4f, StringOffset.LEFT, UIManager.m_col_ui3, 1f);
+                position.y += 22f;
             }
         }
 
         // The engine squishes an over-wide string instead of wrapping it, so the lines are
-        // measured here at the size they will be drawn.
+        // measured here at the size they will be drawn. A blank line in the text starts a
+        // paragraph and is kept as an empty line; single line breaks are wrapped over.
         private static IEnumerable<string> WrapToWidth(string text, float scale, float width)
         {
             if (string.IsNullOrEmpty(text))
                 yield break;
-            string line = "";
-            foreach (string word in text.Split(' '))
+            string[] paragraphs = Regex.Split(text.Replace("\r", "").Trim(), @"\n[ \t]*\n\s*");
+            for (int i = 0; i < paragraphs.Length; i++)
             {
-                string grown = line.Length == 0 ? word : line + " " + word;
-                if (line.Length > 0 && UIManager.GetStringWidth(grown, 20f * scale) > width)
+                if (i > 0)
+                    yield return "";
+                string line = "";
+                foreach (string word in paragraphs[i].Split(new[] { ' ', '\t', '\n' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    yield return line;
-                    line = word;
+                    string grown = line.Length == 0 ? word : line + " " + word;
+                    if (line.Length > 0 && UIManager.GetStringWidth(grown, 20f * scale) > width)
+                    {
+                        yield return line;
+                        line = word;
+                    }
+                    else
+                    {
+                        line = grown;
+                    }
                 }
-                else
-                {
-                    line = grown;
-                }
+                yield return line;
             }
-            yield return line;
+        }
+
+        // Loaded is what runs now, Enabled what runs after the next start; a mod whose two
+        // disagree is waiting for APPLY AND RESTART.
+        private static string StateText(Row row, out Color color)
+        {
+            bool enabled = Mods.IsEnabled(row.File);
+            bool loaded = Mods.IsLoaded(row.File);
+            if (row.File == Library.Downloading)
+            {
+                color = UIManager.m_col_hi5;
+                return Loc.LS("DOWNLOADING");
+            }
+            if (!row.Installed)
+            {
+                color = enabled ? UIManager.m_col_em5 : UIManager.m_col_ui0;
+                return enabled ? Loc.LS("MISSING") : Loc.LS("NOT INSTALLED");
+            }
+            if (enabled != loaded)
+            {
+                color = UIManager.m_col_hi5;
+                return enabled ? Loc.LS("ON AFTER RESTART") : Loc.LS("OFF AFTER RESTART");
+            }
+            color = enabled ? UIManager.m_col_good_ping : UIManager.m_col_ui1;
+            return enabled ? Loc.LS("ACTIVE") : Loc.LS("OFF");
+        }
+
+        private static string RowLine(Row row)
+        {
+            if (row.Check == FileCheck.Unlisted || row.Check == FileCheck.Mismatched)
+                return CheckText(row.Check);
+            string version = row.Listed != null ? row.Listed.Version : null;
+            return string.IsNullOrEmpty(version) ? row.File : Loc.LS("VERSION") + " " + version;
         }
 
         private static string CheckText(FileCheck check)
@@ -310,25 +368,12 @@ namespace GameMod.ModsHandler
                 : Loc.LS("NOT LISTED ON THE MOD SITE");
         }
 
-        // A mod's identity in one line: the file it installs as, its version, and what a
-        // download would cost while it is not installed yet.
-        private static string Facts(Row row)
-        {
-            List<string> parts = new List<string>();
-            parts.Add(row.File);
-            if (row.Listed != null && !string.IsNullOrEmpty(row.Listed.Version))
-                parts.Add(Loc.LS("VERSION") + " " + row.Listed.Version);
-            if (!row.Installed && row.Listed != null && row.Listed.Size > 0)
-                parts.Add((row.Listed.Size / 1048576f).ToString("0.0") + " MB");
-            return string.Join("  --  ", parts.ToArray());
-        }
-
         private static string Warning(Row row)
         {
             if (row.Check == FileCheck.Unlisted || row.Check == FileCheck.Mismatched)
                 return CheckText(row.Check);
             if (!row.Installed && (row.Listed == null || !row.Listed.Downloadable))
-                return Loc.LS("THE MOD SITE PUBLISHES NO VERIFIABLE DOWNLOAD FOR THIS FILE");
+                return Loc.LS("NO VERIFIABLE DOWNLOAD PUBLISHED");
             return null;
         }
 
@@ -374,6 +419,7 @@ namespace GameMod.ModsHandler
                 if (!rows.Exists(row => string.Equals(row.File, file, StringComparison.OrdinalIgnoreCase)))
                     rows.Add(RowFor(file, false));
             ScrollTo(firstRow);
+            selectedRow = rows.Count > 0 ? Mathf.Clamp(selectedRow, 0, rows.Count - 1) : -1;
         }
 
         private static Row RowFor(string file, bool installed)
@@ -384,13 +430,19 @@ namespace GameMod.ModsHandler
                 check = listed == null || string.IsNullOrEmpty(listed.Sha256) ? FileCheck.Unlisted
                     : string.Equals(Library.HashOf(file), listed.Sha256, StringComparison.OrdinalIgnoreCase)
                         ? FileCheck.Published : FileCheck.Mismatched;
+            // The site's text is current for a published file; a local build or an
+            // unlisted mod is described only by the .txt it came with.
+            string description = listed != null && check != FileCheck.Mismatched && !string.IsNullOrEmpty(listed.Description)
+                ? listed.Description
+                : (installed ? Library.DescriptionOf(file) : null) ?? (listed != null ? listed.Description : null);
             return new Row
             {
                 File = file,
                 Name = Catalog.DisplayName(file),
                 Installed = installed,
                 Listed = listed,
-                Check = check
+                Check = check,
+                Description = description
             };
         }
     }

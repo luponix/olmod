@@ -129,6 +129,11 @@ namespace GameMod.ModsHandler
             return Enabled.Any(name => string.Equals(name, file, StringComparison.OrdinalIgnoreCase));
         }
 
+        public static bool IsLoaded(string file)
+        {
+            return Loaded.Any(name => string.Equals(name, file, StringComparison.OrdinalIgnoreCase));
+        }
+
         public static void SetEnabled(string file, bool enabled)
         {
             if (enabled == IsEnabled(file))

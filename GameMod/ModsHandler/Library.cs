@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using Overload;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -44,9 +45,39 @@ namespace GameMod.ModsHandler
                 LastError = "COULD NOT DELETE " + file.ToUpper() + " -- " + ex.Message.ToUpper();
                 return false;
             }
+            try
+            {
+                File.Delete(DescriptionPath(file));
+            }
+            catch (Exception ex)
+            {
+                Debug.Log("[Mods] cannot delete the description of " + file + " -- " + ex.Message);
+            }
             Mods.SetEnabled(file, false);
             Changes++;
             return true;
+        }
+
+        // A mod's description is Mod-<name>.txt beside Mod-<name>.dll: plain text, a blank
+        // line between paragraphs. Installing from the mod site writes it, and a mod copied
+        // in by hand can bring its own. Null when there is none.
+        public static string DescriptionOf(string file)
+        {
+            string path = DescriptionPath(file);
+            try
+            {
+                return File.Exists(path) ? File.ReadAllText(path) : null;
+            }
+            catch (Exception ex)
+            {
+                Debug.Log("[Mods] cannot read " + path + " -- " + ex.Message);
+                return null;
+            }
+        }
+
+        private static string DescriptionPath(string file)
+        {
+            return Path.ChangeExtension(Path.Combine(Config.OLModDir, file), ".txt");
         }
 
         // The hash the catalog publishes is what tells the file the site serves from one
@@ -108,12 +139,18 @@ namespace GameMod.ModsHandler
                     yield break;
                 }
 
-                string problem = Write(entry.File, payload);
+                string problem = Write(Path.Combine(Config.OLModDir, entry.File), payload);
                 if (problem != null)
                 {
                     Fail(entry.File, problem);
                     yield break;
                 }
+            }
+            if (!string.IsNullOrEmpty(entry.Description))
+            {
+                string descriptionProblem = Write(DescriptionPath(entry.File), Encoding.UTF8.GetBytes(entry.Description));
+                if (descriptionProblem != null)
+                    Debug.Log("[Mods] cannot write the description of " + entry.File + " -- " + descriptionProblem);
             }
             Downloading = null;
             Changes++;
@@ -122,9 +159,8 @@ namespace GameMod.ModsHandler
 
         // Temp file + rename, so a crash mid-write cannot leave a truncated DLL under
         // the final name that the next start would try to load.
-        private static string Write(string file, byte[] payload)
+        private static string Write(string path, byte[] payload)
         {
-            string path = Path.Combine(Config.OLModDir, file);
             try
             {
                 string temporary = path + ".tmp";
