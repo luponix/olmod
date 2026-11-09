@@ -20,6 +20,7 @@ namespace GameMod.Replay
         private static readonly HashSet<Projectile> trackedProjectiles = new HashSet<Projectile>();
 
         private static int pendingFireId = -1;
+        private static bool pendingShotByPlayer;
 
         private static GameObject fireOwner;
 
@@ -45,15 +46,16 @@ namespace GameMod.Replay
             }
         }
 
-        public static void Inject(MatchEvent fire)
+        public static void Inject(MatchEvent fire, ProjTeam team)
         {
             try
             {
                 if (fireOwner != null)
                     fireOwner.transform.position = fire.pos;
                 pendingFireId = fire.iC;
+                pendingShotByPlayer = team != ProjTeam.ENEMY;
                 ProjectileManager.FireProjectile((ProjPrefab)fire.iB, fire.pos, fire.rot, fireOwner,
-                    0f, ProjTeam.PLAYER, (WeaponUnlock)(int)fire.fA);
+                    0f, team, (WeaponUnlock)(int)fire.fA);
             }
             finally
             {
@@ -175,7 +177,7 @@ namespace GameMod.Replay
         {
             static bool Prefix(ref bool __result)
             {
-                if (!Playback.IsActive || pendingFireId < 0)
+                if (!Playback.IsActive || pendingFireId < 0 || !pendingShotByPlayer)
                     return true;
                 __result = true;
                 return false;
@@ -187,7 +189,7 @@ namespace GameMod.Replay
     {
         public static bool MultiplayerBehaviour()
         {
-            return GameplayManager.IsMultiplayerActive || Playback.Ready;
+            return GameplayManager.IsMultiplayerActive || (Playback.Ready && !Playback.Replay.IsChallenge);
         }
 
         private static readonly FieldInfo isMultiplayerActiveField =

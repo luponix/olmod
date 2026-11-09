@@ -28,6 +28,8 @@ namespace GameMod.Replay
 
         public static string ModeName(int matchMode)
         {
+            if (matchMode == Recording.CHALLENGE_MATCH_MODE)
+                return "CHALLENGE";
             if (matchMode >= 0 && matchMode < (int)ExtMatchMode.NUM)
                 return ExtMatchMode.ToString((MatchMode)matchMode);
             return "MODE " + matchMode;

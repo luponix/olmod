@@ -10,7 +10,17 @@ namespace GameMod.Replay
 {
     public static class OlrFile
     {
-        public const byte VERSION = 13;
+        public const byte VERSION = 14;
+        private const byte NO_ROBOTS_VERSION = 13; // v14 added the per-frame robot block
+
+        internal const int MAX_FRAMES = 2000000; // ~9 h at 60 Hz
+        internal const int MAX_EVENTS = 1000000;
+        internal const int MAX_CHAT_LINES = 1000000;
+
+        public static bool CanRead(int version)
+        {
+            return version == VERSION || version == NO_ROBOTS_VERSION || LegacyOlrFile.CanRead(version);
+        }
 
         public static string Directory
         {
@@ -88,6 +98,7 @@ namespace GameMod.Replay
                 }
                 WriteItemSamples(writer, frame.items);
                 WriteObjectiveState(writer, ref frame.objective);
+                WriteRobotSamples(writer, frame.robots);
             }
 
             writer.Write(replay.events.Count);
@@ -102,49 +113,73 @@ namespace GameMod.Replay
         public static Recording Load(string path)
         {
             using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read))
-            using (var reader = OpenPayload(stream))
             {
-                float storedDuration;
-                var replay = ReadHeader(reader, out storedDuration);
-
-                int frameCount = ReadCount(reader, 2000000, "frame"); // ~9 h at 60 Hz
-                for (int i = 0; i < frameCount; i++)
+                int version = ReadFormatVersion(stream);
+                if (!CanRead(version))
+                    throw new IOException("unsupported .olr version " + version);
+                using (var reader = OpenBody(stream, version))
                 {
-                    var frame = new Frame();
-                    frame.t = reader.ReadSingle();
-                    frame.ships = new ShipState[replay.players.Count];
-                    for (int slot = 0; slot < replay.players.Count; slot++)
-                        frame.ships[slot] = ReadShipState(reader);
-                    frame.items = ReadItemSamples(reader);
-                    frame.objective = ReadObjectiveState(reader);
-                    replay.frames.Add(frame);
+                    var replay = LegacyOlrFile.CanRead(version)
+                        ? LegacyOlrFile.ReadBody(reader, version)
+                        : ReadBody(reader, version);
+                    NormalizeTimeline(replay);
+                    return replay;
                 }
-
-                int eventCount = ReadCount(reader, 1000000, "event");
-                for (int i = 0; i < eventCount; i++)
-                    replay.events.Add(ReadEvent(reader, replay.players.Count));
-
-                int chatCount = ReadCount(reader, 1000000, "chat");
-                for (int i = 0; i < chatCount; i++)
-                    replay.chat.Add(ReadChat(reader));
-
-                NormalizeTimeline(replay);
-                return replay;
             }
         }
 
-        private static BinaryReader OpenPayload(Stream stream)
+        private static Recording ReadBody(BinaryReader reader, int version)
         {
-            int version = stream.ReadByte();
-            if (version != VERSION)
-                throw new IOException("unsupported .olr version " + version +
-                                      " (expected " + VERSION + ")");
+            float storedDuration;
+            var replay = ReadHeader(reader, out storedDuration);
+
+            int frameCount = ReadCount(reader, MAX_FRAMES, "frame");
+            for (int i = 0; i < frameCount; i++)
+            {
+                var frame = new Frame();
+                frame.t = reader.ReadSingle();
+                frame.ships = new ShipState[replay.players.Count];
+                for (int slot = 0; slot < replay.players.Count; slot++)
+                    frame.ships[slot] = ReadShipState(reader);
+                frame.items = ReadItemSamples(reader);
+                frame.objective = ReadObjectiveState(reader);
+                if (version != NO_ROBOTS_VERSION)
+                    frame.robots = ReadRobotSamples(reader);
+                replay.frames.Add(frame);
+            }
+
+            int eventCount = ReadCount(reader, MAX_EVENTS, "event");
+            for (int i = 0; i < eventCount; i++)
+                replay.events.Add(ReadEvent(reader, replay.players.Count));
+
+            int chatCount = ReadCount(reader, MAX_CHAT_LINES, "chat");
+            for (int i = 0; i < chatCount; i++)
+                replay.chat.Add(ReadChat(reader));
+            return replay;
+        }
+
+        // Reads both preludes and leaves the stream at the body: v13 and later start with
+        // the version byte, v8-v10 put the magic "ROL1" before it. Returns -1 for neither.
+        private static int ReadFormatVersion(Stream stream)
+        {
+            int first = stream.ReadByte(); // -1 on an empty file
+            if (first != 'R')
+                return first;
+            bool magicFollows = stream.ReadByte() == 'O' && stream.ReadByte() == 'L' &&
+                                stream.ReadByte() == '1';
+            return magicFollows ? stream.ReadByte() : -1;
+        }
+
+        private static BinaryReader OpenBody(Stream stream, int version)
+        {
+            if (version < 10) // v8 and v9 predate the zlib body
+                return new BinaryReader(stream);
             return new BinaryReader(new ZlibStream(stream, CompressionMode.Decompress));
         }
 
         // every count in the stream is attacker-controlled: a crafted or corrupt .olr must
         // fail here with a clean IOException, before anything allocates by the count
-        private static int ReadCount(BinaryReader reader, int max, string what)
+        internal static int ReadCount(BinaryReader reader, int max, string what)
         {
             int count = reader.ReadInt32();
             if (count < 0 || count > max)
@@ -157,7 +192,7 @@ namespace GameMod.Replay
         // replaces BinaryReader.ReadString (same wire format: 7-bit length prefix + UTF-8
         // bytes, what BinaryWriter.Write(string) emits) so the length is capped before the
         // bytes are allocated
-        private static string ReadString(BinaryReader reader)
+        internal static string ReadString(BinaryReader reader)
         {
             int byteCount = 0, shift = 0;
             byte part;
@@ -196,15 +231,17 @@ namespace GameMod.Replay
             {
                 using (var stream = new FileStream(path, FileMode.Open, FileAccess.Read))
                 {
-                    info.formatVersion = (byte)Math.Max(0, stream.ReadByte()); // ReadByte is -1 on an empty file
-                    if (info.formatVersion != VERSION)
+                    int version = ReadFormatVersion(stream);
+                    info.formatVersion = (byte)Math.Max(0, version);
+                    if (!CanRead(version))
                         return info;
-                    stream.Position = 0;
 
                     float duration;
-                    using (var reader = OpenPayload(stream))
+                    using (var reader = OpenBody(stream, version))
                     {
-                        var replay = ReadHeader(reader, out duration);
+                        var replay = LegacyOlrFile.CanRead(version)
+                            ? LegacyOlrFile.ReadHeader(reader, version, out duration)
+                            : ReadHeader(reader, out duration);
                         info.sceneName = replay.sceneName;
                         info.matchMode = replay.matchMode;
                         info.durationSeconds = duration;
@@ -260,7 +297,12 @@ namespace GameMod.Replay
             replay.matchStartOffset = reader.ReadSingle();
             replay.recorderSlot = reader.ReadInt32();
             replay.recordedUtcBinary = reader.ReadInt64();
+            ReadRoster(reader, replay);
+            return replay;
+        }
 
+        internal static void ReadRoster(BinaryReader reader, Recording replay)
+        {
             int playerCount = ReadCount(reader, 64, "player");
             for (int i = 0; i < playerCount; i++)
             {
@@ -271,7 +313,6 @@ namespace GameMod.Replay
                     color = new Color(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), 1f)
                 });
             }
-            return replay;
         }
 
         private static void NormalizeTimeline(Recording replay)
@@ -345,8 +386,8 @@ namespace GameMod.Replay
             return ((float)quantized / ROTATION_COMPONENT_STEPS * 2f - 1f) * MAX_SMALL_COMPONENT;
         }
 
-        private const byte PRESENT_FLAG = 1;
-        private const byte ALIVE_FLAG = 2;
+        internal const byte PRESENT_FLAG = 1;
+        internal const byte ALIVE_FLAG = 2;
 
         private static void WriteShipState(BinaryWriter writer, ref ShipState ship)
         {
@@ -369,7 +410,7 @@ namespace GameMod.Replay
             writer.Write(ship.statusFlags);
         }
 
-        private static ShipState ReadShipState(BinaryReader reader)
+        internal static ShipState ReadShipState(BinaryReader reader)
         {
             byte flags = reader.ReadByte();
             var ship = new ShipState();
@@ -381,9 +422,7 @@ namespace GameMod.Replay
             ship.rot = UnpackRotation(reader.ReadUInt32());
             ship.weapon = reader.ReadByte();
             ship.missile = reader.ReadByte();
-            if (ship.weapon > 8 || ship.missile > 8) // 8 = the NUM/NONE sentinel of both enums
-                throw new IOException("corrupt .olr: weapon " + ship.weapon +
-                                      " missile " + ship.missile);
+            CheckSelection(ship);
             ship.health = reader.ReadByte();
             ship.vel = ReadHalfVector(reader);
             ship.vrot = ReadHalfVector(reader);
@@ -394,6 +433,13 @@ namespace GameMod.Replay
             ship.missileAmmo = reader.ReadUInt64();
             ship.statusFlags = reader.ReadByte();
             return ship;
+        }
+
+        internal static void CheckSelection(ShipState ship)
+        {
+            if (ship.weapon > 8 || ship.missile > 8) // 8 = the NUM/NONE sentinel of both enums
+                throw new IOException("corrupt .olr: weapon " + ship.weapon +
+                                      " missile " + ship.missile);
         }
 
         private static void WriteItemSamples(BinaryWriter writer, ItemSample[] items)
@@ -407,7 +453,7 @@ namespace GameMod.Replay
             }
         }
 
-        private static ItemSample[] ReadItemSamples(BinaryReader reader)
+        internal static ItemSample[] ReadItemSamples(BinaryReader reader)
         {
             int sampleCount = reader.ReadUInt16();
             if (sampleCount == 0)
@@ -433,7 +479,7 @@ namespace GameMod.Replay
             WriteHalfVector(writer, objective.ballVel);
         }
 
-        private static ObjectiveState ReadObjectiveState(BinaryReader reader)
+        internal static ObjectiveState ReadObjectiveState(BinaryReader reader)
         {
             var objective = new ObjectiveState();
             objective.ballPresent = (reader.ReadByte() & BALL_PRESENT_FLAG) != 0;
@@ -443,6 +489,35 @@ namespace GameMod.Replay
             objective.ballRot = UnpackRotation(reader.ReadUInt32());
             objective.ballVel = ReadHalfVector(reader);
             return objective;
+        }
+
+        private static void WriteRobotSamples(BinaryWriter writer, RobotSample[] robots)
+        {
+            int sampleCount = robots != null ? robots.Length : 0;
+            writer.Write((ushort)sampleCount);
+            for (int i = 0; i < sampleCount; i++)
+            {
+                writer.Write(robots[i].id);
+                WriteVector(writer, robots[i].pos);
+                writer.Write(PackRotation(robots[i].rot));
+                WriteHalfVector(writer, robots[i].vel);
+            }
+        }
+
+        internal static RobotSample[] ReadRobotSamples(BinaryReader reader)
+        {
+            int sampleCount = reader.ReadUInt16();
+            if (sampleCount == 0)
+                return null;
+            var robots = new RobotSample[sampleCount];
+            for (int i = 0; i < sampleCount; i++)
+            {
+                robots[i].id = reader.ReadUInt16();
+                robots[i].pos = ReadVector(reader);
+                robots[i].rot = UnpackRotation(reader.ReadUInt32());
+                robots[i].vel = ReadHalfVector(reader);
+            }
+            return robots;
         }
 
         private static void WriteEvent(BinaryWriter writer, MatchEvent ev)
@@ -459,7 +534,7 @@ namespace GameMod.Replay
             writer.Write(ev.nameB ?? "");
         }
 
-        private static MatchEvent ReadEvent(BinaryReader reader, int playerCount)
+        internal static MatchEvent ReadEvent(BinaryReader reader, int playerCount)
         {
             var ev = new MatchEvent();
             ev.t = reader.ReadSingle();
@@ -535,7 +610,7 @@ namespace GameMod.Replay
             writer.Write(v.x); writer.Write(v.y); writer.Write(v.z);
         }
 
-        private static Vector3 ReadVector(BinaryReader reader)
+        internal static Vector3 ReadVector(BinaryReader reader)
         {
             return new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
         }
@@ -547,7 +622,7 @@ namespace GameMod.Replay
             writer.Write(HalfHelper.Compress(v.z));
         }
 
-        private static Vector3 ReadHalfVector(BinaryReader reader)
+        internal static Vector3 ReadHalfVector(BinaryReader reader)
         {
             return new Vector3(HalfHelper.Decompress(reader.ReadUInt16()),
                                HalfHelper.Decompress(reader.ReadUInt16()),

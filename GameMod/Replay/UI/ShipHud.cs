@@ -36,14 +36,14 @@ namespace GameMod.Replay
         public static float BannerY { get { return BlockY - BANNER_STEP; } }
 
         public static void Draw(UIElement ui, ShipState state, MpTeam team, bool teamMatch,
-            float maxHitpoints)
+            float maxHitpoints, float maxEnergy)
         {
             bool weaponsOnLeft = MenuManager.opt_hud_weapons != 0;
 
             Vector2 at = new Vector2(0f, BlockY);
             DrawArmor(ui, at, state, team, teamMatch, maxHitpoints);
             at.y += 35f;
-            DrawEnergyAmmo(ui, at, state, 120f); // MP MAX_ENERGY (Player.cs:1027); header maxHitpoints can differ on modded servers
+            DrawEnergyAmmo(ui, at, state, maxEnergy);
             at.y += 70f;
             if (state.HasOverdrive)
             {

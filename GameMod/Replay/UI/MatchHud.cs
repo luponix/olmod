@@ -192,6 +192,8 @@ namespace GameMod.Replay
                     0.45f, clockColor, ui.m_alpha);
             }
 
+            if (replay.IsChallenge)
+                return; // robot kills are not recorded, so there is no score to show
             pos.y += HEADER_ROW_HEIGHT;
             if (Hud.IsTeamMode(replay.matchMode))
                 DrawTeamScores(ui, ref pos, replay);

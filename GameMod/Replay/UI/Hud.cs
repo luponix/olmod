@@ -653,7 +653,7 @@ namespace GameMod.Replay
                     {
                         if (!ControlBar.Shown)
                             ShipHud.Draw(__instance, state, (MpTeam)replay.players[pov].team,
-                                IsTeamMode(replay.matchMode), replay.maxHitpoints);
+                                IsTeamMode(replay.matchMode), replay.maxHitpoints, replay.MaxEnergy);
                         Vector2 reticleAt = new Vector2(0f, UIManager.UI_BOTTOM + 128f);
 
                         if (Viewpoint.Mode == CameraMode.FirstPerson)

@@ -163,7 +163,7 @@ namespace GameMod.Replay
             ownedItems.Add(item);
         }
 
-        private static void MakeDisplayOnly(GameObject prop)
+        internal static void MakeDisplayOnly(GameObject prop)
         {
             prop.SetActive(true);
             foreach (var collider in prop.GetComponentsInChildren<Collider>(true))

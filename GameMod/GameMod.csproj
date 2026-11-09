@@ -273,12 +273,14 @@
     <Compile Include="Boss2B.cs" />
     <Compile Include="MatcenHp.cs" />
     <Compile Include="Replay\Benchmark.cs" />
+    <Compile Include="Replay\Data\LegacyOlrFile.cs" />
     <Compile Include="Replay\Data\Model.cs" />
     <Compile Include="Replay\Data\OlrFile.cs" />
     <Compile Include="Replay\DemosMenu.cs" />
     <Compile Include="Replay\Playback.cs" />
     <Compile Include="Replay\Recorder.cs" />
     <Compile Include="Replay\Scene\DamageFlash.cs" />
+    <Compile Include="Replay\Scene\Robots.cs" />
     <Compile Include="Replay\Scene\Ships.cs" />
     <Compile Include="Replay\Scene\Shots.cs" />
     <Compile Include="Replay\Scene\Viewpoint.cs" />

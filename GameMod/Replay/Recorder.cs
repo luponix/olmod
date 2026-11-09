@@ -93,6 +93,9 @@ namespace GameMod.Replay
             recentPickupFX.Clear();
             recentPickupEvents.Clear();
             recentMiniFires.Clear();
+            robotIds.Clear();
+            nextRobotId = 0;
+            recordingRobots = false;
 
             lastTeamScore = null;
             for (int flag = 0; flag < CTF.TeamCount; flag++)
@@ -167,26 +170,36 @@ namespace GameMod.Replay
                 if (level.IsAddOn)
                     Recording.levelIdHash = level.GetAddOnLevelIdStringHash();
             }
-            Recording.matchMode = (int)NetworkMatch.GetMode();
+            bool challenge = GameplayManager.IsChallengeMode;
+            Recording.matchMode = challenge ? Recording.CHALLENGE_MATCH_MODE : (int)NetworkMatch.GetMode();
             recordingCTF = Recording.matchMode == (int)CTF.MatchModeCTF;
             recordingMonsterball = Recording.matchMode == (int)MatchMode.MONSTERBALL;
 
-            recordingTeamMode = NetworkMatch.IsTeamMode(NetworkMatch.GetMode());
+            recordingTeamMode = !challenge && NetworkMatch.IsTeamMode(NetworkMatch.GetMode());
+            recordingRobots = challenge;
 
             Recording.maxHitpoints = Player.MAX_HITPOINTS > 1f ? Player.MAX_HITPOINTS : 120f;
 
-            int timeLimitSeconds = NetworkMatch.m_match_time_limit_seconds;
+            int timeLimitSeconds = challenge ? 0 : NetworkMatch.m_match_time_limit_seconds;
             bool hasTimeLimit = timeLimitSeconds > 0 &&
                                 timeLimitSeconds < 2000000; // the menu stores "no limit" as a huge seconds value
             Recording.matchTimeLimit = hasTimeLimit ? timeLimitSeconds : 0f;
 
-            Recording.matchStartOffset = Mathf.Max(0f, NetworkMatch.m_match_elapsed_seconds);
+            Recording.matchStartOffset = challenge ? 0f : Mathf.Max(0f, NetworkMatch.m_match_elapsed_seconds);
 
-            foreach (var player in Overload.NetworkManager.m_Players)
+            if (challenge)
             {
-                if (player == null || player.m_spectator)
-                    continue;
-                AddRosterPlayer(player, player.netId, player.m_mp_name);
+                var pilot = GameManager.m_local_player;
+                AddRosterPlayer(pilot, pilot.netId, PilotManager.PilotName);
+            }
+            else
+            {
+                foreach (var player in Overload.NetworkManager.m_Players)
+                {
+                    if (player == null || player.m_spectator)
+                        continue;
+                    AddRosterPlayer(player, player.netId, player.m_mp_name);
+                }
             }
 
             if (Item.m_ItemList != null)
@@ -229,6 +242,12 @@ namespace GameMod.Replay
                 return true;
             // Absorb small float rounding differences
             return (time - lastSampledTime) >= 1f / 60f - 1e-4f;
+        }
+
+        private static void AdvanceClock(float t)
+        {
+            clockTime = t;
+            clockAnchorRealTime = Time.time;
         }
 
         private const int MISSILE_COUNT_BITS = 8;
@@ -313,9 +332,7 @@ namespace GameMod.Replay
                     recordTime += Time.fixedDeltaTime;
                 float t = haveTimestamp ? msg.m_server_timestamp : recordTime;
                 lastRawTimestamp = t;
-
-                clockTime = t;
-                clockAnchorRealTime = Time.time;
+                AdvanceClock(t);
 
                 if (!ShouldSample(t))
                     return;
@@ -383,6 +400,45 @@ namespace GameMod.Replay
             }
         }
 
+        // A challenge has no snapshot stream, so the local ship is sampled on the physics tick.
+        [HarmonyPatch(typeof(PlayerShip), "FixedUpdateAll")]
+        class Recorder_PlayerShip_FixedUpdateAll
+        {
+            static void Postfix()
+            {
+                if (!GameplayManager.IsChallengeMode || Session.Mode == SessionMode.Playback)
+                    return;
+                if (IsRecording && GameplayManager.m_gameplay_state == GameplayState.EXIT)
+                {
+                    StopAndSave();
+                    return;
+                }
+                var player = GameManager.m_local_player;
+                if (GameplayManager.m_gameplay_state != GameplayState.PLAYING ||
+                    player == null || player.c_player_ship == null)
+                    return;
+                if (!IsRecording && !alreadySaved && Session.Mode == SessionMode.Off)
+                    Start();
+                if (!IsRecording)
+                    return;
+
+                recordTime += Time.fixedDeltaTime;
+                AdvanceClock(recordTime);
+                if (!ShouldSample(recordTime))
+                    return;
+                lastSampledTime = recordTime;
+
+                var ship = player.c_player_ship;
+                var body = ship.c_rigidbody;
+                var frame = new Frame { t = recordTime, ships = new ShipState[1] };
+                frame.ships[0] = CaptureShipState(player, ship.c_transform.localPosition, ship.c_transform.rotation,
+                    body != null ? body.velocity : Vector3.zero, body != null ? body.angularVelocity : Vector3.zero);
+                CollectItemSamples(frame);
+                CollectRobotSamples(frame);
+                Recording.frames.Add(frame);
+            }
+        }
+
         [HarmonyPatch(typeof(Projectile), "Fire")]
         class Recorder_Projectile_Fire
         {
@@ -392,7 +448,11 @@ namespace GameMod.Replay
                 if (!CanRecord || __instance == null)
                     return;
                 if (team == ProjTeam.ENEMY)
+                {
+                    if (recordingRobots)
+                        RecordRobotFire(__instance, owner, upgrade_lvl, pos, rot);
                     return;
+                }
                 if (owner == null)
                     return;
                 var player = owner.GetComponent<Player>();
@@ -1031,6 +1091,124 @@ namespace GameMod.Replay
             {
                 OnPickupFX(__instance, (int)type);
             }
+        }
+
+        // Robots are not networked, so the master list is walked once per stored frame. A robot
+        // is registered the first time anything sees it, which covers level robots, matcen
+        // spawns and boss splits with no spawn hook.
+        private static bool recordingRobots;
+        private static readonly Dictionary<Robot, int> robotIds = new Dictionary<Robot, int>();
+        private static int nextRobotId;
+        private static readonly List<RobotSample> robotSampleBuffer = new List<RobotSample>();
+
+        // Returns the robot's id, emitting its RobotSpawn (the only record of its type) on first
+        // sight. Returns -1 once the ushort id space is used up.
+        private static int EnsureRobotId(Robot robot)
+        {
+            int id;
+            if (robotIds.TryGetValue(robot, out id))
+                return id;
+            if (nextRobotId > ushort.MaxValue)
+                return -1;
+            id = nextRobotId++;
+            robotIds[robot] = id;
+            var flags = (robot.m_super ? RobotSpawnFlags.Super : 0) |
+                        (robot.m_variant ? RobotSpawnFlags.Variant : 0) |
+                        (robot.m_alien ? RobotSpawnFlags.Alien : 0) |
+                        (robot.m_is_boss ? RobotSpawnFlags.Boss : 0);
+            Recording.events.Add(new MatchEvent
+            {
+                t = CurrentTime, type = MatchEventType.RobotSpawn,
+                iA = id, iB = (int)robot.robot_type, iC = (int)flags,
+                pos = robot.c_transform != null ? robot.c_transform.position : Vector3.zero,
+                rot = robot.c_transform != null ? robot.c_transform.rotation : Quaternion.identity
+            });
+            return id;
+        }
+
+        // RobotManager.ActivateRobot deactivates sleeping robots out of the player's sight, so
+        // only active robots move or render, and a missing sample means "not visible".
+        private static void CollectRobotSamples(Frame frame)
+        {
+            var robots = RobotManager.m_master_robot_list;
+            if (!recordingRobots || robots == null || robots.Count == 0)
+                return;
+            robotSampleBuffer.Clear();
+            foreach (var robot in robots)
+            {
+                if (robot == null || robot.c_go == null || robot.c_transform == null || !robot.c_go.activeSelf)
+                    continue;
+                int id = EnsureRobotId(robot);
+                if (id < 0)
+                    continue;
+                robotSampleBuffer.Add(new RobotSample
+                {
+                    id = (ushort)id,
+                    pos = robot.c_transform.position,
+                    rot = robot.c_transform.rotation,
+                    vel = robot.c_rigidbody != null ? robot.c_rigidbody.velocity : Vector3.zero
+                });
+            }
+            if (robotSampleBuffer.Count > 0)
+                frame.robots = robotSampleBuffer.ToArray();
+        }
+
+        // No flare filter and no mini dedup: robots fire no flares, and their minis come once,
+        // straight from the robot (a detonator fires twelve as it dies, Robot.cs:10613).
+        // Reactor turrets fire without a robot and record iA = -1.
+        private static void RecordRobotFire(Projectile projectile, GameObject owner,
+                                            WeaponUnlock upgradeLevel, Vector3 pos, Quaternion rot)
+        {
+            var robot = owner != null ? owner.GetComponent<Robot>() : null;
+            int fireId = nextFireId++;
+            fireIdByProjectile[projectile] = fireId;
+            Recording.events.Add(new MatchEvent
+            {
+                t = CurrentTime, type = MatchEventType.RobotFire,
+                iA = robot != null ? EnsureRobotId(robot) : -1, iB = (int)projectile.m_type, iC = fireId,
+                fA = (int)upgradeLevel, pos = pos, rot = rot
+            });
+        }
+
+        // The dying tumble's poses are in the frames, this only cues the FX. m_dying is the
+        // engine's own once-only test (Robot.cs:10547).
+        [HarmonyPatch(typeof(Robot), "StartExploding")]
+        class Recorder_Robot_StartExploding
+        {
+            static void Prefix(Robot __instance)
+            {
+                if (!CanRecord || !recordingRobots || __instance == null || __instance.m_dying)
+                    return;
+                RecordRobotDeath(__instance, RobotDeathStage.Dying);
+            }
+        }
+
+        // ExplodeNow ends by removing the robot from the master list (Robot.cs:11166); a
+        // prefix still sees its pose.
+        [HarmonyPatch(typeof(Robot), "ExplodeNow")]
+        class Recorder_Robot_ExplodeNow
+        {
+            static void Prefix(Robot __instance)
+            {
+                if (!CanRecord || !recordingRobots || __instance == null || !robotIds.ContainsKey(__instance))
+                    return;
+                RecordRobotDeath(__instance, RobotDeathStage.Exploded);
+                robotIds.Remove(__instance);
+            }
+        }
+
+        private static void RecordRobotDeath(Robot robot, RobotDeathStage stage)
+        {
+            int id = EnsureRobotId(robot);
+            if (id < 0)
+                return;
+            Recording.events.Add(new MatchEvent
+            {
+                t = CurrentTime, type = MatchEventType.RobotDeath,
+                iA = id, iB = (int)stage, fA = robot.m_explosion_size,
+                pos = robot.c_transform != null ? robot.c_transform.position : Vector3.zero,
+                rot = robot.c_transform != null ? robot.c_transform.rotation : Quaternion.identity
+            });
         }
 
         [HarmonyPatch(typeof(Client), "OnMatchStart")]

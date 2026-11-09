@@ -95,6 +95,31 @@ namespace GameMod.Replay
         public Vector3 pos;
     }
 
+    public struct RobotSample
+    {
+        public ushort id;
+        public Vector3 pos;
+        public Quaternion rot;
+        public Vector3 vel;
+    }
+
+    // carried in RobotSpawn.iC
+    [Flags]
+    public enum RobotSpawnFlags
+    {
+        Super = 1,
+        Variant = 2,
+        Alien = 4,
+        Boss = 8,
+    }
+
+    // carried in RobotDeath.iB
+    public enum RobotDeathStage
+    {
+        Dying = 0,
+        Exploded = 1,
+    }
+
     public struct FlagSnapshot
     {
         public bool known;
@@ -126,6 +151,7 @@ namespace GameMod.Replay
         public ShipState[] ships;
         public ItemSample[] items;
         public ObjectiveState objective;
+        public RobotSample[] robots;
     }
 
     public enum MatchEventType : byte
@@ -147,6 +173,10 @@ namespace GameMod.Replay
         MonsterballGoal = 16,
         FlagState = 17,
         MassdriverShot = 18,
+
+        RobotSpawn = 19,
+        RobotDeath = 20,
+        RobotFire = 21,
     }
 
     public class MatchEvent
@@ -187,6 +217,9 @@ namespace GameMod.Replay
 
     public class Recording
     {
+        // a challenge has no MatchMode; v8-v10 wrote -1 for every singleplayer recording
+        public const int CHALLENGE_MATCH_MODE = -1;
+
         public string sceneName = "";
         public string levelIdHash = "";
         public int matchMode;
@@ -199,6 +232,12 @@ namespace GameMod.Replay
         public List<Frame> frames = new List<Frame>();
         public List<MatchEvent> events = new List<MatchEvent>();
         public List<ChatLine> chat = new List<ChatLine>();
+
+        public bool IsChallenge { get { return matchMode == CHALLENGE_MATCH_MODE; } }
+
+        // Player.Awake sets MAX_ENERGY together with MAX_HITPOINTS (Player.cs:1027), but a
+        // modded server can move the recorded maxHitpoints, so multiplayer stays at 120
+        public float MaxEnergy { get { return IsChallenge ? maxHitpoints : 120f; } }
 
         public float Duration
         {
@@ -368,6 +407,6 @@ namespace GameMod.Replay
         public DateTime date;
 
         public byte formatVersion;
-        public bool IsPlayable { get { return formatVersion == OlrFile.VERSION; } }
+        public bool IsPlayable { get { return OlrFile.CanRead(formatVersion); } }
     }
 }

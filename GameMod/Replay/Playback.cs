@@ -107,7 +107,7 @@ namespace GameMod.Replay
 
         private static int ResolveLevel(Recording replay, out Mission mission)
         {
-            mission = GameManager.MultiplayerMission;
+            mission = replay.IsChallenge ? GameManager.ChallengeMission : GameManager.MultiplayerMission;
             if (mission == null)
                 return -1;
 
@@ -134,6 +134,7 @@ namespace GameMod.Replay
             Hud.Init(Replay);
             Reticle.Style = MenuManager.opt_hud_reticle;
             World.Begin(Replay);
+            Robots.Begin(Replay);
             Shots.Begin();
             DamageFlash.Begin(Replay);
 
@@ -169,6 +170,7 @@ namespace GameMod.Replay
         public static void Stop()
         {
             World.End();
+            Robots.End();
             Ships.Destroy();
             Shots.End();
             DamageFlash.End();
@@ -211,6 +213,7 @@ namespace GameMod.Replay
             Ships.HideAll();
             Shots.ClearAll();
             World.HideAll();
+            Robots.HideAll();
 
             ParticleManager.DestroyAll();
             ExplosionManager.ResetQueuedExplosions();
@@ -272,6 +275,7 @@ namespace GameMod.Replay
 
             Ships.Drive();
             World.Drive();
+            Robots.Drive();
 
             int eventCount = Replay.events.Count;
 
@@ -378,6 +382,7 @@ namespace GameMod.Replay
             }
             Ships.ResetDeathRollAt(playClock);
             World.RebuildAt(playClock);
+            Robots.RebuildAt(playClock);
             JustSeeked = true;
         }
 
@@ -387,7 +392,11 @@ namespace GameMod.Replay
             {
                 case MatchEventType.Fire:
                     if (allowFx)
-                        Shots.Inject(ev);
+                        Shots.Inject(ev, ProjTeam.PLAYER);
+                    break;
+                case MatchEventType.RobotFire:
+                    if (allowFx)
+                        Shots.Inject(ev, ProjTeam.ENEMY);
                     break;
                 case MatchEventType.MassdriverShot:
                     if (allowFx)
@@ -403,6 +412,15 @@ namespace GameMod.Replay
                     World.DestroyItem(ev.iA);
                     if (allowFx)
                         World.PlayPickupFx(ev);
+                    break;
+                case MatchEventType.RobotSpawn:
+                    Robots.SpawnRobot(ev.iA);
+                    break;
+                case MatchEventType.RobotDeath:
+                    if (allowFx)
+                        Robots.PlayDeathFx(ev);
+                    if (ev.iB == (int)RobotDeathStage.Exploded)
+                        Robots.DestroyRobot(ev.iA);
                     break;
                 case MatchEventType.SuperAlert:
                     if (allowFx)
