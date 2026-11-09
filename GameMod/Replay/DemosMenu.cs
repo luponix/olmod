@@ -206,10 +206,10 @@ namespace GameMod.Replay
             {
                 string map;
                 if (!info.IsPlayable)
-                    map = info.formatVersion > 0 ? "OLD FORMAT (V" + info.formatVersion + ")" : "UNREADABLE";
+                    map = info.formatVersion > 0 ? string.Format(Loc.LS("OLD FORMAT (V{0})"), info.formatVersion) : Loc.LS("UNREADABLE");
                 else
                     map = string.IsNullOrEmpty(info.sceneName)
-                        ? "UNKNOWN" : info.sceneName.ToUpperInvariant();
+                        ? Loc.LS("UNKNOWN") : info.sceneName.ToUpperInvariant();
                 string date = DateText(info, withTime: false);
                 demoRows.Add(new DemoRow
                 {
@@ -287,14 +287,14 @@ namespace GameMod.Replay
             ui.m_alpha = 1f;
             UIManager.ui_bg_dark = true;
             ui.DrawMenuBG();
-            ui.DrawHeaderMedium(Vector2.up * (UIManager.UI_TOP + 30f), "DEMOS", 265f);
+            ui.DrawHeaderMedium(Vector2.up * (UIManager.UI_TOP + 30f), Loc.LS("DEMOS"), 265f);
             ui.DrawMenuSeparator(new Vector2(0f, UIManager.UI_TOP + 55f));
             ui.DrawMenuSeparator(new Vector2(0f, UIManager.UI_BOTTOM - 140f));
 
             if (replays.Count == 0)
             {
                 ui.DrawLabelSmall(new Vector2(0f, (listTop + listBottom) * 0.5f),
-                    "NO REPLAYS RECORDED YET", 400f);
+                    Loc.LS("NO REPLAYS RECORDED YET"), 400f);
             }
             else
             {
@@ -359,7 +359,7 @@ namespace GameMod.Replay
 
                 if (selectedIndex < 0 || selectedIndex >= replays.Count)
                 {
-                    ui.DrawLabelSmall(new Vector2(detailX, listTop), "SELECT A DEMO", columnHalfWidth);
+                    ui.DrawLabelSmall(new Vector2(detailX, listTop), Loc.LS("SELECT A DEMO"), columnHalfWidth);
                 }
                 else
                 {
@@ -387,11 +387,11 @@ namespace GameMod.Replay
 
                 bool buttonsDisabled = selectedIndex < 0;
                 bool playDisabled = buttonsDisabled || !replays[selectedIndex].IsPlayable;
-                ui.SelectAndDrawItem("PLAY", new Vector2(detailX, actionY - 52f),
+                ui.SelectAndDrawItem(Loc.LS("PLAY"), new Vector2(detailX, actionY - 52f),
                     SEL_PLAY, playDisabled, itemScale, itemTextSize);
-                ui.SelectAndDrawItem("BENCHMARK", new Vector2(detailX, actionY),
+                ui.SelectAndDrawItem(Loc.LS("BENCHMARK"), new Vector2(detailX, actionY),
                     SEL_BENCHMARK, playDisabled, itemScale, itemTextSize);
-                ui.SelectAndDrawItem(confirmDelete ? "CONFIRM DELETE" : "DELETE",
+                ui.SelectAndDrawItem(Loc.LS(confirmDelete ? "CONFIRM DELETE" : "DELETE"),
                     new Vector2(detailX, actionY + 52f), SEL_DELETE, buttonsDisabled,
                     itemScale, itemTextSize);
             }
@@ -400,7 +400,7 @@ namespace GameMod.Replay
                 ui.DrawStringSmall(startError, new Vector2(detailX, actionY - 104f), 0.4f,
                     StringOffset.CENTER, UIManager.m_col_damage, 1f, columnHalfWidth * 2f);
 
-            ui.SelectAndDrawItem("RECORD MATCHES: " + (Session.RecordReplays ? "ON" : "OFF"),
+            ui.SelectAndDrawItem(string.Format(Loc.LS("RECORD MATCHES: {0}"), Loc.LS(Session.RecordReplays ? "ON" : "OFF")),
                 new Vector2(detailX, recordToggleY), SEL_RECORD_TOGGLE, false,
                 itemScale, itemTextSize);
             ui.SelectAndDrawItem(Loc.LS("BACK"), new Vector2(0f, UIManager.UI_BOTTOM - 105f),
@@ -409,7 +409,7 @@ namespace GameMod.Replay
 
         private static void DrawDetailLine(UIElement ui, ref Vector2 pos, string label, string value)
         {
-            ui.DrawStringSmall(label, pos, 0.35f, StringOffset.LEFT, UIManager.m_col_ui0, 1f, -1f);
+            ui.DrawStringSmall(Loc.LS(label), pos, 0.35f, StringOffset.LEFT, UIManager.m_col_ui0, 1f, -1f);
             ui.DrawStringSmall(value, pos + Vector2.right * 110f, 0.4f, StringOffset.LEFT,
                 UIManager.m_col_ui1, 1f, 300f);
             pos.y += 26f;

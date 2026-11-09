@@ -108,6 +108,7 @@
     <Compile Include="Hooks\UIElement.cs" />
     <Compile Include="Hooks\GameManager.cs" />
     <Compile Include="Hooks\Player.cs" />
+    <Compile Include="Hooks\Loc.cs" />
     <Compile Include="Hooks\PlayerShip.cs" />
     <Compile Include="Hooks\Viewer.cs" />
     <Compile Include="Hooks\NetworkMatch.cs" />
@@ -155,6 +156,7 @@
     <Compile Include="JoystickCurveEditor.cs" />
     <Compile Include="JoystickRotationFix.cs" />
     <Compile Include="LevelError.cs" />
+    <Compile Include="Localization.cs" />
     <Compile Include="MatchModeRace.cs" />
     <Compile Include="MatchSetupMenu.cs" />
     <Compile Include="MessageTypes.cs" />
@@ -299,6 +301,9 @@
     <None Include="Directory.Build.targets" />
     <None Include="olmodsettings.json" />
     <EmbeddedResource Include="Resources\meshes" />
+    <EmbeddedResource Include="Resources\lang\*.txt">
+      <LogicalName>GameMod.Resources.lang.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

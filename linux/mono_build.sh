@@ -29,6 +29,11 @@ fi
 
 echo ../GameMod/*.cs
 
+LANG_RESOURCES=""
+for f in ../GameMod/Resources/lang/*.txt; do
+    test -e "$f" && LANG_RESOURCES="$LANG_RESOURCES -resource:$f,GameMod.Resources.lang.$(basename "$f")"
+done
+
 mcs \
     -r:"${OLPATH}"/Overload_Data/Managed/Assembly-CSharp.dll \
     -r:"${OLPATH}"/Overload_Data/Managed/Assembly-CSharp-firstpass.dll \
@@ -49,6 +54,7 @@ mcs \
     -target:library \
     -sdk:2 \
     -resource:../GameMod/Resources/meshes,GameMod.Resources.meshes \
+    $LANG_RESOURCES \
     -out:GameMod.dll \
     ../GameMod/*.cs \
     ../GameMod/*/*.cs \

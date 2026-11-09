@@ -61,12 +61,12 @@ namespace GameMod.Replay
             catch (Exception e)
             {
                 Debug.LogErrorFormat("[Replay] load failed: {0}", e);
-                return "CANNOT READ THE DEMO FILE";
+                return Loc.LS("CANNOT READ THE DEMO FILE");
             }
             if (Replay.frames.Count == 0)
             {
                 Replay = null;
-                return "THE DEMO HAS NO FRAMES";
+                return Loc.LS("THE DEMO HAS NO FRAMES");
             }
             CorrectRemoteMissileCounts();
 
@@ -75,7 +75,7 @@ namespace GameMod.Replay
             if (levelIndex < 0)
             {
                 Debug.LogErrorFormat("[Replay] level not found: '{0}' hash='{1}'", Replay.sceneName, Replay.levelIdHash);
-                string error = "MAP NOT INSTALLED: " + (Replay.sceneName ?? "").ToUpperInvariant();
+                string error = string.Format(Loc.LS("MAP NOT INSTALLED: {0}"), (Replay.sceneName ?? "").ToUpperInvariant());
                 Replay = null;
                 return error;
             }
@@ -103,7 +103,7 @@ namespace GameMod.Replay
                 Debug.LogErrorFormat("[Replay] level launch failed: {0}", e);
                 Session.Mode = SessionMode.Off;
                 Replay = null;
-                launchError = "CANNOT START THE LEVEL";
+                launchError = Loc.LS("CANNOT START THE LEVEL");
             }
             Launching = false;
             return launchError;
