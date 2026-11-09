@@ -130,6 +130,12 @@ namespace GameMod
                 uie.DrawStringSmall("INSTAREAP ENABLED", position - Vector2.right * LEFT_OFFSET, TEXT_SIZE, StringOffset.LEFT, UIManager.m_col_ui1, 1f, 200f);
                 position.y += LINE_SIZE;
             }
+            if (MPModPrivateData.InstareapRapidFire)
+            {
+                show = true;
+                uie.DrawStringSmall("MASSDRIVER RAPID FIRE ENABLED", position - Vector2.right * LEFT_OFFSET, TEXT_SIZE, StringOffset.LEFT, UIManager.m_col_ui1, 1f, 200f);
+                position.y += LINE_SIZE;
+            }
             if (MPModPrivateData.BoostFireEnabled)
             {
                 show = true;

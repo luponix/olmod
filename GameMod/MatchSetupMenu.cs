@@ -197,8 +197,8 @@ namespace GameMod
 
         private const int ADVANCED_VISIBLE_ROWS = 10;
         private const float ADVANCED_ROW_PITCH = 55f;
-        private static readonly int[] advancedRowsCtf = { 27, 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
-        private static readonly int[] advancedRowsOtherModes = { 27, 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
+        private static readonly int[] advancedRowsCtf = { 27, 28, 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
+        private static readonly int[] advancedRowsOtherModes = { 27, 28, 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
         private static int advancedScrollOffset;
         private static bool advancedScrollbarDragging;
         private static int previousSelection = -1;
@@ -271,6 +271,9 @@ namespace GameMod
                     break;
                 case 27:
                     uie.SelectAndDrawStringOptionItem(Loc.LS("INSTAREAP"), position, 27, Menus.GetMMSInstareap(), Loc.LS("EVERY SHIP CARRIES ONLY A MASSDRIVER THAT KILLS IN ONE HIT, NO PICKUPS"), 1f, MenuManager.mms_mode == ExtMatchMode.RACE);
+                    break;
+                case 28:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("MASSDRIVER RAPID FIRE"), position, 28, Menus.GetMMSInstareapRapidFire(), Loc.LS("INSTAREAP WITHOUT THE MASSDRIVER COOLDOWN, EVERY SHOT STILL PUSHES YOU BACK AND SHAKES YOUR AIM"), 1f, !Menus.mms_instareap || MenuManager.mms_mode == ExtMatchMode.RACE);
                     break;
             }
         }
@@ -874,6 +877,12 @@ namespace GameMod
                     break;
                 case 27:
                     Menus.mms_instareap = !Menus.mms_instareap;
+                    PlayCycleSound();
+                    break;
+                case 28:
+                    if (!Menus.mms_instareap)
+                        break;
+                    Menus.mms_instareap_rapid_fire = !Menus.mms_instareap_rapid_fire;
                     PlayCycleSound();
                     break;
                 case 100:

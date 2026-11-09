@@ -14,6 +14,9 @@ namespace GameMod
     {
         // Ships[].static_wb[6].gp_fire_wait is 1.5 s on the Pyro-GL and Phoenix, 1.2 on the Magnum
         private const float MD_COOLDOWN_TIME = 1.5f;
+        // The rapid fire setting copies a Descent 3 instareap bug that drops the cooldown. Fire on
+        // release still needs a press and a release, so this only caps a flood the server must drop.
+        private const float MD_RAPID_FIRE_COOLDOWN_TIME = 0.1f;
         private const float MD_TIME_TILL_ZOOM_KICKS_IN = 0.5f;  // seconds after the press, not at it
         // metres. D3 caps the slug by lifetime instead - 0.15 s at 15000 u/s, far enough that
         // no indoor level reaches the end of it.
@@ -108,7 +111,7 @@ namespace GameMod
         private static AudioClip md_indicator_audio;
 
         static MassdriverProjectile localplayer_md_projectile = new MassdriverProjectile();
-        static MassdriverProjectile[] md_projectile_pool = new MassdriverProjectile[15];
+        static MassdriverProjectile[] md_projectile_pool = new MassdriverProjectile[64];
         static readonly Dictionary<int, float> lastShotTimeByConnection = new Dictionary<int, float>();
 
         // Instareap was match mode 5 before it became a setting on top of any mode. Lobbies,
@@ -117,6 +120,12 @@ namespace GameMod
 
         // MPSetupDefault clears it before every lobby: a stock server or match creator sends no private data
         public static bool Enabled = false;
+        public static bool RapidFire = false;
+
+        private static float CooldownTime
+        {
+            get { return RapidFire ? MD_RAPID_FIRE_COOLDOWN_TIME : MD_COOLDOWN_TIME; }
+        }
 
         // Enabled survives leaving multiplayer until the next lobby resets it, so every
         // client-side gate must also require that a multiplayer match is actually running
@@ -258,10 +267,10 @@ namespace GameMod
                 // Step 2: drop shots arriving faster than the weapon can fire, leaving slack for jitter
                 float previousShotTime;
                 if (lastShotTimeByConnection.TryGetValue(connection_id, out previousShotTime)
-                    && Time.time - previousShotTime < MD_COOLDOWN_TIME * 0.9f)
+                    && Time.time - previousShotTime < CooldownTime * 0.9f)
                 {
                     Debug.LogFormat("INSTAREAP {0}: shot {1:F2}s after the previous one, cooldown is {2}s",
-                        shooter.m_mp_name, Time.time - previousShotTime, MD_COOLDOWN_TIME);
+                        shooter.m_mp_name, Time.time - previousShotTime, CooldownTime);
                     return;
                 }
                 lastShotTimeByConnection[connection_id] = Time.time;
@@ -556,13 +565,15 @@ namespace GameMod
                 ship.c_mesh_collider.enabled = false;
                 try
                 {
-                    localplayer_md_projectile.Fire(ship.transform.position + ship.transform.forward * 1.5f, ship.transform.rotation, ship.transform.forward, Vector3.zero, false);
+                    // under rapid fire the previous beam is still fading, so the shot takes a pooled one
+                    MassdriverProjectile beam = localplayer_md_projectile.active ? FreeBeam() : null;
+                    (beam ?? localplayer_md_projectile).Fire(ship.transform.position + ship.transform.forward * 1.5f, ship.transform.rotation, ship.transform.forward, Vector3.zero, false);
                 }
                 finally
                 {
                     ship.c_mesh_collider.enabled = true;
                 }
-                massdriver_refire_time = MD_COOLDOWN_TIME;
+                massdriver_refire_time = CooldownTime;
             }
 
             private static bool KeyPressed(CCInput cc_type)
@@ -1848,7 +1859,7 @@ namespace GameMod
                 // can be fired while boosting; the massdriver can, so its cooldown has to stay
                 // readable through a boost. Global HUD fades still apply.
                 float alpha = __instance.m_alpha;
-                float charged = Mathf.Clamp01(1f - massdriver_refire_time / MD_COOLDOWN_TIME);
+                float charged = Mathf.Clamp01(1f - massdriver_refire_time / CooldownTime);
                 for (int i = 0; i < STROKE_ANGLES.Length; i++)
                 {
                     float angle = STROKE_ANGLES[i];

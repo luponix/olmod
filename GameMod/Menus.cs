@@ -43,6 +43,7 @@ namespace GameMod {
         public static bool mms_destructible_missiles { get; set; }
         public static bool mms_boost_fire { get; set; }
         public static bool mms_instareap { get; set; }
+        public static bool mms_instareap_rapid_fire { get; set; }
         public static bool mms_client_damage_numbers { get; set; } = true;
         public static bool mms_assist_scoring { get; set; } = true;
         public static bool mms_team_color_default { get; set; } = true;
@@ -147,6 +148,11 @@ namespace GameMod {
         public static string GetMMSInstareap()
         {
             return MenuManager.GetToggleSetting(Convert.ToInt32(mms_instareap));
+        }
+
+        public static string GetMMSInstareapRapidFire()
+        {
+            return MenuManager.GetToggleSetting(Convert.ToInt32(mms_instareap_rapid_fire));
         }
 
         public static string GetMMSScaleRespawnTime()

@@ -70,6 +70,7 @@ namespace GameMod
                 allowSmash = Menus.mms_allow_smash,
                 boostFire = Menus.mms_boost_fire,
                 instareap = Menus.mms_instareap,
+                instareapRapidFire = Menus.mms_instareap_rapid_fire,
                 damageNumbers = Menus.mms_damage_numbers,
                 assistScoring = Menus.mms_assist_scoring,
                 teamCount = MPTeams.MenuManagerTeamCount,
@@ -116,6 +117,7 @@ namespace GameMod
                 allowSmash = false,
                 boostFire = false,
                 instareap = false,
+                instareapRapidFire = false,
                 damageNumbers = true,
                 assistScoring = true,
                 teamCount = 2,
@@ -161,6 +163,7 @@ namespace GameMod
                 allowSmash = false,
                 boostFire = false,
                 instareap = false,
+                instareapRapidFire = false,
                 assistScoring = true,
                 teamCount = 2,
                 shipMeshCollider = 2,
@@ -206,6 +209,7 @@ namespace GameMod
                 allowSmash = false,
                 boostFire = false,
                 instareap = true,
+                instareapRapidFire = false,
                 assistScoring = true,
                 teamCount = 2,
                 shipMeshCollider = 0,
@@ -252,6 +256,7 @@ namespace GameMod
             public bool allowSmash;
             public bool boostFire;
             public bool instareap;
+            public bool instareapRapidFire;
             public bool damageNumbers;
             public bool assistScoring = true;
             public int teamCount = 2;
@@ -304,6 +309,7 @@ namespace GameMod
                 Menus.mms_allow_smash = this.allowSmash;
                 Menus.mms_boost_fire = this.boostFire;
                 Menus.mms_instareap = this.instareap;
+                Menus.mms_instareap_rapid_fire = this.instareapRapidFire;
                 Menus.mms_damage_numbers = this.damageNumbers;
                 Menus.mms_assist_scoring = this.assistScoring;
                 MPTeams.MenuManagerTeamCount = this.teamCount;

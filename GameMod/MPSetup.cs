@@ -21,6 +21,7 @@ namespace GameMod {
             MPSuddenDeath.SuddenDeathMatchEnabled = false;
             MPClassic.matchEnabled = false;
             MPInstareap.Enabled = false;
+            MPInstareap.RapidFire = false;
         }
     }
 
@@ -246,6 +247,7 @@ namespace GameMod {
                 Menus.mms_destructible_missiles = ModPrefs.GetBool("MP_DESTRUCTIBLE_MISSILES", Menus.mms_destructible_missiles);
                 Menus.mms_boost_fire = ModPrefs.GetBool("MP_BOOST_FIRE", Menus.mms_boost_fire);
                 Menus.mms_instareap = ModPrefs.GetBool("MP_INSTAREAP", Menus.mms_instareap);
+                Menus.mms_instareap_rapid_fire = ModPrefs.GetBool("MP_INSTAREAP_RAPID_FIRE", Menus.mms_instareap_rapid_fire);
 
                 JoystickRotationFix.alt_turn_ramp_mode = ModPrefs.GetBool("SCALE_UP_ROTATION", JoystickRotationFix.alt_turn_ramp_mode);
                 MPColoredPlayerNames.isActive = ModPrefs.GetBool("MP_COLORED_NAMES", MPColoredPlayerNames.isActive);
@@ -414,6 +416,7 @@ namespace GameMod {
             ModPrefs.SetBool("MP_DESTRUCTIBLE_MISSILES", Menus.mms_destructible_missiles);
             ModPrefs.SetBool("MP_BOOST_FIRE", Menus.mms_boost_fire);
             ModPrefs.SetBool("MP_INSTAREAP", Menus.mms_instareap);
+            ModPrefs.SetBool("MP_INSTAREAP_RAPID_FIRE", Menus.mms_instareap_rapid_fire);
             ModPrefs.SetBool("MP_CREEPER_COLORS", Menus.mms_creeper_colors);
             ModPrefs.SetBool("MP_AUDIOTAUNTS_ACTIVE", MPAudioTaunts.AClient.active);
             ModPrefs.SetInt("MP_AUDIOTAUNT_VOLUME", MPAudioTaunts.AClient.audio_taunt_volume);

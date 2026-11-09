@@ -1315,6 +1315,12 @@ END_ENTRY
             set { MPInstareap.Enabled = value; }
         }
 
+        public static bool InstareapRapidFire
+        {
+            get { return MPInstareap.RapidFire; }
+            set { MPInstareap.RapidFire = value; }
+        }
+
         public static bool BoostFireEnabled
         {
             get { return MPBoostFire.Enabled; }
@@ -1360,6 +1366,7 @@ END_ENTRY
             jobject["destructiblemissiles"] = DestructibleMissiles;
             jobject["boostfire"] = BoostFireEnabled;
             jobject["instareap"] = InstareapEnabled;
+            jobject["instareaprapidfire"] = InstareapRapidFire;
             jobject["missiletypehealth"] = new JArray(MissileTypeHealth.Select(h => (JToken)(float)h));
             return jobject;
         }
@@ -1374,6 +1381,7 @@ END_ENTRY
             InstareapEnabled = root["instareap"].GetBool(false) || MatchMode == MPInstareap.LEGACY_MATCH_MODE;
             if (MatchMode == MPInstareap.LEGACY_MATCH_MODE)
                 MatchMode = MatchMode.ANARCHY;
+            InstareapRapidFire = root["instareaprapidfire"].GetBool(false);
             SuddenDeathEnabled = root["suddendeathenabled"].GetBool(false);
             LapLimit = root["laplimit"].GetInt(0);
             MatchNotes = root["matchnotes"].GetString(String.Empty);
@@ -1639,6 +1647,7 @@ END_ENTRY
             MPModPrivateData.DestructibleMissiles = Menus.mms_destructible_missiles;
             MPModPrivateData.BoostFireEnabled = Menus.mms_boost_fire;
             MPModPrivateData.InstareapEnabled = Menus.mms_instareap && MenuManager.mms_mode != ExtMatchMode.RACE;
+            MPModPrivateData.InstareapRapidFire = MPModPrivateData.InstareapEnabled && Menus.mms_instareap_rapid_fire;
             if (Menus.mms_mp_projdata_fn == "STOCK") {
                 MPModPrivateData.CustomProjdata = string.Empty;
             } else {
