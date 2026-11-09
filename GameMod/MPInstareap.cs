@@ -783,6 +783,7 @@ namespace GameMod
 
 
                 ExplosionManager.CreateSimpleExplosion(end_position);
+                ImpactMarks.OnBeamHit(start_position, end_position);
                 PlayClipAtPoint(md_fire_audio, start_position, 1f, shot_by_non_local_player);
                 if (!shot_by_non_local_player) fire_shake_magnitude = Mathf.Min(fire_shake_magnitude + MD_SHAKE_MAGNITUDE, 120f);
                 Draw();

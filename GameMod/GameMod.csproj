@@ -114,6 +114,8 @@
     <Compile Include="Hooks\NetworkMatch.cs" />
     <Compile Include="Hooks\MenuManager.cs" />
     <Compile Include="Hooks\Client.cs" />
+    <Compile Include="Hooks\GameplayManager.cs" />
+    <Compile Include="Hooks\Projectile.cs" />
     <Compile Include="Logging\LogRewrite.cs" />
     <Compile Include="Logging\LevelScanLog.cs" />
     <Compile Include="Logging\EngineLogNoise.cs" />
@@ -156,6 +158,7 @@
     <Compile Include="JoystickCurveEditor.cs" />
     <Compile Include="JoystickRotationFix.cs" />
     <Compile Include="LevelError.cs" />
+    <Compile Include="ImpactMarks.cs" />
     <Compile Include="Localization.cs" />
     <Compile Include="MatchModeRace.cs" />
     <Compile Include="MatchSetupMenu.cs" />

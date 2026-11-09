@@ -58,10 +58,6 @@ namespace GameMod
             uie.SelectAndDrawStringOptionItem(Loc.LS("DISABLE REFLECTIONS"), position, 1, MenuManager.GetToggleSetting(deferredReflVal), Loc.LS("DISABLES THE DEFERRED REFLECTIONS RENDER PASS"));
             position.y += 62f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("COMBINE SHIP MESHES"), position, 2, MenuManager.GetToggleSetting(shipCombineVal), Loc.LS("MERGES SHIP COMPONENTS INTO ONE COMPLETE MESH"));
-            // The separator, tooltip and page controls are placed relative to
-            // the LAST item drawn, so a short page has to pin the cursor where
-            // a full one would have ended.
-            position.y = -232.5f + 7f * 62f;
         }
 
         public static void HandleSelection(int selection)

@@ -30,6 +30,7 @@ namespace GameMod.Hooks
         static void Postfix()
         {
             RearView.FlushImageLayer();
+            ImpactMarks.Draw();
         }
     }
 }

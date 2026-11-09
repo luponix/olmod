@@ -2620,6 +2620,8 @@ namespace GameMod {
                     position.y = -232.5f;
                     __instance.DrawMenuSeparator(position - Vector2.up * 40f);
                     GpuPerf.DrawPage(__instance, ref position);
+                    position.y += 62f;
+                    ImpactMarks.DrawOption(__instance, position);
                     break;
             }
             position.y = -232.5f + 7f * 62f; // bottom row of the full pages, so the separator and page controls sit at the same height on every page
@@ -2796,6 +2798,7 @@ namespace GameMod {
                                     break;
                                 }
                                 GpuPerf.HandleSelection(UIManager.m_menu_selection);
+                                ImpactMarks.HandleSelection(UIManager.m_menu_selection);
                                 break;
                         }
                     }
