@@ -19,10 +19,11 @@ namespace GameMod.Replay
 
         public static string RosterName(string rosterName, int rosterIndex, string nameFromEvent = null)
         {
+            // a challenge records the raw pilot name; multiplayer names arrive upper case (Client.cs:338)
             if (!string.IsNullOrEmpty(rosterName))
-                return rosterName;
+                return rosterName.ToUpperInvariant();
             if (!string.IsNullOrEmpty(nameFromEvent))
-                return nameFromEvent;
+                return nameFromEvent.ToUpperInvariant();
             return rosterIndex >= 0 ? "PLAYER " + (rosterIndex + 1) : "?";
         }
 

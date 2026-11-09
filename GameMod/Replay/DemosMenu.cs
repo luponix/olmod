@@ -379,7 +379,7 @@ namespace GameMod.Replay
                         for (int i = 0; i < info.playerNames.Length && i < 8; i++) // two columns of four
                         {
                             Vector2 at = labelPos + new Vector2(i < 4 ? 4f : 212f, (i % 4) * 22f);
-                            ui.DrawStringSmall(info.playerNames[i], at, 0.3f, StringOffset.LEFT,
+                            ui.DrawStringSmall(Session.RosterName(info.playerNames[i], i), at, 0.3f, StringOffset.LEFT,
                                 UIManager.m_col_ui1, 1f, 200f);
                         }
                     }
