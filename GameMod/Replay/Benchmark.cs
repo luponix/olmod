@@ -86,12 +86,17 @@ namespace GameMod.Replay
             }
             targetPov = Mathf.Clamp(autoPov, 0, playerCount - 1);
             Debug.LogFormat("[Bench] auto-starting {0} following [{1}]", Path.GetFileName(path), targetPov);
-            Start(path, targetPov);
+            string error = Start(path, targetPov);
+            if (error != null)
+            {
+                Debug.LogErrorFormat("[Bench] auto-run demo cannot start: {0}", error);
+                Application.Quit();
+            }
         }
 
         private static float maxRunSeconds;
 
-        public static void Start(string path, int povIndex, float maxSeconds = 0f)
+        public static string Start(string path, int povIndex, float maxSeconds = 0f)
         {
             maxRunSeconds = maxSeconds;
             demoName = Path.GetFileNameWithoutExtension(path);
@@ -99,9 +104,10 @@ namespace GameMod.Replay
             Armed = true;
             Running = false;
             ShowingResults = false;
-            Playback.Start(path);
-            if (Session.Mode != SessionMode.Playback)
+            string error = Playback.Start(path);
+            if (error != null)
                 Armed = false;
+            return error;
         }
 
         private static void BeginRun()

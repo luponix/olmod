@@ -50,7 +50,9 @@ namespace GameMod.Replay
             return Session.RosterName(Replay.players[rosterIndex].name, rosterIndex);
         }
 
-        public static void Start(string path)
+        // Returns null once the level is launching, else a reason to show. Nothing is torn
+        // down before the demo passes every check, so the calling menu stays up on failure.
+        public static string Start(string path)
         {
             try
             {
@@ -58,15 +60,13 @@ namespace GameMod.Replay
             }
             catch (Exception e)
             {
-                GameplayManager.AddHUDMessage("Replay load failed");
                 Debug.LogErrorFormat("[Replay] load failed: {0}", e);
-                return;
+                return "CANNOT READ THE DEMO FILE";
             }
             if (Replay.frames.Count == 0)
             {
-                GameplayManager.AddHUDMessage("Replay is empty");
                 Replay = null;
-                return;
+                return "THE DEMO HAS NO FRAMES";
             }
             CorrectRemoteMissileCounts();
 
@@ -74,10 +74,10 @@ namespace GameMod.Replay
             int levelIndex = ResolveLevel(Replay, out mission);
             if (levelIndex < 0)
             {
-                GameplayManager.AddHUDMessage("Replay level not found: " + Replay.sceneName);
                 Debug.LogErrorFormat("[Replay] level not found: '{0}' hash='{1}'", Replay.sceneName, Replay.levelIdHash);
+                string error = "MAP NOT INSTALLED: " + (Replay.sceneName ?? "").ToUpperInvariant();
                 Replay = null;
-                return;
+                return error;
             }
 
             Session.Mode = SessionMode.Playback;
@@ -85,7 +85,9 @@ namespace GameMod.Replay
 
             RecordedRateHz = Replay.Duration > 0.01f ? Replay.frames.Count / Replay.Duration : 0f;
 
+            UIManager.DestroyAll(false);
             Launching = true;
+            string launchError = null;
             try
             {
                 Debug.LogFormat("[Replay] loading level index {0} ({1}) with {2} players, {3} frames", levelIndex, Replay.sceneName, Replay.players.Count, Replay.frames.Count);
@@ -101,8 +103,10 @@ namespace GameMod.Replay
                 Debug.LogErrorFormat("[Replay] level launch failed: {0}", e);
                 Session.Mode = SessionMode.Off;
                 Replay = null;
+                launchError = "CANNOT START THE LEVEL";
             }
             Launching = false;
+            return launchError;
         }
 
         private static int ResolveLevel(Recording replay, out Mission mission)

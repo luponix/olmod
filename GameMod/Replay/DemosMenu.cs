@@ -25,6 +25,7 @@ namespace GameMod.Replay
         private static List<OlrInfo> replays = new List<OlrInfo>();
         private static int selectedIndex = -1;
         private static bool confirmDelete;
+        private static string startError;
 
         public static void DemosUpdate(ref float timer)
         {
@@ -35,6 +36,7 @@ namespace GameMod.Replay
                     if (timer > 0.25f)
                     {
                         selectedIndex = -1;
+                        startError = null;
                         RefreshList();
                         selectedIndex = replays.Count > 0 ? 0 : -1;
 
@@ -81,6 +83,7 @@ namespace GameMod.Replay
                             break;
 
                         int selection = UIManager.m_menu_selection;
+                        startError = null;
                         if (selection == SEL_BACK)
                         {
                             MenuManager.PlaySelectSound(1f);
@@ -108,10 +111,8 @@ namespace GameMod.Replay
                                 }
                                 else
                                 {
-                                    MenuManager.PlaySelectSound(1f);
-                                    timer = 0f;
-                                    UIManager.DestroyAll(false);
-                                    Benchmark.Start(replays[selectedIndex].path, 0, 45f);
+                                    startError = Benchmark.Start(replays[selectedIndex].path, 0, 45f);
+                                    OnStartResult(ref timer);
                                 }
                             }
                         }
@@ -138,8 +139,6 @@ namespace GameMod.Replay
             }
         }
 
-        // an unplayable demo must never reach UIManager.DestroyAll: Playback.Start aborts
-        // and msDemos would be left with no UI and no way out
         private static void StartPlayback(ref float timer)
         {
             if (!replays[selectedIndex].IsPlayable)
@@ -147,11 +146,21 @@ namespace GameMod.Replay
                 MenuManager.PlayCycleSound(1f, -1f);
                 return;
             }
+            startError = Playback.Start(replays[selectedIndex].path);
+            OnStartResult(ref timer);
+        }
+
+        // Playback.Start removes this menu's UI only on success, so on failure the menu
+        // is still up and shows startError until the next selection.
+        private static void OnStartResult(ref float timer)
+        {
+            if (startError != null)
+            {
+                MenuManager.PlayCycleSound(1f, -1f);
+                return;
+            }
             MenuManager.PlaySelectSound(1f);
             timer = 0f;
-            UIManager.DestroyAll(false);
-
-            Playback.Start(replays[selectedIndex].path);
         }
 
         private static void DoDelete()
@@ -387,6 +396,10 @@ namespace GameMod.Replay
                     itemScale, itemTextSize);
             }
 
+            if (startError != null)
+                ui.DrawStringSmall(startError, new Vector2(detailX, actionY - 104f), 0.4f,
+                    StringOffset.CENTER, UIManager.m_col_damage, 1f, columnHalfWidth * 2f);
+
             ui.SelectAndDrawItem("RECORD MATCHES: " + (Session.RecordReplays ? "ON" : "OFF"),
                 new Vector2(detailX, recordToggleY), SEL_RECORD_TOGGLE, false,
                 itemScale, itemTextSize);
@@ -505,7 +518,9 @@ namespace GameMod.Replay
                 return;
             }
             uConsole.Log("Playing " + Path.GetFileName(path));
-            Playback.Start(path);
+            string error = Playback.Start(path);
+            if (error != null)
+                uConsole.Log("Replay failed: " + error);
         }
     }
 }
