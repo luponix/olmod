@@ -392,7 +392,7 @@ namespace GameMod.VersionHandling
             if (Controls.JustPressed(CCInput.MENU_PGUP)) step -= VISIBLE_LINES;
             if (Controls.JustPressed(CCInput.MENU_PGDN)) step += VISIBLE_LINES;
             float wheel = Input.GetAxis("Mouse ScrollWheel");
-            if (wheel != 0f) step += wheel < 0f ? 3 : -3;
+            if (wheel != 0f) step += wheel < 0f ? 1 : -1;
             if (step == 0)
                 return;
 
