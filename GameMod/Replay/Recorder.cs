@@ -525,7 +525,7 @@ namespace GameMod.Replay
         // Both the local shot and a relayed one reach this method, and only it knows where the
         // beam ended -- a local shot arrives with the end still unresolved. The shooter is not
         // recorded: a relayed packet does not name one, so no client could supply it.
-        [HarmonyPatch(typeof(MatchModeInstareap.MassdriverProjectile), "Fire")]
+        [HarmonyPatch(typeof(MPInstareap.MassdriverProjectile), "Fire")]
         class Recorder_MassdriverProjectile_Fire
         {
             static void Postfix(Vector3 pos, Quaternion rot, Vector3 ___end_position)

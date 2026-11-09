@@ -197,8 +197,8 @@ namespace GameMod
 
         private const int ADVANCED_VISIBLE_ROWS = 10;
         private const float ADVANCED_ROW_PITCH = 55f;
-        private static readonly int[] advancedRowsCtf = { 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
-        private static readonly int[] advancedRowsOtherModes = { 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
+        private static readonly int[] advancedRowsCtf = { 27, 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
+        private static readonly int[] advancedRowsOtherModes = { 27, 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
         private static int advancedScrollOffset;
         private static bool advancedScrollbarDragging;
         private static int previousSelection = -1;
@@ -268,6 +268,9 @@ namespace GameMod
                     break;
                 case 26:
                     uie.SelectAndDrawStringOptionItem(Loc.LS("FIRE WHILE BOOSTING"), position, 26, Menus.GetMMSBoostFire(), Loc.LS("ALLOWS PLAYERS TO FIRE WEAPONS AND MISSILES WHILE BOOSTING"), 1f);
+                    break;
+                case 27:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("INSTAREAP"), position, 27, Menus.GetMMSInstareap(), Loc.LS("EVERY SHIP CARRIES ONLY A MASSDRIVER THAT KILLS IN ONE HIT, NO PICKUPS"), 1f, MenuManager.mms_mode == ExtMatchMode.RACE);
                     break;
             }
         }
@@ -867,6 +870,10 @@ namespace GameMod
                     break;
                 case 26:
                     Menus.mms_boost_fire = !Menus.mms_boost_fire;
+                    PlayCycleSound();
+                    break;
+                case 27:
+                    Menus.mms_instareap = !Menus.mms_instareap;
                     PlayCycleSound();
                     break;
                 case 100:

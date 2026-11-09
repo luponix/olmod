@@ -18,13 +18,12 @@ namespace GameMod {
         public const MatchMode MONSTERBALL = MatchMode.MONSTERBALL;
         public const MatchMode CTF = (MatchMode)3;
         public const MatchMode RACE = (MatchMode)4;
-        public const MatchMode INSTAREAP = (MatchMode)5;
         //public const MatchMode ARENA = (MatchMode)5;
         //public const MatchMode TEAM_ARENA = (MatchMode)6;
-        public const MatchMode NUM = (MatchMode)((int)INSTAREAP + 1);
+        public const MatchMode NUM = (MatchMode)((int)RACE + 1);
 
         private static readonly string[] Names = new string[] {
-            "ANARCHY", "TEAM ANARCHY", "MONSTERBALL", "CTF", "RACE", "INSTAREAP" };
+            "ANARCHY", "TEAM ANARCHY", "MONSTERBALL", "CTF", "RACE" };
         public static string ToString(MatchMode mode)
         {
             if ((int)mode < 0 || (int)mode >= Names.Length)
@@ -1310,6 +1309,12 @@ END_ENTRY
             set { MPDestructibleMissiles.Enabled = value; }
         }
 
+        public static bool InstareapEnabled
+        {
+            get { return MPInstareap.Enabled; }
+            set { MPInstareap.Enabled = value; }
+        }
+
         public static bool BoostFireEnabled
         {
             get { return MPBoostFire.Enabled; }
@@ -1354,6 +1359,7 @@ END_ENTRY
             jobject["rollspeedlimit"] = RollSpeedLimit;
             jobject["destructiblemissiles"] = DestructibleMissiles;
             jobject["boostfire"] = BoostFireEnabled;
+            jobject["instareap"] = InstareapEnabled;
             jobject["missiletypehealth"] = new JArray(MissileTypeHealth.Select(h => (JToken)(float)h));
             return jobject;
         }
@@ -1365,6 +1371,9 @@ END_ENTRY
             JIPEnabled = root["jipenabled"].GetBool(false);
             SniperPacketsEnabled = root["sniperpacketsenabled"].GetBool(false);
             MatchMode = (MatchMode)root["matchmode"].GetInt(0);
+            InstareapEnabled = root["instareap"].GetBool(false) || MatchMode == MPInstareap.LEGACY_MATCH_MODE;
+            if (MatchMode == MPInstareap.LEGACY_MATCH_MODE)
+                MatchMode = MatchMode.ANARCHY;
             SuddenDeathEnabled = root["suddendeathenabled"].GetBool(false);
             LapLimit = root["laplimit"].GetInt(0);
             MatchNotes = root["matchnotes"].GetString(String.Empty);
@@ -1476,6 +1485,8 @@ END_ENTRY
         static bool Prefix(MatchMode mode, ref string __result)
         {
             __result = MPModPrivateData.GetModeString(NetworkMatch.GetMode());
+            if (MPInstareap.IsActive)
+                __result = Loc.LS("INSTAREAP") + " " + __result;
             return false;
         }
     }
@@ -1627,6 +1638,7 @@ END_ENTRY
             MPModPrivateData.RollSpeedLimit = MPServerOptimization.RollSpeedLimit;
             MPModPrivateData.DestructibleMissiles = Menus.mms_destructible_missiles;
             MPModPrivateData.BoostFireEnabled = Menus.mms_boost_fire;
+            MPModPrivateData.InstareapEnabled = Menus.mms_instareap && MenuManager.mms_mode != ExtMatchMode.RACE;
             if (Menus.mms_mp_projdata_fn == "STOCK") {
                 MPModPrivateData.CustomProjdata = string.Empty;
             } else {

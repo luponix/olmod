@@ -30,6 +30,8 @@ namespace GameMod.Replay
         {
             if (matchMode == Recording.CHALLENGE_MATCH_MODE)
                 return "CHALLENGE";
+            if (matchMode == (int)MPInstareap.LEGACY_MATCH_MODE)
+                return "INSTAREAP";
             if (matchMode >= 0 && matchMode < (int)ExtMatchMode.NUM)
                 return ExtMatchMode.ToString((MatchMode)matchMode);
             return "MODE " + matchMode;

@@ -1008,7 +1008,7 @@ namespace GameMod
         static bool Prefix(UIElement __instance, Vector2 pos, bool dead, bool show_loadout, bool show_respawn_timer, bool showing_auto_timer)
         {
             // every instareap ship carries the same massdriver, so there is nothing to pick
-            if (show_loadout && !MatchModeInstareap.IsActive)
+            if (show_loadout && !MPInstareap.IsActive)
             {
                 //pos.y -= 80f;
                 pos.x = -300f;

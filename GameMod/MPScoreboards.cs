@@ -976,16 +976,16 @@ namespace GameMod
                     MPScoreboards.TeamAnarchy.DrawMpScoreboardRaw(__instance, ref pos);
                     break;
                 case ExtMatchMode.ANARCHY:
-                    MPScoreboards.Anarchy.DrawMpScoreboardRaw(__instance, ref pos);
+                    if (MPInstareap.IsActive)
+                        MPScoreboards.Instareap.DrawMpScoreboardRaw(__instance, ref pos);
+                    else
+                        MPScoreboards.Anarchy.DrawMpScoreboardRaw(__instance, ref pos);
                     break;
                 case ExtMatchMode.MONSTERBALL:
                     MPScoreboards.Monsterball.DrawMpScoreboardRaw(__instance, ref pos);
                     break;
                 case ExtMatchMode.RACE:
                     MPScoreboards.Race.DrawMpScoreboardRaw(__instance, ref pos);
-                    break;
-                case ExtMatchMode.INSTAREAP:
-                    MPScoreboards.Instareap.DrawMpScoreboardRaw(__instance, ref pos);
                     break;
                 default:
                     return true;
@@ -1009,13 +1009,13 @@ namespace GameMod
                 case ExtMatchMode.TEAM_ANARCHY:
                     return MPScoreboards.TeamAnarchy.DrawHUDScoreInfo(__instance, pos);
                 case ExtMatchMode.ANARCHY:
+                    if (MPInstareap.IsActive)
+                        return MPScoreboards.Instareap.DrawHUDScoreInfo(__instance, pos, ___temp_pos);
                     return true;
                 case ExtMatchMode.MONSTERBALL:
                     return true;
                 case ExtMatchMode.RACE:
                     return MPScoreboards.Race.DrawHUDScoreInfo(__instance, pos, ___temp_pos);
-                case ExtMatchMode.INSTAREAP:
-                    return MPScoreboards.Instareap.DrawHUDScoreInfo(__instance, pos, ___temp_pos);
                 default:
                     return true;
             }

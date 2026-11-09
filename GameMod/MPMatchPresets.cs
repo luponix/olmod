@@ -69,6 +69,7 @@ namespace GameMod
                 alwaysCloaked = Menus.mms_always_cloaked,
                 allowSmash = Menus.mms_allow_smash,
                 boostFire = Menus.mms_boost_fire,
+                instareap = Menus.mms_instareap,
                 damageNumbers = Menus.mms_damage_numbers,
                 assistScoring = Menus.mms_assist_scoring,
                 teamCount = MPTeams.MenuManagerTeamCount,
@@ -114,6 +115,7 @@ namespace GameMod
                 alwaysCloaked = false,
                 allowSmash = false,
                 boostFire = false,
+                instareap = false,
                 damageNumbers = true,
                 assistScoring = true,
                 teamCount = 2,
@@ -158,6 +160,7 @@ namespace GameMod
                 alwaysCloaked = false,
                 allowSmash = false,
                 boostFire = false,
+                instareap = false,
                 assistScoring = true,
                 teamCount = 2,
                 shipMeshCollider = 2,
@@ -170,7 +173,7 @@ namespace GameMod
             presets.Add(new MPMatchPreset
             {
                 title = "INSTAREAP",
-                matchMode = ExtMatchMode.INSTAREAP,
+                matchMode = ExtMatchMode.ANARCHY,
                 maxPlayers = 16,
                 friendlyFire = 0,
                 timeLimit = 15 * 60,
@@ -202,6 +205,7 @@ namespace GameMod
                 alwaysCloaked = false,
                 allowSmash = false,
                 boostFire = false,
+                instareap = true,
                 assistScoring = true,
                 teamCount = 2,
                 shipMeshCollider = 0,
@@ -247,6 +251,7 @@ namespace GameMod
             public bool alwaysCloaked;
             public bool allowSmash;
             public bool boostFire;
+            public bool instareap;
             public bool damageNumbers;
             public bool assistScoring = true;
             public int teamCount = 2;
@@ -298,6 +303,7 @@ namespace GameMod
                 Menus.mms_always_cloaked = this.alwaysCloaked;
                 Menus.mms_allow_smash = this.allowSmash;
                 Menus.mms_boost_fire = this.boostFire;
+                Menus.mms_instareap = this.instareap;
                 Menus.mms_damage_numbers = this.damageNumbers;
                 Menus.mms_assist_scoring = this.assistScoring;
                 MPTeams.MenuManagerTeamCount = this.teamCount;

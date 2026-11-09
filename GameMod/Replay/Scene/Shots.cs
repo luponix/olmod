@@ -65,7 +65,7 @@ namespace GameMod.Replay
 
         public static void InjectBeam(MatchEvent shot)
         {
-            MatchModeInstareap.ShowBeam(shot.pos, shot.rot, shot.fA);
+            MPInstareap.ShowBeam(shot.pos, shot.rot, shot.fA);
         }
 
         public static void Terminate(int fireId, bool exploded, Vector3 pos)
@@ -90,14 +90,14 @@ namespace GameMod.Replay
         public static void ClearAll()
         {
             ProjectileManager.DestroyAll();
-            MatchModeInstareap.ClearBeams();
+            MPInstareap.ClearBeams();
             liveShots.Clear();
             pendingFireId = -1;
         }
 
         public static void Drive()
         {
-            MatchModeInstareap.UpdateBeams();
+            MPInstareap.UpdateBeams();
             if (Time.unscaledTime >= nextUntrackedSweepTime)
             {
                 nextUntrackedSweepTime = Time.unscaledTime + 0.5f;

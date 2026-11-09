@@ -42,6 +42,7 @@ namespace GameMod {
         public static bool mms_damage_numbers { get; set; }
         public static bool mms_destructible_missiles { get; set; }
         public static bool mms_boost_fire { get; set; }
+        public static bool mms_instareap { get; set; }
         public static bool mms_client_damage_numbers { get; set; } = true;
         public static bool mms_assist_scoring { get; set; } = true;
         public static bool mms_team_color_default { get; set; } = true;
@@ -141,6 +142,11 @@ namespace GameMod {
         public static string GetMMSBoostFire()
         {
             return MenuManager.GetToggleSetting(Convert.ToInt32(mms_boost_fire));
+        }
+
+        public static string GetMMSInstareap()
+        {
+            return MenuManager.GetToggleSetting(Convert.ToInt32(mms_instareap));
         }
 
         public static string GetMMSScaleRespawnTime()
@@ -1427,7 +1433,7 @@ namespace GameMod {
                     GameManager.m_audio.MusicVolume = MenuManager.opt_volume_music;
                     GameManager.m_audio.VoiceVolume = MenuManager.opt_volume_voice;
                     GameManager.m_audio.AmbientVolume = MenuManager.opt_volume_ambient;
-                    MatchModeInstareap.ReloadSoundEffects();
+                    MPInstareap.ReloadSoundEffects();
                     MenuManager.PlaySelectSound(1f);
                     break;
                 case 10:

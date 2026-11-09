@@ -10,7 +10,7 @@ using UnityEngine.Networking;
 
 namespace GameMod
 {
-    class MatchModeInstareap
+    class MPInstareap
     {
         // Ships[].static_wb[6].gp_fire_wait is 1.5 s on the Pyro-GL and Phoenix, 1.2 on the Magnum
         private const float MD_COOLDOWN_TIME = 1.5f;
@@ -111,12 +111,18 @@ namespace GameMod
         static MassdriverProjectile[] md_projectile_pool = new MassdriverProjectile[15];
         static readonly Dictionary<int, float> lastShotTimeByConnection = new Dictionary<int, float>();
 
-        // NetworkMatch's mode survives leaving multiplayer, so every client-side instareap gate
-        // must also require that a multiplayer match is actually running - the mode check alone
-        // would leak into singleplayer, challenge and the menus
+        // Instareap was match mode 5 before it became a setting on top of any mode. Lobbies,
+        // pilot prefs and older servers can still carry that value.
+        public const MatchMode LEGACY_MATCH_MODE = (MatchMode)5;
+
+        // MPSetupDefault clears it before every lobby: a stock server or match creator sends no private data
+        public static bool Enabled = false;
+
+        // Enabled survives leaving multiplayer until the next lobby resets it, so every
+        // client-side gate must also require that a multiplayer match is actually running
         public static bool IsActive
         {
-            get { return MPModPrivateData.MatchMode == ExtMatchMode.INSTAREAP && GameplayManager.IsMultiplayerActive; }
+            get { return Enabled && GameplayManager.IsMultiplayerActive; }
         }
 
         public static bool IsActiveServer
@@ -152,7 +158,7 @@ namespace GameMod
                     md_projectile_pool[i].Update();
         }
 
-        // Replay playback runs a local mission, so IsActive is false and none of the mode's
+        // Replay playback runs a local mission, so IsActive is false and none of the setting's
         // own hooks fire - the replay calls ShowBeam/UpdateBeams/ClearBeams for itself.
         // A recorded beam carries its length rather than its end point: both ends and the
         // direction are a rotation and a distance apart.
@@ -201,7 +207,7 @@ namespace GameMod
         }
 
         [HarmonyPatch(typeof(Client), "RegisterHandlers")]
-        class MatchModeInstareap_Client_RegisterHandlers
+        class MPInstareap_Client_RegisterHandlers
         {
             static void Postfix()
             {
@@ -219,7 +225,7 @@ namespace GameMod
         }
 
         [HarmonyPatch(typeof(Server), "RegisterHandlers")]
-        class MatchModeInstareap_Server_RegisterHandlers
+        class MPInstareap_Server_RegisterHandlers
         {
             static void Postfix()
             {
@@ -230,7 +236,7 @@ namespace GameMod
             {
                 // the handler is registered for every match, but the packet only means
                 // anything while an instareap match is being played
-                if (MPModPrivateData.MatchMode != ExtMatchMode.INSTAREAP || NetworkMatch.GetMatchState() != MatchState.PLAYING)
+                if (!Enabled || NetworkMatch.GetMatchState() != MatchState.PLAYING)
                     return;
 
                 MassdriverProjectilePacket shot = rawMsg.ReadMessage<MassdriverProjectilePacket>();
@@ -359,7 +365,7 @@ namespace GameMod
             // knows where everyone stood when the trigger came up.
             private static bool CanShotHit(Player shooter, Player victim, MassdriverProjectilePacket shot)
             {
-                if (victim == shooter || !IsAlive(victim))
+                if (victim == shooter || !IsAlive(victim) || NetworkMatch.ShouldIgnoreTeamDamage(victim, shooter))
                     return false;
 
                 Vector3 beam = shot.end - shot.start;
@@ -414,7 +420,7 @@ namespace GameMod
         }
 
         [HarmonyPatch(typeof(NetworkMatch), "InitBeforeEachMatch")]
-        class MatchModeInstareap_NetworkMatch_InitBeforeEachMatch
+        class MPInstareap_NetworkMatch_InitBeforeEachMatch
         {
             static void Postfix()
             {
@@ -427,7 +433,7 @@ namespace GameMod
         // StartInvul's own Rpc carries the duration to the clients, so replacing the argument
         // is the whole change - the HUD bar and the shield bubble both follow.
         [HarmonyPatch(typeof(NetworkSpawnPlayer), "StartSpawnInvul")]
-        class MatchModeInstareap_NetworkSpawnPlayer_StartSpawnInvul
+        class MPInstareap_NetworkSpawnPlayer_StartSpawnInvul
         {
             static bool Prefix(Player player)
             {
@@ -442,7 +448,7 @@ namespace GameMod
 
         // UNET reuses connection ids, so a new player must not inherit the previous occupant's cooldown stamp
         [HarmonyPatch(typeof(Server), "OnDisconnect")]
-        class MatchModeInstareap_Server_OnDisconnect
+        class MPInstareap_Server_OnDisconnect
         {
             static void Postfix(NetworkMessage msg)
             {
@@ -454,7 +460,7 @@ namespace GameMod
         // spawn a projectile and drive the weapon HUD for a weapon that does not exist. The
         // prefix takes the input instead of filtering its effects afterwards.
         [HarmonyPatch(typeof(Controls), "UpdateKey")]
-        class MatchModeInstareap_Controls_UpdateKey
+        class MPInstareap_Controls_UpdateKey
         {
             static bool Prefix(CCInput cc_type)
             {
@@ -590,7 +596,7 @@ namespace GameMod
         }
 
         [HarmonyPatch(typeof(PlayerShip), "Awake")]
-        class MatchModeInstareap_PlayerShip_Awake
+        class MPInstareap_PlayerShip_Awake
         {
             static void Postfix()
             {
@@ -606,7 +612,7 @@ namespace GameMod
         // isLocalPlayer is not assigned yet there, and resetting for ANY spawning ship let the
         // local player fire early whenever someone respawned or joined.
         [HarmonyPatch(typeof(Player), "OnStartLocalPlayer")]
-        class MatchModeInstareap_Player_OnStartLocalPlayer
+        class MPInstareap_Player_OnStartLocalPlayer
         {
             static void Postfix()
             {
@@ -622,7 +628,7 @@ namespace GameMod
         // every runtime item passes through - the match-start burst, the respawn nodes, the
         // super powerups and PlayerShip.SpewItemsOnDeath all end up here.
         [HarmonyPatch(typeof(Item), "Spew")]
-        class MatchModeInstareap_Item_Spew
+        class MPInstareap_Item_Spew
         {
             static bool Prefix()
             {
@@ -634,7 +640,7 @@ namespace GameMod
         // whether or not an item was created: left running it would announce supers to the
         // whole match that nothing ever spawns.
         [HarmonyPatch(typeof(NetworkMatch), "MaybeSpawnPowerup")]
-        class MatchModeInstareap_NetworkMatch_MaybeSpawnPowerup
+        class MPInstareap_NetworkMatch_MaybeSpawnPowerup
         {
             static bool Prefix()
             {
@@ -643,7 +649,7 @@ namespace GameMod
         }
 
         [HarmonyPatch(typeof(GameManager), "Update")]
-        class MatchModeInstareap_GameManager_Update
+        class MPInstareap_GameManager_Update
         {
             static void Prefix()
             {
@@ -653,10 +659,10 @@ namespace GameMod
                 if (massdriver_refire_time >= 0f)
                     massdriver_refire_time -= Time.deltaTime;
 
-                if (active_shot && !MatchModeInstareap_Controls_UpdateKey.CanChargeShot())
+                if (active_shot && !MPInstareap_Controls_UpdateKey.CanChargeShot())
                 {
                     active_shot = false;
-                    MatchModeInstareap_Controls_UpdateKey.ResetZoom();
+                    MPInstareap_Controls_UpdateKey.ResetZoom();
                 }
 
                 if (localplayer_md_projectile == null)
@@ -795,21 +801,21 @@ namespace GameMod
                 // graze still counts and the beam still passes behind the ship it grazed.
                 const int layerMask = (1 << (int)UnityObjectLayers.LEVEL) | (1 << (int)UnityObjectLayers.DOOR) | (1 << (int)UnityObjectLayers.LAVA) | (1 << (int)UnityObjectLayers.PLAYER_MESH);
                 RaycastHit hitInfo;
-                bool hitSomething = Physics.Raycast(start_position, forward, out hitInfo, MD_RANGE, layerMask, QueryTriggerInteraction.Ignore);
+                bool hitSomething = FirstTargetHit(Physics.RaycastAll(start_position, forward, MD_RANGE, layerMask, QueryTriggerInteraction.Ignore), out hitInfo);
                 end_position = hitSomething ? hitInfo.point : start_position + forward * MD_RANGE;
 
                 // whatever stopped the line also stops the sphere, so the sweep never reaches
                 // through a wall for a ship standing behind it
                 RaycastHit sweepInfo;
-                bool sweptSomeone = Physics.SphereCast(start_position, MD_HIT_RADIUS, forward, out sweepInfo,
+                bool sweptSomeone = FirstTargetHit(Physics.SphereCastAll(start_position, MD_HIT_RADIUS, forward,
                     hitSomething ? hitInfo.distance : MD_RANGE,
-                    1 << (int)UnityObjectLayers.PLAYER_MESH, QueryTriggerInteraction.Ignore);
+                    1 << (int)UnityObjectLayers.PLAYER_MESH, QueryTriggerInteraction.Ignore), out sweepInfo);
 
                 // sweepInfo is only filled in on a hit - reading its collider after a miss throws
                 PlayerMeshCollider pmc = sweptSomeone ? sweepInfo.collider.GetComponentInParent<PlayerMeshCollider>() : null;
 
-                // a sphere cast reports nothing for a collider it already overlaps where it
-                // starts, so point blank falls back to the line, which has no such blind spot
+                // a sphere cast can miss a collider it already overlaps where it starts, so
+                // point blank falls back to the line, which has no such blind spot
                 if (pmc == null && hitSomething)
                     pmc = hitInfo.collider.GetComponentInParent<PlayerMeshCollider>();
 
@@ -823,6 +829,25 @@ namespace GameMod
                     rot = rotation,
                 };
                 Client.GetClient().SendByChannel(MessageTypes.MsgMassdriverProjectilePacket, mpp, 0);
+            }
+
+            // Nearest hit that is not a teammate the match protects from team damage: such a
+            // ship neither stops the beam nor takes the shot. False when nothing else was hit.
+            private static bool FirstTargetHit(RaycastHit[] hits, out RaycastHit first)
+            {
+                first = default(RaycastHit);
+                bool found = false;
+                foreach (RaycastHit hit in hits)
+                {
+                    if (found && hit.distance >= first.distance)
+                        continue;
+                    PlayerMeshCollider pmc = hit.collider.GetComponentInParent<PlayerMeshCollider>();
+                    if (pmc != null && pmc.c_player != null && NetworkMatch.ShouldIgnoreTeamDamage(pmc.c_player, GameManager.m_local_player))
+                        continue;
+                    first = hit;
+                    found = true;
+                }
+                return found;
             }
 
             public void Update()
@@ -1578,7 +1603,7 @@ namespace GameMod
 
 
         [HarmonyPatch(typeof(MenuManager), "ApplySpeakerMode")]
-        internal class MatchModeInstareap_MenuManager_ApplySpeakerMode
+        internal class MPInstareap_MenuManager_ApplySpeakerMode
         {
             private static AudioSpeakerMode speaker_mode;
 
@@ -1710,9 +1735,9 @@ namespace GameMod
         }
 
         // Instareap overrides the player's screenshake setting for the duration of Update,
-        // because the massdriver's own shake is the mode's main feedback for firing.
+        // because the massdriver's own shake is instareap's main feedback for firing.
         [HarmonyPatch(typeof(PlayerShip), "Update")]
-        class MatchModeInstareap_PlayerShip_Update
+        class MPInstareap_PlayerShip_Update
         {
             private static int option_screenshake;
 
@@ -1771,7 +1796,7 @@ namespace GameMod
         // 24 is the engine's own ceiling: it is where the two hit cues in the same method
         // saturate.
         [HarmonyPatch(typeof(PlayerShip), "RpcApplyDamageEffects")]
-        class MatchModeInstareap_PlayerShip_RpcApplyDamageEffects
+        class MPInstareap_PlayerShip_RpcApplyDamageEffects
         {
             static void Prefix(ref float damage)
             {
@@ -1781,7 +1806,7 @@ namespace GameMod
         }
 
         [HarmonyPatch(typeof(Player), "UpdateCurrentWeaponName")]
-        class MatchModeInstareap_PlayerShip_UpdateCurrentWeaponName
+        class MPInstareap_PlayerShip_UpdateCurrentWeaponName
         {
 
             static void Postfix(Player __instance)
@@ -1798,7 +1823,7 @@ namespace GameMod
         // from their outer ends inwards as the cooldown runs out - the same two colours every
         // other refire indicator uses, the dim one giving way to the bright one.
         [HarmonyPatch(typeof(UIElement), "DrawHUDWeaponReticle")]
-        class MatchModeInstareap_UIElement_DrawHUDWeaponReticle
+        class MPInstareap_UIElement_DrawHUDWeaponReticle
         {
             private const float STROKE_INNER_RADIUS = 4f;
             private const float STROKE_OUTER_RADIUS = 25f;
@@ -1845,7 +1870,7 @@ namespace GameMod
         // No missiles in instareap, so the diamonds the engine parks around the crosshair for
         // the selected one have nothing to indicate.
         [HarmonyPatch(typeof(UIElement), "DrawHUDMissileReticle")]
-        class MatchModeInstareap_UIElement_DrawHUDMissileReticle
+        class MPInstareap_UIElement_DrawHUDMissileReticle
         {
             static bool Prefix()
             {
