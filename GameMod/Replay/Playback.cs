@@ -187,6 +187,7 @@ namespace GameMod.Replay
 
             Time.timeScale = 1f;
             SetAudioPaused(silent: false);
+            SetSlowSpeedMute(false);
 
             GameManager.UnlockCursor();
             if (Session.Mode == SessionMode.Playback)
@@ -269,6 +270,11 @@ namespace GameMod.Replay
             if (silent != audioPaused || (silent && engineJustUnpaused))
                 SetAudioPaused(silent);
 
+            // Not held in the pause menu: SFXVolume also drives the Menus mixer group.
+            bool slowSpeedMute = Speed < 1f && GameplayManager.m_gameplay_state == GameplayState.PLAYING;
+            if (slowSpeedMute != slowSpeedMuted)
+                SetSlowSpeedMute(slowSpeedMute);
+
             if (seekPending)
             {
                 ApplySeek();
@@ -325,6 +331,19 @@ namespace GameMod.Replay
                 audio.PauseAllSounds();
             else
                 audio.UnPauseAllSounds();
+        }
+
+        private static bool slowSpeedMuted;
+
+        // Unity audio ignores timeScale and cannot be time-stretched here (no runtime mixer
+        // effects), so below 1x the SFX group is muted. Music and ambience keep playing.
+        private static void SetSlowSpeedMute(bool mute)
+        {
+            var audio = GameManager.m_audio;
+            if (audio == null)
+                return;
+            slowSpeedMuted = mute;
+            audio.SFXVolume = mute ? 0f : MenuManager.opt_volume_sfx;
         }
 
         private static void FindBracketingFrames(float time)
