@@ -408,11 +408,6 @@ namespace GameMod.Replay
             {
                 if (!GameplayManager.IsChallengeMode || Session.Mode == SessionMode.Playback)
                     return;
-                if (IsRecording && GameplayManager.m_gameplay_state == GameplayState.EXIT)
-                {
-                    StopAndSave();
-                    return;
-                }
                 var player = GameManager.m_local_player;
                 if (GameplayManager.m_gameplay_state != GameplayState.PLAYING ||
                     player == null || player.c_player_ship == null)
@@ -436,6 +431,18 @@ namespace GameMod.Replay
                 CollectItemSamples(frame);
                 CollectRobotSamples(frame);
                 Recording.frames.Add(frame);
+            }
+        }
+
+        // Death and quit both end a challenge through DoneLevel, which then opens the results
+        // menu (GameplayManager.cs:2130) and never reaches GameplayState.EXIT.
+        [HarmonyPatch(typeof(GameplayManager), "DoneLevel")]
+        class Recorder_GameplayManager_DoneLevel
+        {
+            static void Prefix()
+            {
+                if (GameplayManager.IsChallengeMode && IsRecording)
+                    StopAndSave();
             }
         }
 
@@ -1090,6 +1097,18 @@ namespace GameMod.Replay
             static void Postfix(Player __instance, ItemType type)
             {
                 OnPickupFX(__instance, (int)type);
+            }
+        }
+
+        // Outside multiplayer the item plays its pickup FX itself instead of sending the Rpc
+        // (Item.cs:570).
+        [HarmonyPatch(typeof(Item), "PlayItemPickupFX")]
+        class Recorder_Item_PlayItemPickupFX
+        {
+            static void Postfix(Item __instance, Player player)
+            {
+                if (!GameplayManager.IsMultiplayerActive && __instance != null)
+                    OnPickupFX(player, (int)__instance.m_type);
             }
         }
 
