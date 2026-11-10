@@ -174,7 +174,7 @@ namespace GameMod.Replay
         {
             if (version < 10) // v8 and v9 predate the zlib body
                 return new BinaryReader(stream);
-            return new BinaryReader(new ZlibStream(stream, CompressionMode.Decompress));
+            return new BinaryReader(new BufferedStream(new ZlibStream(stream, CompressionMode.Decompress), 4096));
         }
 
         // every count in the stream is attacker-controlled: a crafted or corrupt .olr must
