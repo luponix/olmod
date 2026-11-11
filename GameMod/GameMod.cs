@@ -41,7 +41,7 @@ namespace GameMod.Core {
             var harmony = new Harmony("olmod.olmod");
             try
             {
-                harmony.PatchAll(Assembly.GetExecutingAssembly());
+                FastStartup.PatchAll(harmony, Assembly.GetExecutingAssembly());
             }
             catch (Exception ex)
             {
