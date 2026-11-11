@@ -7,6 +7,26 @@ namespace GameMod
 {
     static class FastStartup
     {
+        const string TextureLimitKey = "olmod_master_texture_limit";
+
+        public static void ApplyTextureLimit()
+        {
+            if (!GameplayManager.IsDedicatedServer())
+                QualitySettings.masterTextureLimit = PlayerPrefs.GetInt(TextureLimitKey, 0);
+        }
+
+        [HarmonyPatch(typeof(MenuManager), "SetTextureLevel")]
+        class RememberTextureLimit
+        {
+            static void Postfix()
+            {
+                if (GameplayManager.IsDedicatedServer() || PlayerPrefs.GetInt(TextureLimitKey, 0) == QualitySettings.masterTextureLimit)
+                    return;
+                PlayerPrefs.SetInt(TextureLimitKey, QualitySettings.masterTextureLimit);
+                PlayerPrefs.Save();
+            }
+        }
+
         [HarmonyPatch(typeof(GameManager), "MaybeEnableDeveloperMode")]
         class BatchInitSteps
         {

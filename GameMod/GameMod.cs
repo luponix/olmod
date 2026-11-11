@@ -34,6 +34,7 @@ namespace GameMod.Core {
             Debug.Log("[Init] command line " + String.Join(" ", Environment.GetCommandLineArgs()));
             Config.Init();
             MPInternet.CheckInternetServer();
+            FastStartup.ApplyTextureLimit();
             MainMenuRows.Add("DEMOS", Replay.DemosMenu.SEL_DEMOS_MAIN_MENU);
             MainMenuRows.Add("MODS", ModsHandler.Menu.SEL_MAIN_MENU_MODS);
             Harmony.DEBUG = FindArg("-harmonydebug");
