@@ -5,28 +5,6 @@ using Overload;
 using UnityEngine;
 
 namespace GameMod {
-    // load faster by doing multiple steps in the same frame
-    [HarmonyPatch(typeof(GameManager), "MaybeEnableDeveloperMode")]
-    class FastLoadInit
-    {
-        private static bool Prepare()
-        {
-            var enabled = Core.GameMod.FindArg("-fastload");
-            if (enabled)
-                Debug.Log("[FastLoad] fastload enabled");
-            return enabled;
-        }
-        private static void Prefix(GameManager __instance, IEnumerator<float> ___m_initialization_enumerator, ref float ___m_initialization_progress)
-        {
-            var yieldTime = Time.realtimeSinceStartup + 0.1f;
-            while (!GameManager.m_initialized && Time.realtimeSinceStartup < yieldTime)
-            {
-                ___m_initialization_progress = ___m_initialization_enumerator.Current;
-                GameManager.m_initialized = !___m_initialization_enumerator.MoveNext();
-            }
-        }
-    }
-
     [HarmonyPatch(typeof(UnityAudio), "LoadSoundEffects")]
     class FastLoadNoSound
     {

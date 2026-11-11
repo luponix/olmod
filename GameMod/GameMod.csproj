@@ -274,6 +274,7 @@
     <Compile Include="VersionHandling\SignedIndex.cs" />
     <Compile Include="VersionHandling\UpdateMenu.cs" />
     <Compile Include="VRScale.cs" />
+    <Compile Include="FastStartup.cs" />
     <Compile Include="FastUserLevelLoad.cs" />
     <Compile Include="VSync.cs" />
     <Compile Include="Boss2B.cs" />
