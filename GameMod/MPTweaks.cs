@@ -384,4 +384,16 @@ namespace GameMod {
             }
         }
     }
+
+    [HarmonyPatch(typeof(NetworkMatch), "ProcessLobby")]
+    class MPTweaks_NetworkMatch_ProcessLobby {
+        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes) {
+            foreach (var code in codes) {
+                if (code.opcode == OpCodes.Ldc_R4 && (float)code.operand == 5f) {
+                    code.operand = 3f;
+                }
+                yield return code;
+            }
+        }
+    }
 }
