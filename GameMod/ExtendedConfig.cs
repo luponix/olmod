@@ -661,6 +661,8 @@ namespace GameMod
             public static void ParseSectionData()
             {
                 SetDefault();
+                if (lines.Count == 0)
+                    return;
 
                 // Save the current configuration in case we need to reset back to it when we encounter an incorrectable error
                 List<Controller> copy_of_controllers = CloneCurrentControllerConfiguration();
