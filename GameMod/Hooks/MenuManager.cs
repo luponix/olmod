@@ -1,3 +1,4 @@
+using GameMod.Bots;
 using HarmonyLib;
 using Overload;
 
@@ -15,6 +16,20 @@ namespace GameMod.Hooks
         {
             MatchSetupMenu.Update(online, ref ___m_menu_state_timer);
             return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(MenuManager), "MpPreMatchMenuUpdate")]
+    class MenuManager_MpPreMatchMenuUpdate
+    {
+        static bool Prefix()
+        {
+            return AddBotMenu.BeforeLobbyUpdate();
+        }
+
+        static void Postfix()
+        {
+            AddBotMenu.AfterLobbyUpdate();
         }
     }
 }

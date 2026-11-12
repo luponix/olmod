@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using GameMod.Bots;
+using HarmonyLib;
 using Overload;
 using System;
 using System.Collections.Generic;
@@ -697,6 +698,11 @@ namespace GameMod
     {
         static bool DrawLast(UIElement uie)
         {
+            if (AddBotMenu.IsOpen)
+            {
+                AddBotMenu.Draw(uie);
+                return false;
+            }
             if (MenuManager.m_menu_micro_state != 0)
                 return MenuManager.m_menu_micro_state == 1 ? DrawLastQuit(uie) : true;
             Vector2 position;
@@ -712,6 +718,7 @@ namespace GameMod
             uie.SelectAndDrawItem(Loc.LS("OPTIONS"), position - Vector2.right * 250f, 2, false, 0.75f, 0.75f);
             //position.y += 62f;
             uie.SelectAndDrawItem(Loc.LS("MULTIPLAYER MENU"), position + Vector2.right * 250f, 100, false, 0.75f, 0.75f);
+            uie.SelectAndDrawItem(Loc.LS("ADD BOT"), position - Vector2.up * 124f, AddBotMenu.OPEN_SELECTION, false, 0.5f, 0.75f);
             return false;
         }
 

@@ -275,6 +275,11 @@
     <Compile Include="VersionHandling\UpdateMenu.cs" />
     <Compile Include="VRScale.cs" />
     <Compile Include="FastStartup.cs" />
+    <Compile Include="Bots\AddBotMenu.cs" />
+    <Compile Include="Bots\LevelCapture.cs" />
+    <Compile Include="Bots\MapBake.cs" />
+    <Compile Include="Bots\MapView.cs" />
+    <Compile Include="Bots\Olbot.cs" />
     <Compile Include="FastUserLevelLoad.cs" />
     <Compile Include="VSync.cs" />
     <Compile Include="Boss2B.cs" />

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using HarmonyLib;
 using Overload;
+using GameMod.Bots;
 using GameMod.Logging;
 
 namespace GameMod.Hooks
@@ -31,6 +32,8 @@ namespace GameMod.Hooks
         {
             RearView.FlushImageLayer();
             ImpactMarks.Draw();
+            MapBake.Tick();
+            MapView.Draw();
         }
     }
 }

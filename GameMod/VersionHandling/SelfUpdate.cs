@@ -700,7 +700,7 @@ namespace GameMod.VersionHandling
         // Restores the executable bit, which a freshly written file does not carry. This shells
         // out rather than P/Invoking chmod because Mono's dllmap points "libc" at libc.so.6,
         // which does not exist on macOS.
-        private static void MakeExecutable(string path)
+        internal static void MakeExecutable(string path)
         {
             using (Process chmod = Process.Start(new ProcessStartInfo("/bin/chmod", "755 \"" + path + "\"")
             {

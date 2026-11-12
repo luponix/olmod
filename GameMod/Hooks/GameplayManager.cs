@@ -1,4 +1,5 @@
 using HarmonyLib;
+using GameMod.Bots;
 using Overload;
 
 namespace GameMod.Hooks
@@ -10,6 +11,7 @@ namespace GameMod.Hooks
         static void Postfix()
         {
             ImpactMarks.Clear();
+            LevelCapture.OnLevelStart();
         }
     }
 

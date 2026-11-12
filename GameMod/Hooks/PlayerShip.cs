@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using HarmonyLib;
 using Overload;
+using GameMod.Bots;
 using GameMod.Logging;
 
 namespace GameMod.Hooks
@@ -32,6 +33,16 @@ namespace GameMod.Hooks
                 return true;
             __result = MPBoostFire.AllowsFire(__instance);
             return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(PlayerShip), "AllowedToUseFullChat")]
+    class PlayerShip_AllowedToUseFullChat
+    {
+        static void Postfix(ref bool __result)
+        {
+            if (AddBotMenu.IsTypingName)
+                __result = false;
         }
     }
 }
