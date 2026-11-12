@@ -43,7 +43,7 @@ namespace GameMod.Bots
                 MapBake.OnLevelLoaded();
                 return;
             }
-            if (!AddBotMenu.HasStartedBots || GameplayManager.IsDedicatedServer() || !GameplayManager.IsMultiplayerActive)
+            if (!Hosting.HasBots || !GameplayManager.IsDedicatedServer())
                 return;
             if (GameplayManager.Level == null || GameManager.m_level_data == null || GameManager.m_level_data.ChunkObjects == null)
                 return;

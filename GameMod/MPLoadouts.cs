@@ -155,6 +155,24 @@ namespace GameMod
 
         public static Dictionary<int, LoadoutDataMessage> NetworkLoadouts = new Dictionary<int, LoadoutDataMessage>();
 
+        public static void StoreNetworkLoadout(LoadoutDataMessage msg)
+        {
+            NetworkLoadouts[msg.lobby_id] = msg;
+
+            // Add free Reflex sidearm
+            if (IsAllowedByFilter(WeaponType.REFLEX, LoadoutFilterBitmask)) {
+                msg.loadouts
+                    .Where(x => !x.weapons.Contains(WeaponType.REFLEX))
+                    .ToList()
+                    .ForEach(x => x.weapons.Add(WeaponType.REFLEX));
+            }
+
+            // Filter the loadout according to the allowed weapons in the match setting
+            foreach(var loadout in msg.loadouts) {
+                loadout.ApplyFilter();
+            }
+        }
+
         public static CustomLoadout[] Loadouts = new CustomLoadout[4]
         {
             new BomberLoadout(WeaponType.IMPULSE, MissileType.MISSILE_POD, MissileType.HUNTER),
@@ -668,28 +686,7 @@ namespace GameMod
 
         private static void OnCustomLoadoutDataMessage(NetworkMessage rawMsg)
         {
-            var msg = rawMsg.ReadMessage<MPLoadouts.LoadoutDataMessage>();
-            if (!MPLoadouts.NetworkLoadouts.ContainsKey(msg.lobby_id))
-            {
-                MPLoadouts.NetworkLoadouts.Add(msg.lobby_id, msg);
-            }
-            else
-            {
-                MPLoadouts.NetworkLoadouts[msg.lobby_id] = msg;
-            }
-
-            // Add free Reflex sidearm
-            if (MPLoadouts.IsAllowedByFilter(WeaponType.REFLEX, MPLoadouts.LoadoutFilterBitmask)) {
-                MPLoadouts.NetworkLoadouts[msg.lobby_id].loadouts
-                    .Where(x => !x.weapons.Contains(WeaponType.REFLEX))
-                    .ToList()
-                    .ForEach(x => x.weapons.Add(WeaponType.REFLEX));
-            }
-
-            // Filter the loadout according to the allowed weapons in the match setting
-            foreach(var loadout in  MPLoadouts.NetworkLoadouts[msg.lobby_id].loadouts) {
-                loadout.ApplyFilter();
-            }
+            MPLoadouts.StoreNetworkLoadout(rawMsg.ReadMessage<MPLoadouts.LoadoutDataMessage>());
         }
 
         private static void OnSetCustomLoadoutMessage(NetworkMessage rawMsg)

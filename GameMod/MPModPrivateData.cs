@@ -1277,6 +1277,8 @@ END_ENTRY
             set { MPAudioTaunts.AServer.server_supports_audiotaunts = value; }
         }
 
+        public static GameMod.Bots.BotSettings BotSettings { get; set; } = new GameMod.Bots.BotSettings();
+
         public static int LoadoutFilterBitmask
         {
             get { return MPLoadouts.LoadoutFilterBitmask; }
@@ -1367,6 +1369,7 @@ END_ENTRY
             jobject["boostfire"] = BoostFireEnabled;
             jobject["instareap"] = InstareapEnabled;
             jobject["instareaprapidfire"] = InstareapRapidFire;
+            jobject["bots"] = BotSettings.ToJson();
             jobject["missiletypehealth"] = new JArray(MissileTypeHealth.Select(h => (JToken)(float)h));
             return jobject;
         }
@@ -1410,6 +1413,7 @@ END_ENTRY
             RollSpeedLimit = root["rollspeedlimit"].GetInt(7);
             DestructibleMissiles = root["destructiblemissiles"].GetBool(false);
             BoostFireEnabled = root["boostfire"].GetBool(false);
+            BotSettings = GameMod.Bots.BotSettings.FromJson(root["bots"]);
             var hArr = root["missiletypehealth"] as JArray;
             if (hArr != null && hArr.Count == 8)
                 MissileTypeHealth = hArr.Select((t, i) => t?.Value<float>() ?? MPDestructibleMissiles.DefaultHealth[i]).ToArray();
@@ -1554,6 +1558,7 @@ END_ENTRY
     {
         public static string ModNetSystemOnGameSessionStart(Dictionary<string, object> attributes)
         {
+            GameMod.Bots.Hosting.ReadPassword(attributes);
             return attributes.ContainsKey("mod_private_data") ? (string)attributes["mod_private_data"] : "";
         }
 
@@ -1646,6 +1651,7 @@ END_ENTRY
             MPModPrivateData.RollSpeedLimit = MPServerOptimization.RollSpeedLimit;
             MPModPrivateData.DestructibleMissiles = Menus.mms_destructible_missiles;
             MPModPrivateData.BoostFireEnabled = Menus.mms_boost_fire;
+            MPModPrivateData.BotSettings = GameMod.Bots.BotSettingsPage.Settings;
             MPModPrivateData.InstareapEnabled = Menus.mms_instareap && MenuManager.mms_mode != ExtMatchMode.RACE;
             MPModPrivateData.InstareapRapidFire = MPModPrivateData.InstareapEnabled && Menus.mms_instareap_rapid_fire;
             if (Menus.mms_mp_projdata_fn == "STOCK") {

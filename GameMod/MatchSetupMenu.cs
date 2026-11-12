@@ -61,6 +61,9 @@ namespace GameMod
                 case 15:
                     MPLoadouts.DrawAllowedLoadoutsPage(uie);
                     break;
+                case Bots.BotSettingsPage.MICRO_STATE:
+                    Bots.BotSettingsPage.Draw(uie, position);
+                    break;
             }
 
             position.x = 0f;
@@ -189,6 +192,8 @@ namespace GameMod
             uie.SelectAndDrawItem(Loc.LS("POWERUP SETTINGS"), left, 4, false);
             left.y += 62f;
             uie.SelectAndDrawItem(Loc.LS("LOADOUT SETTINGS"), left, 5, false);
+            left.y += 62f;
+            uie.SelectAndDrawItem(Loc.LS("BOT SETTINGS"), left, 29, false);
 
             Vector2 bottom = new Vector2(position.x, left.y);
             uie.DrawMenuSeparator(bottom + Vector2.up * 40f);
@@ -443,6 +448,14 @@ namespace GameMod
                         if (!entered)
                             break;
                     }
+                    if (MenuManager.m_menu_micro_state == Bots.BotSettingsPage.MICRO_STATE && UIManager.m_menu_selection == Bots.BotSettingsPage.SELECTION_NAME && Bots.BotSettingsPage.EditedSlot != null)
+                    {
+                        Controls.m_disable_menu_letter_keys = true;
+                        string name = Bots.BotSettingsPage.EditedSlot.Name;
+                        bool entered = ProcessInputField(ref name, Loc.LS("BOT NAME"), false);
+                        Bots.BotSettingsPage.TypeName(name, entered);
+                        break;
+                    }
                     if (MenuManager.m_menu_micro_state == 2 && UIManager.m_menu_selection == 303)
                     {
                         Controls.m_disable_menu_letter_keys = true;
@@ -609,6 +622,12 @@ namespace GameMod
                     break;
                 case 10:
                     SelectOnTeamSettings(selection);
+                    break;
+                case Bots.BotSettingsPage.MICRO_STATE:
+                    if (selection == 100)
+                        GoToPage(3);
+                    else
+                        Bots.BotSettingsPage.Select(selection);
                     break;
                 case 15:
                     if (selection == 22)
@@ -846,6 +865,9 @@ namespace GameMod
                     break;
                 case 19:
                     GoToPage(10);
+                    break;
+                case 29:
+                    GoToPage(Bots.BotSettingsPage.MICRO_STATE);
                     break;
                 case 20:
                     MPThunderboltPassthrough.isAllowed = !MPThunderboltPassthrough.isAllowed;

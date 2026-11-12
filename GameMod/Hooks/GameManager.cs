@@ -33,6 +33,7 @@ namespace GameMod.Hooks
             RearView.FlushImageLayer();
             ImpactMarks.Draw();
             MapBake.Tick();
+            Hosting.Tick();
             MapView.Draw();
         }
     }

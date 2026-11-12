@@ -275,7 +275,9 @@
     <Compile Include="VersionHandling\UpdateMenu.cs" />
     <Compile Include="VRScale.cs" />
     <Compile Include="FastStartup.cs" />
-    <Compile Include="Bots\AddBotMenu.cs" />
+    <Compile Include="Bots\Hosting.cs" />
+    <Compile Include="Bots\BotSettings.cs" />
+    <Compile Include="Bots\BotSettingsPage.cs" />
     <Compile Include="Bots\LevelCapture.cs" />
     <Compile Include="Bots\MapBake.cs" />
     <Compile Include="Bots\MapView.cs" />
