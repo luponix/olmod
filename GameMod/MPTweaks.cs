@@ -373,18 +373,6 @@ namespace GameMod {
         }
     }
 
-    [HarmonyPatch(typeof(NetworkMatch), "ProcessPregame")]
-    class MPTweaks_NetworkMatch_ProcessPregame {
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes) {
-            foreach (var code in codes) {
-                if (code.opcode == OpCodes.Ldc_R4 && ((float)code.operand == 3f || (float)code.operand == 3000f)) {
-                    code.operand = 0f;
-                }
-                yield return code;
-            }
-        }
-    }
-
     [HarmonyPatch(typeof(NetworkMatch), "ProcessLobby")]
     class MPTweaks_NetworkMatch_ProcessLobby {
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codes) {
