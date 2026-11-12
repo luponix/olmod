@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using HarmonyLib;
+using Overload;
 using UnityEngine;
 
 namespace GameMod
@@ -23,7 +24,7 @@ namespace GameMod
             static bool Prefix(OverloadLevelConvertSerializer __instance, Type elementType, Stream ___m_stream, ref Array __result)
             {
                 int size = ElementSize(elementType);
-                if (size == 0)
+                if (size == 0 || (!GameplayManager.IsDedicatedServer() && elementType != typeof(Color32)))
                     return true;
 
                 int count = __instance.SerializeIn_int32();
