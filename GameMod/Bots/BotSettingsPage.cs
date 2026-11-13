@@ -283,7 +283,7 @@ namespace GameMod.Bots
                 case SELECTION_ADD:
                     if (editedIndex < 0 && Slots.Count >= BotSettings.MAX_BOTS)
                         return;
-                    if (Draft.Name.Trim().Length == 0 || Slots.Exists(s => s != EditedSlot && s.Name == Draft.Name))
+                    if (Draft.Name.Trim().Length == 0 || Slots.Exists(s => s != EditedSlot && string.Equals(s.Name.Trim(), Draft.Name.Trim(), System.StringComparison.OrdinalIgnoreCase)))
                         Draft.Name = FreeName();
                     if (editedIndex < 0)
                     {

@@ -14,6 +14,9 @@ namespace GameMod.Bots
     static class Hosting
     {
         static readonly FieldInfo maxPlayersField = AccessTools.Field(typeof(NetworkMatch), "m_max_players_for_match");
+        static readonly FieldInfo pregameWaitField = AccessTools.Field(typeof(NetworkMatch), "m_pregame_elapsed_seconds_waiting_before_countdown");
+        const float ENGINE_PREGAME_WAIT = 60f;
+        const float BOT_PREGAME_WAIT = 150f;
 
         static List<BotSlot> bots = new List<BotSlot>();
         static readonly Dictionary<int, BotSlot> botsByConnection = new Dictionary<int, BotSlot>();
@@ -79,10 +82,18 @@ namespace GameMod.Bots
                 notice = string.Format("THIS MATCH ALLOWS {0} OF THE {1} BOTS", allowed, requested.Count);
             bots = requested.Take(allowed).Select(slot => slot.Resolve()).ToList();
             replaceWithHumans = MPModPrivateData.BotSettings.ReplaceWithHumans;
-            if (bots.Count > 0)
+            if (bots.Count == 0)
+                return;
+            LevelCapture.RenameLegacyFiles();
+            try
             {
-                LevelCapture.RenameLegacyFiles();
                 StartOlbot();
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogFormat("[Bots] cannot start {0}: {1}", Olbot.PlayerPath, ex.Message);
+                notice = "THE BOTS COULD NOT START ON THIS SERVER";
+                olbot = null;
             }
         }
 
@@ -90,7 +101,7 @@ namespace GameMod.Bots
         {
             string logDir = Path.Combine(Application.persistentDataPath, "BotLogs");
             Directory.CreateDirectory(logDir);
-            string logPath = Path.Combine(logDir, "server-bots.log");
+            string logPath = Path.Combine(logDir, "server-bots" + LevelCapture.InstanceTag + ".log");
             var arguments = new List<string> {
                 "-batchmode", "-nographics",
                 "-logFile", logPath,
@@ -101,11 +112,9 @@ namespace GameMod.Bots
                 "-olbot-geometry-cache", LevelCapture.CacheDir,
             };
             string levelKey = MPJoinInProgress.NetworkMatchLevelName();
-            if (levelKey != null)
-                arguments.AddRange(new[] { "-olbot-level", levelKey });
             if (replaceWithHumans)
             {
-                botCountPath = Path.Combine(logDir, "server-bot-count.txt");
+                botCountPath = Path.Combine(logDir, "server-bot-count" + LevelCapture.InstanceTag + ".txt");
                 WriteBotCount(bots.Count);
                 arguments.AddRange(new[] { "-olbot-bot-count-file", botCountPath });
             }
@@ -117,7 +126,8 @@ namespace GameMod.Bots
         {
             if (lobbyData == null || !IsLoopback(connectionId))
                 return;
-            BotSlot slot = bots.FirstOrDefault(s => string.Equals(s.PilotName, name.Trim(), StringComparison.OrdinalIgnoreCase));
+            Func<BotSlot, bool> named = s => string.Equals(s.PilotName, name.Trim(), StringComparison.OrdinalIgnoreCase);
+            BotSlot slot = bots.FirstOrDefault(s => named(s) && !botsByConnection.ContainsValue(s)) ?? bots.FirstOrDefault(named);
             if (slot == null)
                 return;
             botsByConnection[connectionId] = slot;
@@ -142,6 +152,8 @@ namespace GameMod.Bots
             if ((bots.Count == 0 && notice == null) || Time.unscaledTime < nextCheck)
                 return;
             nextCheck = Time.unscaledTime + 1f;
+            if (olbot != null && olbot.HasExited)
+                OnOlbotExited();
             int humans = NetworkMatch.m_players.Keys.Count(id => !botsByConnection.ContainsKey(id));
             if (notice != null && humans > 0)
             {
@@ -155,12 +167,24 @@ namespace GameMod.Bots
             maxPlayersField.SetValue(null, hostMaxPlayers + (botsByConnection.Count > 0 ? 1 : 0));
         }
 
+        static void OnOlbotExited()
+        {
+            olbot.Dispose();
+            olbot = null;
+            string levelKey = GameplayManager.Level != null ? LevelCapture.LevelKey(GameplayManager.Level) : MPJoinInProgress.NetworkMatchLevelName();
+            string failure = string.IsNullOrEmpty(levelKey) ? null : LevelCapture.FailureOf(levelKey);
+            UnityEngine.Debug.LogFormat("[Bots] the bot process ended, level {0}{1}", levelKey, failure == null ? string.Empty : ", map data failed: " + failure);
+            if (failure != null)
+                notice = "THE BOTS CANNOT PLAY THIS MAP YET";
+        }
+
         static void WriteBotCount(int count)
         {
             if (count == botCount)
                 return;
+            if (!LevelCapture.WriteAtomically(botCountPath, System.Text.Encoding.ASCII.GetBytes(count.ToString())))
+                return;
             botCount = count;
-            LevelCapture.WriteAtomically(botCountPath, System.Text.Encoding.ASCII.GetBytes(count.ToString()));
             UnityEngine.Debug.LogFormat("[Bots] bot count {0}", count);
         }
 
@@ -168,8 +192,18 @@ namespace GameMod.Bots
         {
             if (olbot != null)
             {
-                if (!olbot.HasExited)
-                    olbot.Kill();
+                try
+                {
+                    if (!olbot.HasExited)
+                    {
+                        olbot.Kill();
+                        olbot.WaitForExit(3000);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    UnityEngine.Debug.LogFormat("[Bots] cannot stop the bot process: {0}", ex.Message);
+                }
                 olbot.Dispose();
                 olbot = null;
             }
@@ -177,6 +211,33 @@ namespace GameMod.Bots
             botsByConnection.Clear();
             botCount = -1;
             notice = null;
+        }
+
+        static bool holdingCountdown;
+
+        public static bool HoldCountdown()
+        {
+            bool hold = ShouldHoldCountdown();
+            if (hold != holdingCountdown)
+                UnityEngine.Debug.LogFormat(hold ? "[Bots] holding the countdown for the bots' map data" : "[Bots] countdown released");
+            holdingCountdown = hold;
+            return hold;
+        }
+
+        static bool ShouldHoldCountdown()
+        {
+            if (bots.Count == 0 || olbot == null || olbot.HasExited || pregameWaitField == null)
+                return false;
+            float waited = (float)pregameWaitField.GetValue(null);
+            if (waited < ENGINE_PREGAME_WAIT || waited > BOT_PREGAME_WAIT || GameplayManager.Level == null)
+                return false;
+            string levelKey = LevelCapture.LevelKey(GameplayManager.Level);
+            if (!LevelCapture.IsBaked(levelKey))
+                return LevelCapture.FailureOf(levelKey) == null;
+            return botsByConnection.Keys.Any(id => {
+                Player player = Server.FindPlayerByConnectionId(id);
+                return player == null || !player.m_ready_for_countdown;
+            });
         }
 
         static bool IsLoopback(int connectionId)
@@ -192,6 +253,18 @@ namespace GameMod.Bots
         static void Postfix()
         {
             Hosting.OnGameSessionStart();
+        }
+    }
+
+    [HarmonyPatch(typeof(NetworkMatch), "CanLaunchCountdown")]
+    class Hosting_NetworkMatch_CanLaunchCountdown
+    {
+        static bool Prefix(ref bool __result)
+        {
+            if (!Hosting.HoldCountdown())
+                return true;
+            __result = false;
+            return false;
         }
     }
 

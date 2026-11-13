@@ -26,7 +26,7 @@ namespace GameMod.Bots
         {
             if (Application.platform != RuntimePlatform.WindowsPlayer)
                 VersionHandling.SelfUpdate.MakeExecutable(PlayerPath);
-            var startInfo = new ProcessStartInfo(PlayerPath, "\"" + string.Join("\" \"", arguments.ToArray()) + "\"")
+            var startInfo = new ProcessStartInfo(PlayerPath, string.Join(" ", arguments.ConvertAll(Quote).ToArray()))
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -34,9 +34,26 @@ namespace GameMod.Bots
             };
             foreach (string variable in new[] { "LD_PRELOAD", "DYLD_INSERT_LIBRARIES", "OLMODDIR" })
                 startInfo.EnvironmentVariables.Remove(variable);
-            Process process = Process.Start(startInfo);
-            process.PriorityClass = ProcessPriorityClass.BelowNormal;
-            return process;
+            return Process.Start(startInfo);
+        }
+
+        public static string Quote(string argument)
+        {
+            var quoted = new System.Text.StringBuilder("\"");
+            int backslashes = 0;
+            foreach (char c in argument)
+            {
+                if (c == '\\')
+                {
+                    backslashes++;
+                    continue;
+                }
+                quoted.Append('\\', c == '"' ? backslashes * 2 + 1 : backslashes);
+                backslashes = 0;
+                quoted.Append(c);
+            }
+            quoted.Append('\\', backslashes * 2);
+            return quoted.Append('"').ToString();
         }
     }
 }

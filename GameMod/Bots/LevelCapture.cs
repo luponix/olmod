@@ -18,9 +18,13 @@ namespace GameMod.Bots
             get { return Path.Combine(Application.persistentDataPath, "BotNav"); }
         }
 
-        public static string CurrentLevelPath
+        public static string InstanceTag
         {
-            get { return Path.Combine(CacheDir, "current-level.txt"); }
+            get
+            {
+                int port = Overload.Server.GetListenPort();
+                return port > 0 ? "-" + port : string.Empty;
+            }
         }
 
         public static string LevelKey(LevelInfo level)
@@ -67,6 +71,22 @@ namespace GameMod.Bots
             }
         }
 
+        public static string FailureOf(string levelKey)
+        {
+            string marker = Path.Combine(CacheDir, FileName(levelKey) + ".bakefail");
+            try
+            {
+                if (IsBaked(levelKey) || !File.Exists(marker))
+                    return null;
+                string[] lines = File.ReadAllLines(marker);
+                return lines.Length > 1 ? lines[1].Trim() : null;
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
+
         public static void OnLevelStart()
         {
             if (MapBake.IsRunning)
@@ -82,7 +102,6 @@ namespace GameMod.Bots
             if (string.IsNullOrEmpty(levelKey))
                 return;
             Directory.CreateDirectory(CacheDir);
-            File.WriteAllText(CurrentLevelPath, levelKey);
             if (IsBaked(levelKey) || File.Exists(CapturePath(levelKey)))
                 return;
 
@@ -270,19 +289,50 @@ namespace GameMod.Bots
             writer.Write(v.z);
         }
 
-        public static void WriteAtomically(string path, byte[] bytes)
+        static void MoveOver(string source, string destination)
+        {
+            if (!File.Exists(destination))
+            {
+                File.Move(source, destination);
+                return;
+            }
+            try
+            {
+                File.Replace(source, destination, null);
+            }
+            catch (NotImplementedException)
+            {
+                File.Delete(destination);
+                File.Move(source, destination);
+            }
+            catch (PlatformNotSupportedException)
+            {
+                File.Delete(destination);
+                File.Move(source, destination);
+            }
+        }
+
+        public static bool WriteAtomically(string path, byte[] bytes)
         {
             string temporary = path + "." + Guid.NewGuid().ToString("N").Substring(0, 8) + ".tmp";
             try
             {
                 File.WriteAllBytes(temporary, bytes);
-                if (File.Exists(path))
-                    File.Delete(path);
-                File.Move(temporary, path);
+                MoveOver(temporary, path);
+                return true;
             }
-            catch (IOException ex)
+            catch (Exception ex)
             {
                 Debug.LogFormat("[Bots] cannot write {0}: {1}", path, ex.Message);
+                try
+                {
+                    if (File.Exists(temporary))
+                        File.Delete(temporary);
+                }
+                catch (Exception)
+                {
+                }
+                return false;
             }
         }
     }

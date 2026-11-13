@@ -142,7 +142,8 @@ namespace GameMod.Bots
             foreach (JToken bot in bots)
             {
                 string name = CleanName(bot["name"].GetString(string.Empty)).Trim();
-                if (name.Length == 0 || settings.Slots.Count == MAX_BOTS)
+                if (name.Length == 0 || settings.Slots.Count == MAX_BOTS
+                    || settings.Slots.Exists(s => string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase)))
                     continue;
                 settings.Slots.Add(new BotSlot {
                     Name = name,

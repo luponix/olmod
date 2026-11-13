@@ -166,8 +166,17 @@ namespace GameMod.Bots
             string logDir = Path.Combine(Application.persistentDataPath, "BotLogs");
             Directory.CreateDirectory(logDir);
             bakeLogPath = Path.Combine(logDir, "bake.log");
-            baker = Olbot.Start(new List<string> {
-                "-batchmode", "-nographics", "-logFile", bakeLogPath, "-olbot-bake-all", LevelCapture.CacheDir });
+            try
+            {
+                baker = Olbot.Start(new List<string> {
+                    "-batchmode", "-nographics", "-logFile", bakeLogPath, "-olbot-bake-all", LevelCapture.CacheDir });
+            }
+            catch (Exception ex)
+            {
+                Report("botmaps: cannot start " + Olbot.PlayerPath + ": " + ex.Message);
+                step = Step.Idle;
+                return;
+            }
             step = Step.Baking;
         }
 
