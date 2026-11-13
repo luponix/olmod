@@ -662,32 +662,29 @@ namespace GameMod {
         private static bool taunt_tab_scrollbar_dragging = false;
         public static void DrawTabs(UIElement uie, Vector2 pos, int tab_selected)
         {
-            float w = 508f;
-            uie.DrawWideBox(pos, w, 22f, UIManager.m_col_ub2, uie.m_alpha, 7);
-            string[] array = new string[]
+            DrawTabs(uie, pos, tab_selected, new string[] { "GENERAL", "TEAM", "LAG COMPENSATION", "AUDIO TAUNTS" }, 200, 265f, 112f, 508f);
+        }
+
+        public static void DrawTabs(UIElement uie, Vector2 pos, int tab_selected, string[] tab_names, int first_selection, float spacing, float tab_half_width, float bar_half_width)
+        {
+            uie.DrawWideBox(pos, bar_half_width, 22f, UIManager.m_col_ub2, uie.m_alpha, 7);
+            for (int i = 0; i < tab_names.Length; i++)
             {
-                "GENERAL",
-                "TEAM",
-                "LAG COMPENSATION",
-                "AUDIO TAUNTS"
-            };
-            for (int i = 0; i < array.Length; i++)
-            {
-                pos.x = -133f + ((float)i - 1f) * 265f;
-                uie.TestMouseInRect(pos, 112f, 16f, 200 + i, false);
-                if (UIManager.m_menu_selection == 200 + i)
+                pos.x = ((float)i - (tab_names.Length - 1) * 0.5f) * spacing;
+                uie.TestMouseInRect(pos, tab_half_width, 16f, first_selection + i, false);
+                if (UIManager.m_menu_selection == first_selection + i)
                 {
-                    uie.DrawWideBox(pos, 112f, 19f, UIManager.m_col_ui4, uie.m_alpha, 7);
+                    uie.DrawWideBox(pos, tab_half_width, 19f, UIManager.m_col_ui4, uie.m_alpha, 7);
                 }
                 if (i == tab_selected)
                 {
-                    uie.DrawWideBox(pos, 112f, 16f, UIManager.m_col_ui4, uie.m_alpha, 12);
-                    uie.DrawStringSmall(array[i], pos, 0.6f, StringOffset.CENTER, UIManager.m_col_ub3, 1f, -1f);
+                    uie.DrawWideBox(pos, tab_half_width, 16f, UIManager.m_col_ui4, uie.m_alpha, 12);
+                    uie.DrawStringSmall(tab_names[i], pos, 0.6f, StringOffset.CENTER, UIManager.m_col_ub3, 1f, -1f);
                 }
                 else
                 {
-                    uie.DrawWideBox(pos, 112f, 16f, UIManager.m_col_ui0, uie.m_alpha, 8);
-                    uie.DrawStringSmall(array[i], pos, 0.6f, StringOffset.CENTER, UIManager.m_col_ui1, 1f, -1f);
+                    uie.DrawWideBox(pos, tab_half_width, 16f, UIManager.m_col_ui0, uie.m_alpha, 8);
+                    uie.DrawStringSmall(tab_names[i], pos, 0.6f, StringOffset.CENTER, UIManager.m_col_ui1, 1f, -1f);
                 }
             }
         }

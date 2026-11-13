@@ -18,7 +18,7 @@ namespace GameMod.Bots
         const int SELECTION_SCROLLBAR = 28;
         const int SELECTION_ROW = 200;
         const int SELECTION_REMOVE = 300;
-        const float FORM_TOP = -252f;
+        const float FORM_TOP = -220f;
         const float FORM_ROW_STEP = 44f;
         const float FORM_HALF_HEIGHT = 19f;
         const float BOX_HALF_HEIGHT = 15f;
@@ -26,8 +26,8 @@ namespace GameMod.Bots
         const float COLUMN_WIDTH = 400f;
         const float VALUE_HALF_WIDTH = 115f;
         const float TABLE_HALF_WIDTH = 400f;
-        const float TABLE_TOP = -6f;
-        const float ROW_PITCH = 40f;
+        const float TABLE_TOP = 26f;
+        const float ROW_PITCH = 38f;
         const int ROWS_SHOWN = 7;
         const float TABLE_BOTTOM = TABLE_TOP + ROW_PITCH * ROWS_SHOWN;
         const float SCROLLBAR_X = TABLE_HALF_WIDTH + 20f;
@@ -40,6 +40,7 @@ namespace GameMod.Bots
 
         public static BotSettings Settings = new BotSettings();
         public static BotSlot Draft = NewDraft();
+        static BotSlot lastAdded;
         static int editedIndex = -1;
         static int firstRow;
         static bool isDraggingScrollbar;
@@ -56,10 +57,6 @@ namespace GameMod.Bots
 
         public static void Draw(UIElement uie)
         {
-            uie.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("BOT SETTINGS"), 250f);
-            UIElement.ToolTipActive = false;
-
-            uie.DrawMenuSeparator(new Vector2(0f, FORM_TOP - 34f));
             Vector2 left = new Vector2(-COLUMN_X, FORM_TOP);
             DrawNameRow(uie, left);
             left.y += FORM_ROW_STEP;
@@ -89,13 +86,18 @@ namespace GameMod.Bots
         {
             uie.TestMouseInRect(position, COLUMN_WIDTH * 0.5f, FORM_HALF_HEIGHT, SELECTION_NAME);
             bool isHighlighted = UIManager.m_menu_selection == SELECTION_NAME;
-            DrawFormBackground(uie, position, isHighlighted);
+            DrawFormBackground(uie, position, isHighlighted, 1f);
             DrawFormLabel(uie, position, Loc.LS("BOT NAME"), isHighlighted, 1f);
             Vector2 value = ValuePosition(position);
             Color color = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui4;
-            bool showCursor = isHighlighted && (int)(Time.unscaledTime * 4f) % 2 == 0;
             DrawValueBox(uie, value, isHighlighted, 1f);
-            uie.DrawStringSmall(Draft.Name + (showCursor ? "_" : string.Empty), value, 0.55f, StringOffset.CENTER, color, 1f, 2f * VALUE_HALF_WIDTH - 40f);
+            float maxWidth = 2f * VALUE_HALF_WIDTH - 40f;
+            uie.DrawStringSmall(Draft.PilotName, value, 0.55f, StringOffset.CENTER, color, 1f, maxWidth);
+            if (isHighlighted && (int)(Time.unscaledTime * 4f) % 2 == 0)
+            {
+                float textHalfWidth = Mathf.Min(UIManager.GetStringWidth(Draft.PilotName, 20f * 0.55f), maxWidth) * 0.5f;
+                uie.DrawStringSmall("_", value + Vector2.right * textHalfWidth, 0.55f, StringOffset.LEFT, color, 1f);
+            }
         }
 
         static void DrawOptionRow(UIElement uie, Vector2 position, int selection, string label, string value, bool isEnabled)
@@ -110,7 +112,7 @@ namespace GameMod.Bots
             if (isHighlighted)
                 MenuManager.option_dir = true;
             float alpha = isEnabled ? 1f : 0.3f;
-            DrawFormBackground(uie, position, isHighlighted);
+            DrawFormBackground(uie, position, isHighlighted, alpha);
             DrawFormLabel(uie, position, label, isHighlighted, alpha);
             DrawValueBox(uie, valuePosition, isHighlighted, alpha);
             Color color = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui4;
@@ -137,8 +139,11 @@ namespace GameMod.Bots
             uie.DrawOutlineBackdrop(position, BOX_HALF_HEIGHT, 2f * (VALUE_HALF_WIDTH - BOX_HALF_HEIGHT), box, 2);
         }
 
-        static void DrawFormBackground(UIElement uie, Vector2 position, bool isHighlighted)
+        static void DrawFormBackground(UIElement uie, Vector2 position, bool isHighlighted, float alpha)
         {
+            Color frame = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui2;
+            frame.a = alpha;
+            uie.DrawOutlineBackdrop(position, FORM_HALF_HEIGHT, COLUMN_WIDTH - 2f * FORM_HALF_HEIGHT, frame, 2);
             if (isHighlighted)
             {
                 Color bar = Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UIManager.m_select_flash * 0.3f);
@@ -288,6 +293,7 @@ namespace GameMod.Bots
                     if (editedIndex < 0)
                     {
                         Slots.Add(Draft);
+                        lastAdded = Draft.Clone();
                         firstRow = HiddenRows;
                     }
                     else
@@ -358,7 +364,9 @@ namespace GameMod.Bots
 
         static BotSlot NewDraft()
         {
-            return new BotSlot { Name = FreeName() };
+            BotSlot draft = lastAdded == null ? new BotSlot() : lastAdded.Clone();
+            draft.Name = FreeName();
+            return draft;
         }
 
         static int Cycle(int value, int direction, List<int> options, int taken)

@@ -174,6 +174,7 @@ namespace GameMod.Bots
         {
             foreach (char c in "\"\\,:")
                 name = name.Replace(c.ToString(), string.Empty);
+            name = name.ToUpperInvariant();
             return name.Length > MAX_NAME_LENGTH ? name.Substring(0, MAX_NAME_LENGTH) : name;
         }
 

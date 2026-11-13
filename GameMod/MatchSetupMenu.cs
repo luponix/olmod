@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using Overload;
@@ -28,6 +29,8 @@ namespace GameMod
             uie.DrawMenuBG();
             Vector2 position = uie.m_position;
             uie.DrawHeaderMedium(Vector2.up * (UIManager.UI_TOP + 30f), uie.m_display_string1);
+            if (IsTab(MenuManager.m_menu_micro_state))
+                DrawTabBar(uie);
             switch (MenuManager.m_menu_micro_state)
             {
                 case 0:
@@ -40,23 +43,23 @@ namespace GameMod
                 case 2:
                     DrawMatchSettings(uie, position);
                     break;
-                case 3:
-                    DrawAdvancedSettings(uie, position);
+                case TAB_RULES:
+                    DrawRules(uie);
                     break;
-                case 5:
-                    DrawPowerupSettings(uie, position);
+                case TAB_POWERUPS:
+                    DrawPowerupSettings(uie);
                     break;
-                case 6:
-                    DrawLoadoutSettings(uie, position);
-                    break;
-                case 7:
-                    DrawAllowedPowerups(uie, position);
+                case TAB_LOADOUTS:
+                    DrawLoadoutSettings(uie);
                     break;
                 case 9:
                     MPModifiers.DrawAllowedModifiersPage(uie);
                     break;
-                case 10:
-                    DrawTeamSettings(uie, position);
+                case TAB_TEAMS:
+                    DrawSettingsColumn(uie, new Vector2(0f, TAB_CONTENT_TOP), teamRows, 1.5f);
+                    break;
+                case TAB_SERVER:
+                    DrawSettingsColumn(uie, new Vector2(0f, TAB_CONTENT_TOP), serverRows, 1.5f);
                     break;
                 case 15:
                     MPLoadouts.DrawAllowedLoadoutsPage(uie);
@@ -164,150 +167,155 @@ namespace GameMod
             uie.DrawStringSmall(MenuManager.GetMMSLevelPlayersTeam(), position, 0.4f, StringOffset.CENTER, UIManager.m_col_ui2, 1f);
         }
 
-        private static void DrawAdvancedSettings(UIElement uie, Vector2 position)
-        {
-            uie.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("ADVANCED MATCH SETTINGS"), 250f);
-            UIElement.ToolTipActive = false;
+        private const int TAB_RULES = 3;
+        private const int TAB_POWERUPS = 5;
+        private const int TAB_LOADOUTS = 6;
+        private const int TAB_TEAMS = 10;
+        private const int TAB_SERVER = 17;
+        private static readonly int[] tabs = { TAB_RULES, TAB_TEAMS, TAB_POWERUPS, TAB_LOADOUTS, Bots.BotSettingsPage.MICRO_STATE, TAB_SERVER };
+        private static readonly string[] tabNames = { "RULES", "TEAMS", "POWERUPS", "LOADOUTS", "BOTS", "SERVER" };
+        private const int TAB_SELECTION = 400;
+        private const float TAB_CONTENT_TOP = -220f;
+        private const float ROW_PITCH = 55f;
 
-            Vector2 left = position + new Vector2(-300f, -250f);
-            uie.DrawMenuSeparator(left - Vector2.up * 40f);
-            uie.SelectAndDrawStringOptionItem(Loc.LS("SHOW ENEMY NAMES"), left, 0, MenuManager.GetMMSEnemyNames(), string.Empty, 1f);
-            left.y += ADVANCED_ROW_PITCH;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("RESPAWN TIME"), left, 1, MenuManager.GetMMSRespawnTime(), Loc.LS("SECONDS AFTER EXPLODING BEFORE A PLAYER RESPAWNS"), 1f, Menus.mms_scale_respawn_time);
-            left.y += ADVANCED_ROW_PITCH;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("RESPAWN SHIELD"), left, 2, MenuManager.GetMMSRespawnShield(), Loc.LS("SECONDS A PLAYER IS INVULNERABLE WHEN RESPAWNING"), 1f, MenuManager.mms_mode == MatchMode.MONSTERBALL);
-            left.y += ADVANCED_ROW_PITCH;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("TURN SPEED LIMITING"), left, 6, MenuManager.GetMMSTurnSpeedLimit(), Loc.LS("ABSOLUTE LIMIT OF PITCH AND YAW ROTATION SPEED (ALL CONTROL TYPES)"), 1f);
-            left.y += ADVANCED_ROW_PITCH;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("SUDDEN DEATH OVERTIME"), left, 10, MenuManager.GetToggleSetting(Convert.ToInt32(MPSuddenDeath.SuddenDeathMenuEnabled)), string.Empty, 1f, MenuManager.mms_mode != MatchMode.NUM);
-            left.y += ADVANCED_ROW_PITCH;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW JOIN IN PROGRESS"), left, 7,
-                MenuManager.GetToggleSetting(MPJoinInProgress.MenuManagerEnabled || MPJoinInProgress.SingleMatchEnable ? 1 : 0),
-                Loc.LS("ALLOW PLAYERS TO JOIN MATCH AFTER IT HAS STARTED"), 1f, !MenuManager.m_mp_lan_match || MPJoinInProgress.SingleMatchEnable);
-            left.y += ADVANCED_ROW_PITCH;
+        private static readonly int[] rulesLeftRows = { 0, 1, 2, 10, 7, 18, 21, 11, 13 };
+        private static readonly int[] rulesRightRows = { 6, 24, 15, 17, 26, 25, 20, 27, 28 };
+        private static readonly int[] teamRows = { 3, 8, 12, 14 };
+        private static readonly int[] serverRows = { 23, 22, 16, 32 };
 
-            DrawAdvancedRightColumn(uie, new Vector2(300f, position.y - 250f));
-
-            uie.SelectAndDrawItem(Loc.LS("TEAM SETTINGS"), left, 19, false);
-            left.y += ADVANCED_ROW_PITCH;
-            uie.SelectAndDrawItem(Loc.LS("POWERUP SETTINGS"), left, 4, false);
-            left.y += ADVANCED_ROW_PITCH;
-            uie.SelectAndDrawItem(Loc.LS("LOADOUT SETTINGS"), left, 5, false);
-            left.y += ADVANCED_ROW_PITCH;
-            uie.SelectAndDrawItem(Loc.LS("BOT SETTINGS"), left, 29, false);
-
-            Vector2 bottom = new Vector2(position.x, left.y);
-            uie.DrawMenuSeparator(bottom + Vector2.up * 40f);
-            uie.DrawMenuToolTip(bottom + Vector2.up * 40f);
-        }
-
-        private const int ADVANCED_VISIBLE_ROWS = 10;
-        private const float ADVANCED_ROW_PITCH = 55f;
-        private static readonly int[] advancedRowsCtf = { 27, 28, 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25, 26, 32 };
-        private static readonly int[] advancedRowsOtherModes = { 27, 28, 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25, 26, 32 };
-        private static int advancedScrollOffset;
-        private static bool advancedScrollbarDragging;
+        private static readonly MethodInfo _MenuManager_PlayHighlightSound_Method = AccessTools.Method(typeof(MenuManager), "PlayHighlightSound");
         private static int previousSelection = -1;
 
-        private static int[] AdvancedRows()
+        private static bool IsTab(int microState)
         {
-            return MenuManager.mms_mode == ExtMatchMode.CTF ? advancedRowsCtf : advancedRowsOtherModes;
+            return Array.IndexOf(tabs, microState) >= 0;
         }
 
-        private static void DrawAdvancedRightColumn(UIElement uie, Vector2 position)
+        private static void DrawTabBar(UIElement uie)
         {
-            int[] rows = AdvancedRows();
-            int visibleRows = Math.Min(ADVANCED_VISIBLE_ROWS, rows.Length);
-            advancedScrollOffset = Mathf.Clamp(advancedScrollOffset, 0, rows.Length - visibleRows);
-            float firstRowY = position.y;
-            for (int i = advancedScrollOffset; i < advancedScrollOffset + visibleRows; i++)
+            UIElement.ToolTipActive = false;
+            Vector2 bar = new Vector2(0f, UIManager.UI_TOP + 85f);
+            float tabHalfWidth = tabNames.Max(name => UIManager.GetStringWidth(name, 12f)) * 0.5f + 4f;
+            float spacing = 2f * (tabHalfWidth + 16f) + 12f;
+            float barHalfWidth = (tabNames.Length - 1) * 0.5f * spacing + tabHalfWidth + 16f + 8f - 22f;
+            Menus_UIElement_DrawMpOptions.DrawTabs(uie, bar, Array.IndexOf(tabs, MenuManager.m_menu_micro_state), tabNames, TAB_SELECTION, spacing, tabHalfWidth, barHalfWidth);
+            uie.DrawMenuSeparator(bar + Vector2.up * 40f);
+        }
+
+        private static void DrawTabFooter(UIElement uie, float lastRowY)
+        {
+            Vector2 footer = new Vector2(0f, lastRowY + 40f);
+            uie.DrawMenuSeparator(footer);
+            uie.DrawMenuToolTip(footer);
+        }
+
+        private static void DrawRules(UIElement uie)
+        {
+            float leftBottom = DrawSettingsColumn(uie, new Vector2(-300f, TAB_CONTENT_TOP), rulesLeftRows, 1f, false);
+            float rightBottom = DrawSettingsColumn(uie, new Vector2(300f, TAB_CONTENT_TOP), rulesRightRows, 1f, false);
+            DrawTabFooter(uie, Math.Max(leftBottom, rightBottom));
+        }
+
+        private static float DrawSettingsColumn(UIElement uie, Vector2 position, int[] rows, float widthScale, bool withFooter = true)
+        {
+            for (int i = 0; i < rows.Length; i++)
             {
-                DrawAdvancedRow(uie, position, rows[i]);
-                position.y += ADVANCED_ROW_PITCH;
+                if (i > 0)
+                    position.y += ROW_PITCH;
+                DrawSettingRow(uie, position, rows[i], widthScale);
             }
-            if (rows.Length > visibleRows)
-                Menus.DrawScrollbar(uie, ref advancedScrollOffset, ref advancedScrollbarDragging, position.x + 300f, firstRowY, ADVANCED_ROW_PITCH, visibleRows, rows.Length);
+            if (withFooter)
+                DrawTabFooter(uie, position.y);
+            return position.y;
         }
 
-        private static void DrawAdvancedRow(UIElement uie, Vector2 position, int selection)
+        private static void DrawSettingRow(UIElement uie, Vector2 position, int selection, float widthScale)
         {
             switch (selection)
             {
+                case 0:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("SHOW ENEMY NAMES"), position, 0, MenuManager.GetMMSEnemyNames(), string.Empty, widthScale);
+                    break;
+                case 1:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("RESPAWN TIME"), position, 1, MenuManager.GetMMSRespawnTime(), Loc.LS("SECONDS AFTER EXPLODING BEFORE A PLAYER RESPAWNS"), widthScale, Menus.mms_scale_respawn_time);
+                    break;
+                case 2:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("RESPAWN SHIELD"), position, 2, MenuManager.GetMMSRespawnShield(), Loc.LS("SECONDS A PLAYER IS INVULNERABLE WHEN RESPAWNING"), widthScale, MenuManager.mms_mode == MatchMode.MONSTERBALL);
+                    break;
+                case 3:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("FRIENDLY FIRE"), position, 3, MenuManager.GetMMSFriendlyFire(), string.Empty, widthScale, MenuManager.mms_mode == MatchMode.ANARCHY);
+                    break;
+                case 6:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("TURN SPEED LIMITING"), position, 6, MenuManager.GetMMSTurnSpeedLimit(), Loc.LS("ABSOLUTE LIMIT OF PITCH AND YAW ROTATION SPEED (ALL CONTROL TYPES)"), widthScale);
+                    break;
+                case 7:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW JOIN IN PROGRESS"), position, 7,
+                        MenuManager.GetToggleSetting(MPJoinInProgress.MenuManagerEnabled || MPJoinInProgress.SingleMatchEnable ? 1 : 0),
+                        Loc.LS("ALLOW PLAYERS TO JOIN MATCH AFTER IT HAS STARTED"), widthScale, !MenuManager.m_mp_lan_match || MPJoinInProgress.SingleMatchEnable);
+                    break;
+                case 8:
+                    uie.SelectAndDrawStringOptionItem("TEAM COUNT", position, 8, MPTeams.MenuManagerTeamCount.ToString(), string.Empty, widthScale,
+                        MenuManager.mms_mode == MatchMode.ANARCHY || !MenuManager.m_mp_lan_match);
+                    break;
+                case 10:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("SUDDEN DEATH OVERTIME"), position, 10, MenuManager.GetToggleSetting(Convert.ToInt32(MPSuddenDeath.SuddenDeathMenuEnabled)), string.Empty, widthScale, MenuManager.mms_mode != MatchMode.NUM);
+                    break;
                 case 11:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW REAR VIEW CAMERA"), position, 11, Menus.GetMMSRearViewPIP(), Loc.LS("CLIENTS CAN CHOOSE TO HAVE REAR VIEW"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW REAR VIEW CAMERA"), position, 11, Menus.GetMMSRearViewPIP(), Loc.LS("CLIENTS CAN CHOOSE TO HAVE REAR VIEW"), widthScale);
+                    break;
+                case 12:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("SCALE RESPAWN TO TEAM SIZE"), position, 12, Menus.GetMMSScaleRespawnTime(), Loc.LS("AUTOMATICALLY SCALE RESPAWN TIME TO TEAM SIZE (e.g. 4 = 4 seconds)"), widthScale,
+                        !(MenuManager.mms_mode == ExtMatchMode.TEAM_ANARCHY || MenuManager.mms_mode == ExtMatchMode.CTF || MenuManager.mms_mode == ExtMatchMode.MONSTERBALL));
                     break;
                 case 13:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("CLASSIC SPAWNS"), position, 13, Menus.GetMMSClassicSpawns(), Loc.LS("SPAWN WITH IMPULSE+ DUALS AND FALCONS"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("CLASSIC SPAWNS"), position, 13, Menus.GetMMSClassicSpawns(), Loc.LS("SPAWN WITH IMPULSE+ DUALS AND FALCONS"), widthScale);
                     break;
                 case 14:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("CTF CARRIER BOOSTING"), position, 14, Menus.GetMMSCtfCarrierBoost(), Loc.LS("FLAG CARRIER CAN USE BOOST IN CTF"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("CTF CARRIER BOOSTING"), position, 14, Menus.GetMMSCtfCarrierBoost(), Loc.LS("FLAG CARRIER CAN USE BOOST IN CTF"), widthScale, MenuManager.mms_mode != ExtMatchMode.CTF);
                     break;
                 case 15:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("ALWAYS CLOAKED"), position, 15, Menus.GetMMSAlwaysCloaked(), Loc.LS("SHIPS ARE ALWAYS CLOAKED"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("ALWAYS CLOAKED"), position, 15, Menus.GetMMSAlwaysCloaked(), Loc.LS("SHIPS ARE ALWAYS CLOAKED"), widthScale);
                     break;
                 case 16:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("PROJECTILE DATA"), position, 16, Menus.mms_mp_projdata_fn == "STOCK" ? "STOCK" : Path.GetFileName(Menus.mms_mp_projdata_fn), string.Empty, 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("PROJECTILE DATA"), position, 16, Menus.mms_mp_projdata_fn == "STOCK" ? "STOCK" : Path.GetFileName(Menus.mms_mp_projdata_fn), string.Empty, widthScale);
                     break;
                 case 17:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW SMASH ATTACK"), position, 17, Menus.GetMMSAllowSmash(), Loc.LS("ALLOWS PLAYERS TO USE THE SMASH ATTACK"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW SMASH ATTACK"), position, 17, Menus.GetMMSAllowSmash(), Loc.LS("ALLOWS PLAYERS TO USE THE SMASH ATTACK"), widthScale);
                     break;
                 case 18:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("ASSISTS"), position, 18, Menus.GetMMSAssistScoring(), Loc.LS("AWARD POINTS FOR ASSISTING WITH KILLS"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("ASSISTS"), position, 18, Menus.GetMMSAssistScoring(), Loc.LS("AWARD POINTS FOR ASSISTING WITH KILLS"), widthScale, MenuManager.mms_mode == ExtMatchMode.CTF);
                     break;
                 case 20:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("TB PENETRATION"), position, 20, MPThunderboltPassthrough.isAllowed ? "ON" : "OFF", Loc.LS("ALLOWS THUNDERBOLT SHOTS TO PENETRATE SHIPS"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("TB PENETRATION"), position, 20, MPThunderboltPassthrough.isAllowed ? "ON" : "OFF", Loc.LS("ALLOWS THUNDERBOLT SHOTS TO PENETRATE SHIPS"), widthScale);
                     break;
                 case 21:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("DAMAGE NUMBERS"), position, 21, Menus.GetMMSDamageNumbers(), Loc.LS("SHOWS THE DAMAGE YOU DO TO OTHER SHIPS"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("DAMAGE NUMBERS"), position, 21, Menus.GetMMSDamageNumbers(), Loc.LS("SHOWS THE DAMAGE YOU DO TO OTHER SHIPS"), widthScale);
                     break;
                 case 22:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("COLLISION MESH"), position, 22, Menus.GetMMSCollisionMesh(), Loc.LS("COLLIDER TO USE FOR PROJECTILE->SHIP COLLISIONS"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("COLLISION MESH"), position, 22, Menus.GetMMSCollisionMesh(), Loc.LS("COLLIDER TO USE FOR PROJECTILE->SHIP COLLISIONS"), widthScale);
                     break;
                 case 23:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("CLIENT-SIDE PHYSICS"), position, 23, MPServerOptimization.prefEnabled ? "ENABLED" : "DISABLED", Loc.LS("ALLOWS CLIENTS TO PASS PRE-PROCESSED PHYSICS RATHER THAN RESIMULATING INPUTS ON THE SERVER"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("CLIENT-SIDE PHYSICS"), position, 23, MPServerOptimization.prefEnabled ? "ENABLED" : "DISABLED", Loc.LS("ALLOWS CLIENTS TO PASS PRE-PROCESSED PHYSICS RATHER THAN RESIMULATING INPUTS ON THE SERVER"), widthScale);
                     break;
                 case 24:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("ROLL SPEED LIMIT"), position, 24, "+" + (MPServerOptimization.RollSpeedLimit - 3), Loc.LS("MAXIMUM ROLL SPEED MODIFIER TO ALLOW FOR THIS ROUND"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("ROLL SPEED LIMIT"), position, 24, "+" + (MPServerOptimization.RollSpeedLimit - 3), Loc.LS("MAXIMUM ROLL SPEED MODIFIER TO ALLOW FOR THIS ROUND"), widthScale);
                     break;
                 case 25:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("DESTRUCTIBLE MISSILES"), position, 25, Menus.GetMMSDestructibleMissiles(), Loc.LS("ALLOWS MISSILES TO BE SHOT DOWN IN FLIGHT"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("DESTRUCTIBLE MISSILES"), position, 25, Menus.GetMMSDestructibleMissiles(), Loc.LS("ALLOWS MISSILES TO BE SHOT DOWN IN FLIGHT"), widthScale);
                     break;
                 case 26:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("FIRE WHILE BOOSTING"), position, 26, Menus.GetMMSBoostFire(), Loc.LS("ALLOWS PLAYERS TO FIRE WEAPONS AND MISSILES WHILE BOOSTING"), 1f);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("FIRE WHILE BOOSTING"), position, 26, Menus.GetMMSBoostFire(), Loc.LS("ALLOWS PLAYERS TO FIRE WEAPONS AND MISSILES WHILE BOOSTING"), widthScale);
                     break;
                 case 27:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("INSTAREAP"), position, 27, Menus.GetMMSInstareap(), Loc.LS("EVERY SHIP CARRIES ONLY A MASSDRIVER THAT KILLS IN ONE HIT, NO PICKUPS"), 1f, MenuManager.mms_mode == ExtMatchMode.RACE);
-                    break;
-                case 28:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("MASSDRIVER RAPID FIRE"), position, 28, Menus.GetMMSInstareapRapidFire(), Loc.LS("INSTAREAP WITHOUT THE MASSDRIVER COOLDOWN, EVERY SHOT STILL PUSHES YOU BACK AND SHAKES YOUR AIM"), 1f, !Menus.mms_instareap || MenuManager.mms_mode == ExtMatchMode.RACE);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("INSTAREAP"), position, 27, Menus.GetMMSInstareap(), Loc.LS("EVERY SHIP CARRIES ONLY A MASSDRIVER THAT KILLS IN ONE HIT, NO PICKUPS"), widthScale, MenuManager.mms_mode == ExtMatchMode.RACE);
                     break;
                 case 32:
-                    uie.SelectAndDrawStringOptionItem(Loc.LS("HUMANS REPLACE BOTS"), position, 32, MenuManager.GetToggleSetting(Bots.BotSettingsPage.Settings.ReplaceWithHumans ? 1 : 0), Loc.LS("A JOINING PLAYER TAKES THE PLACE OF A BOT, A LEAVING PLAYER BRINGS IT BACK"), 1f, !Bots.BotSettingsPage.Settings.Enabled);
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("BOTS AUTOMATIC LEAVE"), position, 32, MenuManager.GetToggleSetting(Bots.BotSettingsPage.Settings.ReplaceWithHumans ? 1 : 0),
+                        Loc.LS("IF SET THEN EVERYTIME A PLAYER JOINS/LEAVES ONE BOT LEAVES/JOINS"), widthScale, !Bots.BotSettingsPage.Settings.Enabled);
                     break;
-            }
-        }
-
-        private static void ScrollAdvancedRightColumn()
-        {
-            int[] rows = AdvancedRows();
-            float wheel = Input.GetAxis("Mouse ScrollWheel");
-            if (wheel != 0f)
-                advancedScrollOffset = Math.Max(0, advancedScrollOffset + (wheel < 0f ? 1 : -1));
-
-            int selectedRow = Array.IndexOf(rows, previousSelection);
-            if (selectedRow < 0 || !Controls.JustPressedMenuDirection())
-                return;
-            int visibleRows = Math.Min(ADVANCED_VISIBLE_ROWS, rows.Length);
-            float menuDirectionY = Controls.MenuDirection().y;
-            if (menuDirectionY > 0.45f && selectedRow == advancedScrollOffset + visibleRows - 1 && selectedRow + 1 < rows.Length)
-            {
-                advancedScrollOffset++;
-                SelectRow(rows[selectedRow + 1]);
-            }
-            else if (menuDirectionY < -0.45f && selectedRow == advancedScrollOffset && advancedScrollOffset > 0)
-            {
-                advancedScrollOffset--;
-                SelectRow(rows[selectedRow - 1]);
+                case 28:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("MASSDRIVER RAPID FIRE"), position, 28, Menus.GetMMSInstareapRapidFire(), Loc.LS("INSTAREAP WITHOUT THE MASSDRIVER COOLDOWN, EVERY SHOT STILL PUSHES YOU BACK AND SHAKES YOUR AIM"), widthScale, !Menus.mms_instareap || MenuManager.mms_mode == ExtMatchMode.RACE);
+                    break;
             }
         }
 
@@ -320,97 +328,62 @@ namespace GameMod
                 MenuManager.PlayMoveSound();
         }
 
-        private static void DrawTeamSettings(UIElement uie, Vector2 position)
+        private static void DrawPowerupSettings(UIElement uie)
         {
-            uie.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("TEAM SETTINGS"), 250f);
-            position.y -= 280f;
-            uie.DrawMenuSeparator(position);
-            position.y += 40f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("FRIENDLY FIRE"), position, 3, MenuManager.GetMMSFriendlyFire(), string.Empty, 1.5f, MenuManager.mms_mode == MatchMode.ANARCHY);
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem("TEAM COUNT", position, 8, MPTeams.MenuManagerTeamCount.ToString(), string.Empty, 1.5f,
-                MenuManager.mms_mode == MatchMode.ANARCHY || !MenuManager.m_mp_lan_match);
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("SCALE RESPAWN TO TEAM SIZE"), position, 12, Menus.GetMMSScaleRespawnTime(), Loc.LS("AUTOMATICALLY SCALE RESPAWN TIME TO TEAM SIZE (e.g. 4 = 4 seconds)"), 1.5f,
-                !(MenuManager.mms_mode == ExtMatchMode.TEAM_ANARCHY || MenuManager.mms_mode == ExtMatchMode.CTF || MenuManager.mms_mode == ExtMatchMode.MONSTERBALL));
-        }
+            bool isMonsterball = MenuManager.mms_mode == MatchMode.MONSTERBALL;
+            Vector2 position = new Vector2(0f, TAB_CONTENT_TOP);
+            uie.SelectAndDrawStringOptionItem(Loc.LS("OVERALL FREQUENCY"), position, 40, MenuManager.GetMMSPowerupSpawn(), Loc.LS("HOW OFTEN POWERUPS AND SECONDARIES SPAWN"), 1.5f, isMonsterball);
+            position.y += ROW_PITCH;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("INITIAL SECONDARIES"), position, 41, MenuManager.GetMMSPowerupInitial(), Loc.LS("HOW MANY SECONDARIES SPAWN AT THE START OF THE MATCH"), 1.5f, isMonsterball);
+            position.y += ROW_PITCH;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("SUPER FREQUENCY"), position, 42, MenuManager.GetMMSPowerupBigSpawn(), Loc.LS("HOW OFTEN SUPER POWERUPS WILL SPAWN"), 1.5f, isMonsterball);
 
-        private static void DrawPowerupSettings(UIElement uie, Vector2 position)
-        {
-            uie.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("POWERUP SETTINGS"), 250f);
-            UIElement.ToolTipActive = false;
-            position.y -= 93f;
-            uie.DrawMenuSeparator(position - Vector2.up * 40f);
-            uie.SelectAndDrawStringOptionItem(Loc.LS("OVERALL FREQUENCY"), position, 0, MenuManager.GetMMSPowerupSpawn(), Loc.LS("HOW OFTEN POWERUPS AND SECONDARIES SPAWN"), 1.5f, MenuManager.mms_mode == MatchMode.MONSTERBALL);
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("INITIAL SECONDARIES"), position, 1, MenuManager.GetMMSPowerupInitial(), Loc.LS("HOW MANY SECONDARIES SPAWN AT THE START OF THE MATCH"), 1.5f, MenuManager.mms_mode == MatchMode.MONSTERBALL);
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("SUPER FREQUENCY"), position, 2, MenuManager.GetMMSPowerupBigSpawn(), Loc.LS("HOW OFTEN SUPER POWERUPS WILL SPAWN"), 1.5f, MenuManager.mms_mode == MatchMode.MONSTERBALL);
-            position.y += 62f;
-            uie.SelectAndDrawItem(Loc.LS("ALLOWED POWERUPS"), position, 4, false);
-            uie.DrawMenuSeparator(position + Vector2.up * 40f);
-            uie.DrawMenuToolTip(position + Vector2.up * 40f);
-        }
-
-        private static void DrawLoadoutSettings(UIElement uie, Vector2 position)
-        {
-            uie.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("LOADOUT SETTINGS"), 250f);
-            UIElement.ToolTipActive = false;
-            position.y -= 270f;
-            uie.DrawMenuSeparator(position - Vector2.up * 19f);
-            position.y += 12f;
-            uie.SelectAndDrawItem("ALLOWED LOADOUT WEAPONS", position, 23, false);
-            position.y += 62f;
-            uie.SelectAndDrawItem("ALLOWED MODIFIERS", position, 8, false);
-            position.y += 31f;
-            uie.DrawMenuSeparator(position);
-            position.y += 31f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("USE CUSTOM LOADOUT"), position, 0, MenuManager.GetToggleSetting(MenuManager.mms_force_loadout), Loc.LS("FORCE ALL PLAYERS TO START WITH IDENTICAL WEAPONS"));
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM WEAPON 1"), position, 1, MenuManager.GetMMSForceWeapon(MenuManager.mms_force_w1), string.Empty, 1.5f, MenuManager.mms_force_loadout == 0);
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM WEAPON 2"), position, 2, MenuManager.GetMMSForceWeapon(MenuManager.mms_force_w2), string.Empty, 1.5f, MenuManager.mms_force_loadout == 0);
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM MISSILE 1"), position, 3, MenuManager.GetMMSForceMissile(MenuManager.mms_force_m1), string.Empty, 1.5f, MenuManager.mms_force_loadout == 0);
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM MISSILE 2"), position, 4, MenuManager.GetMMSForceMissile(MenuManager.mms_force_m2), string.Empty, 1.5f, MenuManager.mms_force_loadout == 0);
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM MODIFIER 1"), position, 5, MenuManager.GetMMSCustomModifier1(), Loc.LS("FORCE ALL PLAYERS TO USE A SPECIFIC MODIFIER"));
-            position.y += 62f;
-            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM MODIFIER 2"), position, 6, MenuManager.GetMMSCustomModifier2(), Loc.LS("FORCE ALL PLAYERS TO USE A SPECIFIC MODIFIER"));
-            uie.DrawMenuSeparator(position + Vector2.up * 40f);
-            uie.DrawMenuToolTip(position + Vector2.up * 40f);
-        }
-
-        private static void DrawAllowedPowerups(UIElement uie, Vector2 position)
-        {
-            uie.DrawLabelSmall(Vector2.up * (UIManager.UI_TOP + 70f), Loc.LS("ALLOWED POWERUPS"), 250f);
-            position.y = -133f;
-            uie.DrawMenuSeparator(position - Vector2.up * 40f);
-            position.y += 40f;
-            uie.DrawSmallHeader1(position - Vector2.up * 51f, Loc.LS("PRIMARY WEAPONS"), 300f);
-            for (int i = 0; i < 8; i++)
-            {
-                if (i == 4)
-                    position.y += 62f;
-                int column = i % 4;
-                uie.SelectAndDrawCheckboxItem(Player.GetWeaponNameNoDefault((WeaponType)i), position + Vector2.right * ((column - 1.5f) * 320f), i, MenuManager.mms_powerup_filter[i], false, 0.5f);
-            }
-            position.y += 62f;
-            position.y += 40f;
-            uie.DrawSmallHeader1(position - Vector2.up * 51f, Loc.LS("SECONDARY WEAPONS"), 300f);
-            for (int i = 0; i < 8; i++)
-            {
-                if (i == 4)
-                    position.y += 62f;
-                int column = i % 4;
-                uie.SelectAndDrawCheckboxItem(Player.GetMissileNameNoDefault((MissileType)i), position + Vector2.right * ((column - 1.5f) * 320f), i + 8, MenuManager.mms_powerup_filter[i + 8], false, 0.5f);
-            }
-            uie.DrawMenuSeparator(position + Vector2.up * 40f);
-            position.y += 80.6f;
-            uie.SelectAndDrawHalfItem2("ALLOWED LOADOUTS", new Vector2(-473f, 214f), 30, false);
+            position.y += 103f;
+            uie.DrawSmallHeader1(position - Vector2.up * 44f, Loc.LS("ALLOWED PRIMARY WEAPONS"), 300f);
+            DrawPowerupCheckboxes(uie, ref position, 0, i => Player.GetWeaponNameNoDefault((WeaponType)i));
+            position.y += 92f;
+            uie.DrawSmallHeader1(position - Vector2.up * 44f, Loc.LS("ALLOWED SECONDARY WEAPONS"), 300f);
+            DrawPowerupCheckboxes(uie, ref position, 8, i => Player.GetMissileNameNoDefault((MissileType)i));
+            position.y += 58f;
             uie.SelectAndDrawHalfItem2(Loc.LS("CLEAR"), position - Vector2.right * 160f, 20, false);
             uie.SelectAndDrawHalfItem2(Loc.LS("RESET"), position + Vector2.right * 160f, 21, false);
+            DrawTabFooter(uie, position.y);
+        }
+
+        private static void DrawPowerupCheckboxes(UIElement uie, ref Vector2 position, int firstSelection, Func<int, string> name)
+        {
+            for (int i = 0; i < 8; i++)
+            {
+                if (i == 4)
+                    position.y += 52f;
+                int column = i % 4;
+                uie.SelectAndDrawCheckboxItem(name(i), position + Vector2.right * ((column - 1.5f) * 320f), firstSelection + i, MenuManager.mms_powerup_filter[firstSelection + i], false, 0.5f);
+            }
+        }
+
+        private static void DrawLoadoutSettings(UIElement uie)
+        {
+            bool isFree = MenuManager.mms_force_loadout == 0;
+            Vector2 position = new Vector2(0f, TAB_CONTENT_TOP);
+            uie.SelectAndDrawItem("ALLOWED LOADOUT WEAPONS", position - Vector2.right * 280f, 23, false, 0.9f, 0.6f);
+            uie.SelectAndDrawItem("ALLOWED MODIFIERS", position + Vector2.right * 280f, 8, false, 0.9f, 0.6f);
+            position.y += 40f;
+            uie.DrawMenuSeparator(position);
+            position.y += 40f;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("USE CUSTOM LOADOUT"), position, 0, MenuManager.GetToggleSetting(MenuManager.mms_force_loadout), Loc.LS("FORCE ALL PLAYERS TO START WITH IDENTICAL WEAPONS"));
+            position.y += ROW_PITCH;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM WEAPON 1"), position, 1, MenuManager.GetMMSForceWeapon(MenuManager.mms_force_w1), string.Empty, 1.5f, isFree);
+            position.y += ROW_PITCH;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM WEAPON 2"), position, 2, MenuManager.GetMMSForceWeapon(MenuManager.mms_force_w2), string.Empty, 1.5f, isFree);
+            position.y += ROW_PITCH;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM MISSILE 1"), position, 3, MenuManager.GetMMSForceMissile(MenuManager.mms_force_m1), string.Empty, 1.5f, isFree);
+            position.y += ROW_PITCH;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM MISSILE 2"), position, 4, MenuManager.GetMMSForceMissile(MenuManager.mms_force_m2), string.Empty, 1.5f, isFree);
+            position.y += ROW_PITCH;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM MODIFIER 1"), position, 5, MenuManager.GetMMSCustomModifier1(), Loc.LS("FORCE ALL PLAYERS TO USE A SPECIFIC MODIFIER"));
+            position.y += ROW_PITCH;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("CUSTOM MODIFIER 2"), position, 6, MenuManager.GetMMSCustomModifier2(), Loc.LS("FORCE ALL PLAYERS TO USE A SPECIFIC MODIFIER"));
+            DrawTabFooter(uie, position.y);
         }
 
         public static void Update(bool online, ref float menuStateTimer)
@@ -469,8 +442,14 @@ namespace GameMod
                             break;
                     }
                     UIManager.ControllerMenu();
-                    if (MenuManager.m_menu_micro_state == 3)
-                        ScrollAdvancedRightColumn();
+                    if (IsTab(MenuManager.m_menu_micro_state))
+                    {
+                        int tab = Array.IndexOf(tabs, MenuManager.m_menu_micro_state);
+                        if (Controls.JustPressed(CCInput.MENU_PGUP))
+                            OpenTab((tab + tabs.Length - 1) % tabs.Length);
+                        else if (Controls.JustPressed(CCInput.MENU_PGDN))
+                            OpenTab((tab + 1) % tabs.Length);
+                    }
                     if (MenuManager.m_menu_micro_state == Bots.BotSettingsPage.MICRO_STATE)
                     {
                         int row = Bots.BotSettingsPage.ScrollWithSelection(previousSelection);
@@ -536,6 +515,21 @@ namespace GameMod
         private static void SelectOnCurrentPage(bool online, ref float menuStateTimer)
         {
             int selection = UIManager.m_menu_selection;
+            if (IsTab(MenuManager.m_menu_micro_state))
+            {
+                if (selection >= TAB_SELECTION && selection < TAB_SELECTION + tabs.Length)
+                {
+                    OpenTab(selection - TAB_SELECTION);
+                    return;
+                }
+                if (selection == 100)
+                {
+                    Bots.BotSettingsPage.StopEditing();
+                    MenuManager.SetDefaultSelection(7);
+                    GoToPage(2);
+                    return;
+                }
+            }
             switch (MenuManager.m_menu_micro_state)
             {
                 case 0:
@@ -568,63 +562,16 @@ namespace GameMod
                 case 2:
                     SelectOnMatchSettings(online, selection);
                     break;
-                case 3:
-                    SelectOnAdvancedSettings(selection);
+                case TAB_RULES:
+                case TAB_TEAMS:
+                case TAB_SERVER:
+                    SelectOnSettingsTab(selection);
                     break;
-                case 5:
-                    switch (selection)
-                    {
-                        case 0:
-                            MenuManager.mms_powerup_spawn = (MenuManager.mms_powerup_spawn + 4 + UIManager.m_select_dir) % 4;
-                            PlayCycleSound();
-                            break;
-                        case 1:
-                            MenuManager.mms_powerup_initial = (MenuManager.mms_powerup_initial + 4 + UIManager.m_select_dir) % 4;
-                            PlayCycleSound();
-                            break;
-                        case 2:
-                            MenuManager.mms_powerup_big_spawn = (MenuManager.mms_powerup_big_spawn + 4 + UIManager.m_select_dir) % 4;
-                            PlayCycleSound();
-                            break;
-                        case 4:
-                            MenuManager.SetDefaultSelection(100);
-                            GoToPage(7);
-                            break;
-                        case 100:
-                            GoToPage(3);
-                            break;
-                    }
+                case TAB_POWERUPS:
+                    SelectOnPowerupSettings(selection);
                     break;
-                case 6:
+                case TAB_LOADOUTS:
                     SelectOnLoadoutSettings(selection);
-                    break;
-                case 7:
-                    switch (selection)
-                    {
-                        case 20:
-                            for (int i = 0; i < MenuManager.mms_powerup_filter.Length; i++)
-                                MenuManager.mms_powerup_filter[i] = false;
-                            MenuManager.PlaySelectSound();
-                            break;
-                        case 21:
-                            for (int i = 0; i < MenuManager.mms_powerup_filter.Length; i++)
-                                MenuManager.mms_powerup_filter[i] = true;
-                            MenuManager.PlaySelectSound();
-                            break;
-                        case 30:
-                            GoToPage(15);
-                            break;
-                        case 100:
-                            GoToPage(5);
-                            break;
-                        default:
-                            if (selection < MenuManager.mms_powerup_filter.Length)
-                            {
-                                MenuManager.mms_powerup_filter[selection] = !MenuManager.mms_powerup_filter[selection];
-                                MenuManager.PlayCycleSound();
-                            }
-                            break;
-                    }
                     break;
                 case 9:
                     if (selection == 100)
@@ -632,21 +579,12 @@ namespace GameMod
                     else
                         MPModifiers.SelectOnAllowedModifiersPage(selection);
                     break;
-                case 10:
-                    SelectOnTeamSettings(selection);
-                    break;
                 case Bots.BotSettingsPage.MICRO_STATE:
-                    if (selection == 100)
-                    {
-                        Bots.BotSettingsPage.StopEditing();
-                        GoToPage(3);
-                    }
-                    else
-                        Bots.BotSettingsPage.Select(selection);
+                    Bots.BotSettingsPage.Select(selection);
                     break;
                 case 15:
                     if (selection == 22)
-                        GoToPage(7);
+                        OpenTab(Array.IndexOf(tabs, TAB_POWERUPS));
                     else if (selection == 100)
                         GoToPage(6);
                     else
@@ -753,7 +691,7 @@ namespace GameMod
                     break;
                 case 6:
                     MenuManager.SetDefaultSelection(0);
-                    GoToPage(3);
+                    GoToPage(TAB_RULES);
                     break;
                 case 7:
                     if (MenuManager.m_updating_pm_settings)
@@ -813,7 +751,7 @@ namespace GameMod
             }
         }
 
-        private static void SelectOnAdvancedSettings(int selection)
+        private static void SelectOnSettingsTab(int selection)
         {
             switch (selection)
             {
@@ -828,14 +766,6 @@ namespace GameMod
                 case 2:
                     MenuManager.mms_respawn_invuln = Mathf.Clamp(MenuManager.mms_respawn_invuln + UIManager.m_select_dir, 0, 5);
                     PlayCycleSound();
-                    break;
-                case 4:
-                    MenuManager.SetDefaultSelection(0);
-                    GoToPage(5);
-                    break;
-                case 5:
-                    MenuManager.SetDefaultSelection(0);
-                    GoToPage(6);
                     break;
                 case 6:
                     MenuManager.mms_turn_speed_limit = (MenuManager.mms_turn_speed_limit + 5 - UIManager.m_select_dir) % 5;
@@ -882,19 +812,6 @@ namespace GameMod
                     Menus.mms_assist_scoring = !Menus.mms_assist_scoring;
                     PlayCycleSound();
                     break;
-                case 19:
-                    GoToPage(10);
-                    break;
-                case 29:
-                    Bots.BotSettingsPage.Open();
-                    GoToPage(Bots.BotSettingsPage.MICRO_STATE);
-                    break;
-                case 32:
-                    if (!Bots.BotSettingsPage.Settings.Enabled)
-                        break;
-                    Bots.BotSettingsPage.Settings.ReplaceWithHumans = !Bots.BotSettingsPage.Settings.ReplaceWithHumans;
-                    PlayCycleSound();
-                    break;
                 case 20:
                     MPThunderboltPassthrough.isAllowed = !MPThunderboltPassthrough.isAllowed;
                     PlayCycleSound();
@@ -933,24 +850,12 @@ namespace GameMod
                     Menus.mms_instareap_rapid_fire = !Menus.mms_instareap_rapid_fire;
                     PlayCycleSound();
                     break;
-                case 100:
-                    MenuManager.SetDefaultSelection(7);
-                    GoToPage(2);
+                case 32:
+                    if (!Bots.BotSettingsPage.Settings.Enabled)
+                        break;
+                    Bots.BotSettingsPage.Settings.ReplaceWithHumans = !Bots.BotSettingsPage.Settings.ReplaceWithHumans;
+                    PlayCycleSound();
                     break;
-            }
-        }
-
-        private static string NextProjdataFile(string current)
-        {
-            string[] files = new string[] { "STOCK" }.AddRangeToArray(Directory.GetFiles(Config.OLModDir, "projdata-*.txt"));
-            int index = Array.IndexOf(files, current);
-            return index < 0 ? current : files[(index + 1) % files.Length];
-        }
-
-        private static void SelectOnTeamSettings(int selection)
-        {
-            switch (selection)
-            {
                 case 3:
                     MenuManager.mms_friendly_fire = 1 - MenuManager.mms_friendly_fire;
                     MenuManager.PlayCycleSound(1f, 1f);
@@ -964,8 +869,44 @@ namespace GameMod
                     Menus.mms_scale_respawn_time = !Menus.mms_scale_respawn_time;
                     PlayCycleSound();
                     break;
-                case 100:
-                    GoToPage(3);
+            }
+        }
+
+        private static string NextProjdataFile(string current)
+        {
+            string[] files = new string[] { "STOCK" }.AddRangeToArray(Directory.GetFiles(Config.OLModDir, "projdata-*.txt"));
+            int index = Array.IndexOf(files, current);
+            return index < 0 ? current : files[(index + 1) % files.Length];
+        }
+
+        private static void SelectOnPowerupSettings(int selection)
+        {
+            switch (selection)
+            {
+                case 40:
+                    MenuManager.mms_powerup_spawn = (MenuManager.mms_powerup_spawn + 4 + UIManager.m_select_dir) % 4;
+                    PlayCycleSound();
+                    break;
+                case 41:
+                    MenuManager.mms_powerup_initial = (MenuManager.mms_powerup_initial + 4 + UIManager.m_select_dir) % 4;
+                    PlayCycleSound();
+                    break;
+                case 42:
+                    MenuManager.mms_powerup_big_spawn = (MenuManager.mms_powerup_big_spawn + 4 + UIManager.m_select_dir) % 4;
+                    PlayCycleSound();
+                    break;
+                case 20:
+                case 21:
+                    for (int i = 0; i < MenuManager.mms_powerup_filter.Length; i++)
+                        MenuManager.mms_powerup_filter[i] = selection == 21;
+                    MenuManager.PlaySelectSound();
+                    break;
+                default:
+                    if (selection >= 0 && selection < MenuManager.mms_powerup_filter.Length)
+                    {
+                        MenuManager.mms_powerup_filter[selection] = !MenuManager.mms_powerup_filter[selection];
+                        MenuManager.PlayCycleSound();
+                    }
                     break;
             }
         }
@@ -1016,10 +957,19 @@ namespace GameMod
                 case 23:
                     GoToPage(15);
                     break;
-                case 100:
-                    GoToPage(3);
-                    break;
             }
+        }
+
+        private static void OpenTab(int tab)
+        {
+            if (MenuManager.m_menu_micro_state == Bots.BotSettingsPage.MICRO_STATE)
+                Bots.BotSettingsPage.StopEditing();
+            MenuManager.m_menu_micro_state = tabs[tab];
+            if (tabs[tab] == Bots.BotSettingsPage.MICRO_STATE)
+                Bots.BotSettingsPage.Open();
+            UIManager.m_menu_selection = TAB_SELECTION + tab;
+            MenuManager.UIPulse(1f);
+            _MenuManager_PlayHighlightSound_Method.Invoke(null, new object[] { 0.4f, 0.07f });
         }
 
         private static void GoToPage(int microState)
