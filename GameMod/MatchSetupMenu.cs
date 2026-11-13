@@ -62,7 +62,7 @@ namespace GameMod
                     MPLoadouts.DrawAllowedLoadoutsPage(uie);
                     break;
                 case Bots.BotSettingsPage.MICRO_STATE:
-                    Bots.BotSettingsPage.Draw(uie, position);
+                    Bots.BotSettingsPage.Draw(uie);
                     break;
             }
 
@@ -121,27 +121,29 @@ namespace GameMod
             position.y -= 277f;
             uie.DrawMenuSeparator(position - Vector2.up * 40f);
             uie.SelectAndDrawStringOptionItem("MATCH PRESET", position, 9, MPMatchPresets.GetMatchPreset(), "PRECONFIGURED SETTINGS FOR MATCHES");
-            position.y += 62f;
+            position.y += 55f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("GAME MODE"), position, 0, MenuManager.GetMMSGameMode());
-            position.y += 62f;
+            position.y += 55f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("MAX PLAYERS"), position, 1, MenuManager.GetMMSNumPlayers());
-            position.y += 62f;
+            position.y += 55f;
+            uie.SelectAndDrawStringOptionItem(Loc.LS("BOTS"), position, 31, MenuManager.GetToggleSetting(Bots.BotSettingsPage.Settings.Enabled ? 1 : 0), Loc.LS("THE SERVER ADDS THE BOTS FROM BOT SETTINGS TO THE MATCH"));
+            position.y += 55f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("LEVEL"), position, 2, MenuManager.GetMMSLevel());
-            position.y += 62f;
+            position.y += 55f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("TIME LIMIT"), position, 4, MenuManager.GetMMSTimeLimit());
-            position.y += 62f;
+            position.y += 55f;
             uie.SelectAndDrawStringOptionItem(Loc.LS("SCORE LIMIT"), position, 5, MenuManager.GetMMSScoreLimit());
-            position.y += 62f;
+            position.y += 55f;
             if (MenuManager.mms_mode == ExtMatchMode.RACE)
             {
                 string lapLimit = ExtMenuManager.mms_ext_lap_limit == 0 ? "NONE" : ExtMenuManager.mms_ext_lap_limit.ToString();
                 uie.SelectAndDrawStringOptionItem("LAP LIMIT", position, 10, lapLimit);
             }
-            position.y += 62f;
+            position.y += 55f;
             MPServerBrowser.DrawMatchNotes(uie, position);
-            position.y += 62f;
+            position.y += 55f;
             uie.SelectAndDrawItem(Loc.LS("ADVANCED SETTINGS"), position, 6, false);
-            position.y += 62f;
+            position.y += 55f;
             if (MenuManager.m_updating_pm_settings)
                 uie.SelectAndDrawItemOutline(Loc.LS("APPLY SETTINGS"), position, 7, false);
             else
@@ -170,29 +172,28 @@ namespace GameMod
             Vector2 left = position + new Vector2(-300f, -250f);
             uie.DrawMenuSeparator(left - Vector2.up * 40f);
             uie.SelectAndDrawStringOptionItem(Loc.LS("SHOW ENEMY NAMES"), left, 0, MenuManager.GetMMSEnemyNames(), string.Empty, 1f);
-            left.y += 62f;
+            left.y += ADVANCED_ROW_PITCH;
             uie.SelectAndDrawStringOptionItem(Loc.LS("RESPAWN TIME"), left, 1, MenuManager.GetMMSRespawnTime(), Loc.LS("SECONDS AFTER EXPLODING BEFORE A PLAYER RESPAWNS"), 1f, Menus.mms_scale_respawn_time);
-            left.y += 62f;
+            left.y += ADVANCED_ROW_PITCH;
             uie.SelectAndDrawStringOptionItem(Loc.LS("RESPAWN SHIELD"), left, 2, MenuManager.GetMMSRespawnShield(), Loc.LS("SECONDS A PLAYER IS INVULNERABLE WHEN RESPAWNING"), 1f, MenuManager.mms_mode == MatchMode.MONSTERBALL);
-            left.y += 62f;
+            left.y += ADVANCED_ROW_PITCH;
             uie.SelectAndDrawStringOptionItem(Loc.LS("TURN SPEED LIMITING"), left, 6, MenuManager.GetMMSTurnSpeedLimit(), Loc.LS("ABSOLUTE LIMIT OF PITCH AND YAW ROTATION SPEED (ALL CONTROL TYPES)"), 1f);
-            left.y += 62f;
+            left.y += ADVANCED_ROW_PITCH;
             uie.SelectAndDrawStringOptionItem(Loc.LS("SUDDEN DEATH OVERTIME"), left, 10, MenuManager.GetToggleSetting(Convert.ToInt32(MPSuddenDeath.SuddenDeathMenuEnabled)), string.Empty, 1f, MenuManager.mms_mode != MatchMode.NUM);
-            left.y += 62f;
+            left.y += ADVANCED_ROW_PITCH;
             uie.SelectAndDrawStringOptionItem(Loc.LS("ALLOW JOIN IN PROGRESS"), left, 7,
                 MenuManager.GetToggleSetting(MPJoinInProgress.MenuManagerEnabled || MPJoinInProgress.SingleMatchEnable ? 1 : 0),
                 Loc.LS("ALLOW PLAYERS TO JOIN MATCH AFTER IT HAS STARTED"), 1f, !MenuManager.m_mp_lan_match || MPJoinInProgress.SingleMatchEnable);
-            left.y += 62f;
+            left.y += ADVANCED_ROW_PITCH;
 
             DrawAdvancedRightColumn(uie, new Vector2(300f, position.y - 250f));
 
-            left.y += 12f;
             uie.SelectAndDrawItem(Loc.LS("TEAM SETTINGS"), left, 19, false);
-            left.y += 62f;
+            left.y += ADVANCED_ROW_PITCH;
             uie.SelectAndDrawItem(Loc.LS("POWERUP SETTINGS"), left, 4, false);
-            left.y += 62f;
+            left.y += ADVANCED_ROW_PITCH;
             uie.SelectAndDrawItem(Loc.LS("LOADOUT SETTINGS"), left, 5, false);
-            left.y += 62f;
+            left.y += ADVANCED_ROW_PITCH;
             uie.SelectAndDrawItem(Loc.LS("BOT SETTINGS"), left, 29, false);
 
             Vector2 bottom = new Vector2(position.x, left.y);
@@ -202,8 +203,8 @@ namespace GameMod
 
         private const int ADVANCED_VISIBLE_ROWS = 10;
         private const float ADVANCED_ROW_PITCH = 55f;
-        private static readonly int[] advancedRowsCtf = { 27, 28, 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
-        private static readonly int[] advancedRowsOtherModes = { 27, 28, 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25, 26 };
+        private static readonly int[] advancedRowsCtf = { 27, 28, 11, 15, 13, 14, 16, 17, 20, 21, 23, 24, 22, 25, 26, 32 };
+        private static readonly int[] advancedRowsOtherModes = { 27, 28, 11, 15, 13, 18, 16, 17, 20, 21, 23, 24, 22, 25, 26, 32 };
         private static int advancedScrollOffset;
         private static bool advancedScrollbarDragging;
         private static int previousSelection = -1;
@@ -279,6 +280,9 @@ namespace GameMod
                     break;
                 case 28:
                     uie.SelectAndDrawStringOptionItem(Loc.LS("MASSDRIVER RAPID FIRE"), position, 28, Menus.GetMMSInstareapRapidFire(), Loc.LS("INSTAREAP WITHOUT THE MASSDRIVER COOLDOWN, EVERY SHOT STILL PUSHES YOU BACK AND SHAKES YOUR AIM"), 1f, !Menus.mms_instareap || MenuManager.mms_mode == ExtMatchMode.RACE);
+                    break;
+                case 32:
+                    uie.SelectAndDrawStringOptionItem(Loc.LS("HUMANS REPLACE BOTS"), position, 32, MenuManager.GetToggleSetting(Bots.BotSettingsPage.Settings.ReplaceWithHumans ? 1 : 0), Loc.LS("A JOINING PLAYER TAKES THE PLACE OF A BOT, A LEAVING PLAYER BRINGS IT BACK"), 1f, !Bots.BotSettingsPage.Settings.Enabled);
                     break;
             }
         }
@@ -448,10 +452,12 @@ namespace GameMod
                         if (!entered)
                             break;
                     }
-                    if (MenuManager.m_menu_micro_state == Bots.BotSettingsPage.MICRO_STATE && UIManager.m_menu_selection == Bots.BotSettingsPage.SELECTION_NAME && Bots.BotSettingsPage.EditedSlot != null)
+                    if (MenuManager.m_menu_micro_state == Bots.BotSettingsPage.MICRO_STATE)
+                        Bots.BotSettingsPage.Update();
+                    if (MenuManager.m_menu_micro_state == Bots.BotSettingsPage.MICRO_STATE && UIManager.m_menu_selection == Bots.BotSettingsPage.SELECTION_NAME)
                     {
                         Controls.m_disable_menu_letter_keys = true;
-                        string name = Bots.BotSettingsPage.EditedSlot.Name;
+                        string name = Bots.BotSettingsPage.Draft.Name;
                         bool entered = ProcessInputField(ref name, Loc.LS("BOT NAME"), false);
                         Bots.BotSettingsPage.TypeName(name, entered);
                         break;
@@ -465,6 +471,12 @@ namespace GameMod
                     UIManager.ControllerMenu();
                     if (MenuManager.m_menu_micro_state == 3)
                         ScrollAdvancedRightColumn();
+                    if (MenuManager.m_menu_micro_state == Bots.BotSettingsPage.MICRO_STATE)
+                    {
+                        int row = Bots.BotSettingsPage.ScrollWithSelection(previousSelection);
+                        if (row >= 0)
+                            SelectRow(row);
+                    }
                     previousSelection = UIManager.m_menu_selection;
                     if (!UIManager.PushedSelect(100) && (!MenuManager.option_dir || !UIManager.PushedDir()))
                         break;
@@ -625,7 +637,10 @@ namespace GameMod
                     break;
                 case Bots.BotSettingsPage.MICRO_STATE:
                     if (selection == 100)
+                    {
+                        Bots.BotSettingsPage.StopEditing();
                         GoToPage(3);
+                    }
                     else
                         Bots.BotSettingsPage.Select(selection);
                     break;
@@ -759,6 +774,10 @@ namespace GameMod
                     MPMatchPresets.CyclePreset();
                     PlayCycleSound();
                     break;
+                case 31:
+                    Bots.BotSettingsPage.Settings.Enabled = !Bots.BotSettingsPage.Settings.Enabled;
+                    PlayCycleSound();
+                    break;
                 case 10:
                     ExtMenuManager.mms_ext_lap_limit = Math.Max(0, Math.Min(50, ExtMenuManager.mms_ext_lap_limit + UIManager.m_select_dir * 5));
                     PlayCycleSound();
@@ -867,7 +886,14 @@ namespace GameMod
                     GoToPage(10);
                     break;
                 case 29:
+                    Bots.BotSettingsPage.Open();
                     GoToPage(Bots.BotSettingsPage.MICRO_STATE);
+                    break;
+                case 32:
+                    if (!Bots.BotSettingsPage.Settings.Enabled)
+                        break;
+                    Bots.BotSettingsPage.Settings.ReplaceWithHumans = !Bots.BotSettingsPage.Settings.ReplaceWithHumans;
+                    PlayCycleSound();
                     break;
                 case 20:
                     MPThunderboltPassthrough.isAllowed = !MPThunderboltPassthrough.isAllowed;

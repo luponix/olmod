@@ -59,7 +59,7 @@ namespace GameMod.Bots
         {
             Stop();
             List<BotSlot> requested = MPModPrivateData.BotSettings.Slots;
-            if (!GameplayManager.IsDedicatedServer() || requested.Count == 0)
+            if (!GameplayManager.IsDedicatedServer() || !MPModPrivateData.BotSettings.Enabled || requested.Count == 0)
                 return;
             if (Core.GameMod.FindArg("-no-bots"))
             {
@@ -77,7 +77,7 @@ namespace GameMod.Bots
             int allowed = Math.Max(0, Math.Min(ServerMaxBots, hostMaxPlayers - 1));
             if (requested.Count > allowed)
                 notice = string.Format("THIS MATCH ALLOWS {0} OF THE {1} BOTS", allowed, requested.Count);
-            bots = requested.Take(allowed).ToList();
+            bots = requested.Take(allowed).Select(slot => slot.Resolve()).ToList();
             replaceWithHumans = MPModPrivateData.BotSettings.ReplaceWithHumans;
             if (bots.Count > 0)
                 StartOlbot();
@@ -118,7 +118,7 @@ namespace GameMod.Bots
             if (slot == null)
                 return;
             botsByConnection[connectionId] = slot;
-            if (slot.Team != BotSettings.AUTO_TEAM && NetworkMatch.IsTeamMode(NetworkMatch.GetMode()) && slot.Team < MPTeams.NetworkMatchTeamCount)
+            if (slot.Team >= 0 && NetworkMatch.IsTeamMode(NetworkMatch.GetMode()) && slot.Team < MPTeams.NetworkMatchTeamCount)
                 lobbyData.m_team = MPTeams.AllTeams[slot.Team];
             MPLoadouts.StoreNetworkLoadout(new MPLoadouts.LoadoutDataMessage {
                 lobby_id = connectionId,
