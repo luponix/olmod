@@ -283,6 +283,7 @@
     <Compile Include="Bots\MapBake.cs" />
     <Compile Include="Bots\MapView.cs" />
     <Compile Include="Bots\Olbot.cs" />
+    <Compile Include="Bots\OlbotInstaller.cs" />
     <Compile Include="FastUserLevelLoad.cs" />
     <Compile Include="VSync.cs" />
     <Compile Include="Boss2B.cs" />

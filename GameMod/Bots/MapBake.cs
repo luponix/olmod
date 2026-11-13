@@ -157,9 +157,9 @@ namespace GameMod.Bots
         static void StartBake()
         {
             Report(string.Format("botmaps: captured {0} levels in {1:0} s, baking", levelsDone, Time.realtimeSinceStartup - runStarted));
-            if (!File.Exists(Olbot.PlayerPath))
+            if (!OlbotInstaller.Ensure())
             {
-                Report("botmaps: no olbot at " + Olbot.PlayerPath + ", captures stay unbaked");
+                Report("botmaps: " + OlbotInstaller.Detail + ", captures stay unbaked");
                 step = Step.Idle;
                 return;
             }

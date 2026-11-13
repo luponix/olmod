@@ -7,7 +7,7 @@ namespace GameMod.Bots
 {
     static class Olbot
     {
-        static string PlayerFolder
+        public static string PlayerFolder
         {
             get { return Path.Combine(Path.Combine(Config.OLModDir, "olbot"), Application.platform == RuntimePlatform.WindowsPlayer ? "win64" : "linux64"); }
         }

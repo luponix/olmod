@@ -69,9 +69,9 @@ namespace GameMod.Bots
                 notice = "THIS SERVER DOES NOT RUN BOTS";
                 return;
             }
-            if (!File.Exists(Olbot.PlayerPath))
+            if (!OlbotInstaller.Ensure())
             {
-                notice = "BOTS ARE NOT INSTALLED ON THIS SERVER";
+                notice = OlbotInstaller.Failure;
                 return;
             }
             if (connectAddress == null)
