@@ -56,6 +56,7 @@ namespace GameMod.Bots
                 Report("botmaps: start it from the main menu");
                 return;
             }
+            LevelCapture.RenameLegacyFiles();
             var skipped = new HashSet<string>();
             if (File.Exists(SkipListPath))
                 skipped.UnionWith(File.ReadAllLines(SkipListPath));

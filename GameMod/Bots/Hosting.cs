@@ -80,7 +80,10 @@ namespace GameMod.Bots
             bots = requested.Take(allowed).Select(slot => slot.Resolve()).ToList();
             replaceWithHumans = MPModPrivateData.BotSettings.ReplaceWithHumans;
             if (bots.Count > 0)
+            {
+                LevelCapture.RenameLegacyFiles();
                 StartOlbot();
+            }
         }
 
         static void StartOlbot()

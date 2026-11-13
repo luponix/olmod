@@ -28,12 +28,43 @@ namespace GameMod.Bots
             return level.IsAddOn ? level.GetAddOnLevelIdStringHash() : level.FileName;
         }
 
+        const string FORBIDDEN = "<>:\"/\\|?*";
+
         public static string FileName(string levelKey)
         {
-            string name = levelKey.ToLowerInvariant();
-            foreach (char c in Path.GetInvalidFileNameChars())
-                name = name.Replace(c, '_');
-            return name;
+            char[] name = levelKey.ToLowerInvariant().ToCharArray();
+            for (int i = 0; i < name.Length; i++)
+                if (name[i] < ' ' || FORBIDDEN.IndexOf(name[i]) >= 0)
+                    name[i] = '_';
+            return new string(name);
+        }
+
+        public static void RenameLegacyFiles()
+        {
+            try
+            {
+                if (!Directory.Exists(CacheDir))
+                    return;
+                foreach (string path in Directory.GetFiles(CacheDir))
+                {
+                    string name = Path.GetFileName(path);
+                    if (name.IndexOf(':') < 0)
+                        continue;
+                    string renamed = Path.Combine(CacheDir, name.Replace(':', '_'));
+                    try
+                    {
+                        if (!File.Exists(renamed))
+                            File.Move(path, renamed);
+                    }
+                    catch (Exception)
+                    {
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.LogFormat("[Bots] cannot rename the old map files in {0}: {1}", CacheDir, ex.Message);
+            }
         }
 
         public static void OnLevelStart()
