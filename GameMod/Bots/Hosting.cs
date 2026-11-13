@@ -161,6 +161,7 @@ namespace GameMod.Bots
                 UnityEngine.Debug.LogFormat("[Bots] told the players: {0}", notice);
                 notice = null;
             }
+            InputStats.Report();
             if (!replaceWithHumans || olbot == null)
                 return;
             WriteBotCount(Mathf.Clamp(bots.Count + 1 - humans, 0, bots.Count));

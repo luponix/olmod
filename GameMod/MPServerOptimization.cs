@@ -530,6 +530,7 @@ namespace GameMod
 				else if (!player.c_player_ship.m_dying && !player.c_player_ship.m_dead && player.m_server_tick > 0) // input was missing for this frame OR we're at the skip threshold
 				{
 					player.PauseRigidBody();
+					GameMod.Bots.InputStats.Missed(player);
 					player.m_input_deficit = Mathf.Clamp(++player.m_input_deficit, 0, 60); // reusing this to track missing frames so we can skip when needed to let the buffer refill
 
 					/*
@@ -634,6 +635,7 @@ namespace GameMod
 							player2.ProcessRemotePlayerFiringControlsPost(); // and same here. Button states should be properly updated even if we're fast-fowarding (even with client-side physics).
 
 							player2.m_num_inputs_to_accelerate--;
+							GameMod.Bots.InputStats.CaughtUp(player2);
 						}
 					}
 					Physics.Simulate(Time.fixedDeltaTime);

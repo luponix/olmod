@@ -276,6 +276,7 @@
     <Compile Include="VRScale.cs" />
     <Compile Include="FastStartup.cs" />
     <Compile Include="Bots\Hosting.cs" />
+    <Compile Include="Bots\InputStats.cs" />
     <Compile Include="Bots\BotSettings.cs" />
     <Compile Include="Bots\BotSettingsPage.cs" />
     <Compile Include="Bots\LevelCapture.cs" />
