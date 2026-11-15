@@ -619,6 +619,11 @@ namespace GameMod
                 __result = MpTeam.ANARCHY;
                 return false;
             }
+            if (Bots.Hosting.KeepsLobbyTeam(connection_id) && NetworkMatch.m_players.TryGetValue(connection_id, out var botPlayer))
+            {
+                __result = botPlayer.m_team;
+                return false;
+            }
             if (NetworkMatch.GetMode() == MatchMode.ANARCHY || (MPTeams.NetworkMatchTeamCount == 2 &&
                 !MPJoinInProgress.NetworkMatchEnabled)) // use this simple balancing method for JIP to hopefully solve JIP team imbalances
                 return true;

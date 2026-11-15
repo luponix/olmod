@@ -131,7 +131,7 @@ namespace GameMod.Bots
             if (slot == null)
                 return;
             botsByConnection[connectionId] = slot;
-            if (slot.Team >= 0 && NetworkMatch.IsTeamMode(NetworkMatch.GetMode()) && slot.Team < MPTeams.NetworkMatchTeamCount)
+            if (HasFixedTeam(slot))
                 lobbyData.m_team = MPTeams.AllTeams[slot.Team];
             MPLoadouts.StoreNetworkLoadout(new MPLoadouts.LoadoutDataMessage {
                 lobby_id = connectionId,
@@ -140,6 +140,17 @@ namespace GameMod.Bots
                 }
             });
             UnityEngine.Debug.LogFormat("[Bots] {0} joined on connection {1}, team {2}", slot.PilotName, connectionId, lobbyData.m_team);
+        }
+
+        public static bool KeepsLobbyTeam(int connectionId)
+        {
+            BotSlot slot;
+            return botsByConnection.TryGetValue(connectionId, out slot) && HasFixedTeam(slot);
+        }
+
+        static bool HasFixedTeam(BotSlot slot)
+        {
+            return slot.Team >= 0 && NetworkMatch.IsTeamMode(NetworkMatch.GetMode()) && slot.Team < MPTeams.NetworkMatchTeamCount;
         }
 
         public static void OnDisconnect(int connectionId)
