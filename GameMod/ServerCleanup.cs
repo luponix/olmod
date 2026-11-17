@@ -33,6 +33,24 @@ namespace GameMod {
     }
     */
 
+    [HarmonyPatch]
+    class ServerCleanup_SkipVisuals {
+        static bool Prepare() {
+            return Core.GameMod.FindArg("-server-skip-visuals");
+        }
+
+        static IEnumerable<MethodBase> TargetMethods() {
+            yield return AccessTools.Method(typeof(UIManager), "Draw");
+            yield return AccessTools.Method(typeof(PlayerShip), "DrawEffectMesh");
+            yield return AccessTools.Method(typeof(PlayerShip), "UpdateMaterial");
+            yield return AccessTools.Method(typeof(ProFlareBatch), "LateUpdate");
+        }
+
+        static bool Prefix() {
+            return !GameplayManager.IsDedicatedServer();
+        }
+    }
+
     [HarmonyPatch(typeof(UnityAudio), "FindNextOpenAudioSlot")]
     class ServerCleanup_NoOpenAudioSlot {
         static bool Prefix(ref int __result) {

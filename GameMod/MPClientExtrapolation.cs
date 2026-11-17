@@ -96,6 +96,10 @@ namespace GameMod {
 
             var amount = MPClientExtrapolation.GetWeaponExtrapolationTime();
             if (amount <= 0f) {
+                // still drop the queued bodies: with weapon lag compensation off
+                // this list would otherwise grow (and hold dead projectile
+                // rigidbodies) for the whole match
+                MPClientExtrapolation.bodies_to_resolve.Clear();
                 return;
             }
 
@@ -451,12 +455,15 @@ namespace GameMod {
 
         public static NewPlayerSnapshot GetPlayerSnapshot(NewPlayerSnapshotToClientMessage msg, Player p)
         {
+            // the server fills m_net_id from player.netId (MPNoPositionCompression),
+            // so compare ids directly instead of resolving each snapshot to a Player
+            // via ClientScene.FindLocalObject + GetComponent (O(N) per lookup, and
+            // this runs once per player per frame -> O(N^2))
+            uint net_id = p.netId.Value;
             for (int i = 0; i < msg.m_num_snapshots; i++)
             {
                 NewPlayerSnapshot playerSnapshot = msg.m_snapshots[i];
-                Player candidate = OL_Client.GetPlayerFromNetId(playerSnapshot.m_net_id);
-
-                if (candidate == p)
+                if (playerSnapshot.m_net_id.Value == net_id)
                 {
                     return playerSnapshot;
                 }

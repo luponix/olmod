@@ -353,26 +353,34 @@ namespace GameMod
             return max_score;
         }
 
+        // id-based shader property access: this runs every PlayerShip.Update,
+        // and the string overloads hash the name on every call
+        private static readonly int matid_color_burn = Shader.PropertyToID("_color_burn");
+
         public static void SetPlayerGlow(PlayerShip ship, MpTeam team)
         {
             if (GameplayManager.IsMultiplayerActive && !GameplayManager.IsDedicatedServer() && NetworkMatch.IsTeamMode(NetworkMatch.GetMode()))
             {
                 var teamcolor = UIManager.ChooseMpColor(team);
-                foreach (var mat in ship.m_materials)
+                var mats = ship.m_materials;
+                for (int i = 0, count = mats.Count; i < count; i++)
                 {
-                    // Main damage color
+                    var mat = mats[i];
+                    // Main damage color; the early return memoizes on the first
+                    // material — steady-state cost is one GetVector per ship
                     if (mat.shader != null)
                     {
-                        if ((Color)mat.GetVector("_color_burn") == teamcolor)
+                        if ((Color)mat.GetVector(matid_color_burn) == teamcolor)
                         {
                             return;
                         }
-                        mat.SetVector("_color_burn", teamcolor);
+                        mat.SetVector(matid_color_burn, teamcolor);
                     }
-
-                    // Light color (e.g. TB overcharge)
-                    ship.c_lights[4].color = teamcolor;
                 }
+
+                // Light color (e.g. TB overcharge) — only reached on a repaint
+                // pass, matching the original loop's steady-state behavior
+                ship.c_lights[4].color = teamcolor;
             }
         }
 
@@ -1109,13 +1117,24 @@ namespace GameMod
     [HarmonyPatch(typeof(PlayerShip), "Update")]
     class MPTeams_PlayerShip_Update
     {
+        // one cached copy per team: this runs every PlayerShip.Update, and Materials
+        // allocated here are native objects that are never destroyed
+        static readonly Dictionary<MpTeam, Material> m_team_damage_materials = new Dictionary<MpTeam, Material>();
+        static readonly int m_edge_color_id = Shader.PropertyToID("_EdgeColor");
+
         static Material LoadDamageMaterial(PlayerShip player_ship)
         {
             if (GameplayManager.IsMultiplayerActive && !GameplayManager.IsDedicatedServer() && NetworkMatch.IsTeamMode(NetworkMatch.GetMode()))
             {
-                Material m = new Material(UIManager.gm.m_damage_material);
-                var teamcolor = UIManager.ChooseMpColor(player_ship.c_player.m_mp_team);
-                m.SetColor("_EdgeColor", teamcolor);
+                var team = player_ship.c_player.m_mp_team;
+                Material m;
+                if (!m_team_damage_materials.TryGetValue(team, out m) || m == null) // unity-null: recreate if destroyed on scene unload
+                {
+                    m = new Material(UIManager.gm.m_damage_material);
+                    m_team_damage_materials[team] = m;
+                }
+                // team colors can be reconfigured mid-session, so keep the color write
+                m.SetColor(m_edge_color_id, UIManager.ChooseMpColor(team));
                 return m;
             }
             else

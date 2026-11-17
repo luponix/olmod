@@ -14,7 +14,8 @@ namespace GameMod
     //   SKIP IDLE FX PASSES  - stops paying for helper cameras and full-screen
     //                          effect passes that are not doing anything.
     //   DISABLE REFLECTIONS  - drops the deferred reflection shader pass.
-    //   COMBINE SHIP MESHES  - merges other players' hull parts per material.
+    //   COMBINE SHIP MESHES  - merges other players' hull parts per material
+    //                          (Perf.ShipMeshCombine reads shipCombineVal).
     //
     // All three apply and revert live. They are stored per pilot through olmod's
     // ModPrefs (the "<pilot>.xprefsmod" file), written from a ModPrefs.Flush
@@ -300,112 +301,16 @@ namespace GameMod
     }
 
     // ------------------------------------------------------------------
-    // COMBINE SHIP MESHES
-    // ------------------------------------------------------------------
-
-    static class ShipMeshCombine
-    {
-        public static bool Enabled { get { return GpuPerf.shipCombineVal == 1; } }
-
-        public static void CombineHull(GameObject root)
-        {
-            try
-            {
-                Transform ext = null;
-                foreach (var t in root.GetComponentsInChildren<Transform>(true))
-                    if (t.name.StartsWith("playership_ext")) { ext = t; break; }
-                if (ext == null)
-                    return;
-
-                var groups = new Dictionary<Material, List<MeshRenderer>>();
-                foreach (var r in ext.GetComponentsInChildren<MeshRenderer>(true))
-                {
-                    if (!r.enabled || !r.gameObject.activeInHierarchy || r.name.StartsWith("bodyWing"))
-                        continue;
-                    var mats = r.sharedMaterials;
-                    if (mats.Length != 1 || mats[0] == null)
-                        continue;
-                    var mf = r.GetComponent<MeshFilter>();
-                    if (mf == null || mf.sharedMesh == null)
-                        continue;
-                    List<MeshRenderer> list;
-                    if (!groups.TryGetValue(mats[0], out list))
-                        groups[mats[0]] = list = new List<MeshRenderer>();
-                    list.Add(r);
-                }
-
-                int made = 0;
-                foreach (var kv in groups)
-                {
-                    var list = kv.Value;
-                    if (list.Count < 2)
-                        continue;
-                    var combine = new CombineInstance[list.Count];
-                    for (int i = 0; i < list.Count; i++)
-                    {
-                        combine[i] = new CombineInstance
-                        {
-                            mesh = list[i].GetComponent<MeshFilter>().sharedMesh,
-                            transform = ext.worldToLocalMatrix * list[i].transform.localToWorldMatrix
-                        };
-                    }
-                    var mesh = new Mesh { name = "combined_" + kv.Key.name };
-                    mesh.CombineMeshes(combine, true, true);
-
-                    var go = new GameObject("combined_hull_" + made++);
-                    go.layer = list[0].gameObject.layer;
-                    go.transform.SetParent(ext, false);
-                    go.AddComponent<MeshFilter>().sharedMesh = mesh;
-                    var mr = go.AddComponent<MeshRenderer>();
-                    mr.sharedMaterial = kv.Key;
-                    mr.shadowCastingMode = list[0].shadowCastingMode;
-                    mr.receiveShadows = list[0].receiveShadows;
-
-                    foreach (var r in list)
-                        Object.Destroy(r);
-                }
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError("[Perf] ShipMeshCombine: " + e);
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------
     // shared per-frame / per-level hooks
     // ------------------------------------------------------------------
 
     [HarmonyPatch(typeof(GameManager), "Update")]
     class GpuPerf_GameManager_Update
     {
-        static int frame;
-        static readonly HashSet<int> combined = new HashSet<int>();
-
         static void Postfix()
         {
             if (GameplayManager.IsDedicatedServer()) return;
             IdleFxSkip.Tick();
-            TickShipCombine();
-        }
-
-        static void TickShipCombine()
-        {
-            if (++frame % 60 != 0) return;
-            if (!ShipMeshCombine.Enabled) return;
-            if (GameplayManager.m_gameplay_state != GameplayState.PLAYING) return;
-            if (combined.Count > 256) combined.Clear();
-
-            foreach (var player in Overload.NetworkManager.m_Players)
-            {
-                if (player == null || player.isLocalPlayer || player.m_spectator) continue;
-                var ship = player.c_player_ship;
-                if (ship == null || ship.m_dying || player.m_cloaked) continue;
-                int id = ship.GetInstanceID();
-                if (combined.Contains(id)) continue;
-                combined.Add(id);
-                ShipMeshCombine.CombineHull(ship.gameObject);
-            }
         }
     }
 

@@ -60,6 +60,8 @@ namespace GameMod {
             {
                 child.enabled = visible;
             }
+            if (visible)
+                Perf.ShipMeshCombine.Reassert(player.c_player_ship);
         }
 
         public static void SetObservedPlayer(Player player)
@@ -708,21 +710,38 @@ namespace GameMod {
             if (!MPObserver.Enabled && !MPObserver.DamageNumbersEnabled)
                 return;
 
-            if (MPObserverDamage.playerDamages.ContainsKey(__instance.c_player))
-            {
-                foreach (var dmg in MPObserverDamage.playerDamages[__instance.c_player])
-                {
-                    dmg.timer -= RUtility.FRAMETIME_UI;
-                }
+            List<MPObserverDamageLog> damages;
+            if (!MPObserverDamage.playerDamages.TryGetValue(__instance.c_player, out damages))
+                return;
 
-                if (MPObserver.Enabled) {
-                    MPObserverDamage.playerDamages[__instance.c_player].RemoveAll(x => x.timer < 0f);
-                } else {
-                    if (MPObserverDamage.playerDamages[__instance.c_player].Where(x => x.timer >= 0f).Count() == 0) {
-                        MPObserverDamage.playerDamages[__instance.c_player].Clear();
+            int count = damages.Count;
+            for (int i = 0; i < count; i++)
+            {
+                damages[i].timer -= RUtility.FRAMETIME_UI;
+            }
+
+            if (MPObserver.Enabled) {
+                damages.RemoveAll(x => x.timer < 0f);
+            } else {
+                // keep expired entries while any are still alive: the damage
+                // number shown is the sum over the whole burst
+                bool anyAlive = false;
+                for (int i = 0; i < count; i++)
+                {
+                    if (damages[i].timer >= 0f)
+                    {
+                        anyAlive = true;
+                        break;
                     }
                 }
+                if (!anyAlive)
+                    damages.Clear();
             }
+
+            // drop the key once the list is empty so disconnected players don't
+            // accumulate and the per-frame scan stays bounded by live entries
+            if (damages.Count == 0)
+                MPObserverDamage.playerDamages.Remove(__instance.c_player);
         }
     }
 
@@ -733,6 +752,11 @@ namespace GameMod {
         // Preserve arrow display for teammates while they're in death roll/prior to respawn
         static void Postfix()
         {
+            // teammate arrows only exist in team modes: the loop condition below
+            // requires a matching non-ANARCHY team, unsatisfiable in anarchy
+            if (GameManager.m_local_player == null || GameManager.m_local_player.m_mp_team == MpTeam.ANARCHY)
+                return;
+
             Vector2 zero = Vector2.zero;
             int count = Overload.NetworkManager.m_Players.Count;
             for (int i = 0; i < count; i++)
@@ -813,9 +837,15 @@ namespace GameMod {
             }
             if (MPObserver.Enabled || (MPObserver.DamageNumbersEnabled && Menus.mms_client_damage_numbers))
             {
-                if (MPObserverDamage.playerDamages.ContainsKey(player) && MPObserverDamage.playerDamages[player].Sum(x => x.dmg) > 0f)
+                float dmg = 0f;
+                List<MPObserverDamageLog> damages;
+                if (MPObserverDamage.playerDamages.TryGetValue(player, out damages))
                 {
-                    float dmg = MPObserverDamage.playerDamages[player].Sum(x => x.dmg);
+                    for (int di = 0, dcount = damages.Count; di < dcount; di++)
+                        dmg += damages[di].dmg;
+                }
+                if (dmg > 0f)
+                {
                     Color c2 = Color.Lerp(HSBColor.ConvertToColor(0f, 1f, 0.90f), HSBColor.ConvertToColor(0f, 0.9f, 1f), UnityEngine.Random.value * UIElement.FLICKER);
                     if (MPObserver.Enabled)
                     {

@@ -1,5 +1,6 @@
 using HarmonyLib;
 using GameMod.Bots;
+using GameMod.Perf;
 using Overload;
 
 namespace GameMod.Hooks
@@ -12,6 +13,8 @@ namespace GameMod.Hooks
         {
             ImpactMarks.Clear();
             LevelCapture.OnLevelStart();
+            ParticleLifetime.Forget();
+            RemoteThunderboltLight.Forget();
         }
     }
 

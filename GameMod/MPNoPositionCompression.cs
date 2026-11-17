@@ -107,33 +107,41 @@ namespace GameMod {
             m_server_timestamp = reader.ReadSingle();
             m_num_snapshots = (int)reader.ReadByte();
             for (int i = 0; i < m_num_snapshots; i++) {
-                NetworkInstanceId net_id = reader.ReadNetworkId();
-                Vector3 pos = default(Vector3);
-                pos.x = reader.ReadSingle();
-                pos.y = reader.ReadSingle();
-                pos.z = reader.ReadSingle();
-                Quaternion rot = NetworkCompress.DecompressQuaternion(reader.ReadUInt32());
-                Vector3 vel = default(Vector3);
-                vel.x = HalfHelper.Decompress(reader.ReadUInt16());
-                vel.y = HalfHelper.Decompress(reader.ReadUInt16());
-                vel.z = HalfHelper.Decompress(reader.ReadUInt16());
-                Vector3 vrot = default(Vector3);
-                vrot.x = HalfHelper.Decompress(reader.ReadUInt16());
-                vrot.y = HalfHelper.Decompress(reader.ReadUInt16());
-                vrot.z = HalfHelper.Decompress(reader.ReadUInt16());
-                m_snapshots[i] = new NewPlayerSnapshot(net_id, pos, rot,
-                                                       vel, vrot);
+                // write into the preallocated snapshots instead of replacing
+                // them: this runs for every snapshot message (60 Hz per client)
+                NewPlayerSnapshot snapshot = m_snapshots[i];
+                snapshot.m_net_id = reader.ReadNetworkId();
+                snapshot.m_pos.x = reader.ReadSingle();
+                snapshot.m_pos.y = reader.ReadSingle();
+                snapshot.m_pos.z = reader.ReadSingle();
+                snapshot.m_rot = NetworkCompress.DecompressQuaternion(reader.ReadUInt32());
+                snapshot.m_vel.x = HalfHelper.Decompress(reader.ReadUInt16());
+                snapshot.m_vel.y = HalfHelper.Decompress(reader.ReadUInt16());
+                snapshot.m_vel.z = HalfHelper.Decompress(reader.ReadUInt16());
+                snapshot.m_vrot.x = HalfHelper.Decompress(reader.ReadUInt16());
+                snapshot.m_vrot.y = HalfHelper.Decompress(reader.ReadUInt16());
+                snapshot.m_vrot.z = HalfHelper.Decompress(reader.ReadUInt16());
             }
         }
 
         public float m_server_timestamp; // servers NetworkMatch.m_match_elapsed_seconds when packet sent, may change meaning in future
         public int m_num_snapshots;
-        public NewPlayerSnapshot[] m_snapshots = Enumerable.Range(1, 16).Select(x => new NewPlayerSnapshot()).ToArray();
+        public NewPlayerSnapshot[] m_snapshots = NewSnapshotArray();
+
+        private static NewPlayerSnapshot[] NewSnapshotArray() {
+            var snapshots = new NewPlayerSnapshot[16];
+            for (int i = 0; i < snapshots.Length; i++)
+                snapshots[i] = new NewPlayerSnapshot();
+            return snapshots;
+        }
 
         internal PlayerSnapshotToClientMessage ToOldSnapshotMessage() {
+            var old_snapshots = new PlayerSnapshot[m_snapshots.Length];
+            for (int i = 0; i < m_snapshots.Length; i++)
+                old_snapshots[i] = m_snapshots[i].ToOldSnapshot();
             return new PlayerSnapshotToClientMessage() {
                 m_num_snapshots = this.m_num_snapshots,
-                m_snapshots = this.m_snapshots.Select(x => x.ToOldSnapshot()).ToArray()
+                m_snapshots = old_snapshots
             };
         }
 

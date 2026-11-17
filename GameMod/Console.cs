@@ -386,6 +386,7 @@ namespace GameMod {
             uConsole.RegisterCommand("loadout_mask", "Manually set the loadout mask", CmdLoadoutMask);
             uConsole.RegisterCommand("qs_set", "sets a raw Unity QualitySettings field by name (qs_set <name> <value>); run qs_show for names/current values", new uConsole.DebugCommand(CmdSetQualitySetting));
             uConsole.RegisterCommand("qs_show", "prints the current value of every Unity QualitySettings field", new uConsole.DebugCommand(CmdShowQualitySettings));
+            Perf.Commands.Register();
         }
     }
 

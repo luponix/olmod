@@ -3,6 +3,7 @@ using HarmonyLib;
 using Overload;
 using GameMod.Bots;
 using GameMod.Logging;
+using GameMod.Perf;
 
 namespace GameMod.Hooks
 {
@@ -25,6 +26,15 @@ namespace GameMod.Hooks
         }
     }
 
+    [HarmonyPatch(typeof(GameManager), "Update")]
+    class GameManager_Update
+    {
+        static void Postfix()
+        {
+            RenderExperiments.Tick();
+        }
+    }
+
     [HarmonyPatch(typeof(GameManager), "LateUpdate")]
     class GameManager_LateUpdate
     {
@@ -35,6 +45,7 @@ namespace GameMod.Hooks
             MapBake.Tick();
             Hosting.Tick();
             MapView.Draw();
+            ShipParticleCull.Tick();
         }
     }
 }
