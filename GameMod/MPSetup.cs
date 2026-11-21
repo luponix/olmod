@@ -311,6 +311,7 @@ namespace GameMod {
                 MPAudioTaunts.AClient.display_audio_spectrum = ModPrefs.GetBool("MP_AUDIOTAUNT_SHOW_FREQUENCYBAND", true);
 
                 FramerateLimiter.target_framerate = ModPrefs.GetInt("TARGET_FRAMERATE", 0);
+                Perf.FramePacer.Precise = ModPrefs.GetBool("FRAME_LIMITER_PRECISE", true);
 
                 Menus.mms_collision_mesh = ModPrefs.GetInt("MP_COLLIDER_MESH", 0);
 
@@ -424,6 +425,7 @@ namespace GameMod {
             ModPrefs.SetInt("MP_AUDIOTAUNT_VOLUME", MPAudioTaunts.AClient.audio_taunt_volume);
             ModPrefs.SetBool("MP_AUDIOTAUNT_SHOW_FREQUENCYBAND", MPAudioTaunts.AClient.display_audio_spectrum);
             ModPrefs.SetInt("TARGET_FRAMERATE", FramerateLimiter.target_framerate);
+            ModPrefs.SetBool("FRAME_LIMITER_PRECISE", Perf.FramePacer.Precise);
             ModPrefs.SetInt("MP_COLLIDER_MESH", Menus.mms_collision_mesh);
             ModPrefs.SetBool("OD_TURNING", MPServerOptimization.ODTurning);
             ModPrefs.SetBool("MOUSE_ROLL_FIX", MPServerOptimization.RollFix);

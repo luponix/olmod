@@ -16,6 +16,16 @@ namespace GameMod.Hooks
         }
     }
 
+    [HarmonyPatch(typeof(PlayerShip), "StartDyingCamera")]
+    class PlayerShip_StartDyingCamera
+    {
+        static void Postfix(PlayerShip __instance)
+        {
+            if (__instance.c_player.isLocalPlayer)
+                System.GC.Collect();
+        }
+    }
+
     [HarmonyPatch(typeof(PlayerShip), "EnablePlayerLevelCollision")]
     class PlayerShip_EnablePlayerLevelCollision
     {

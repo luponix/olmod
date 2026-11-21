@@ -9,7 +9,9 @@ namespace GameMod
     class FramerateLimiter
     {
         public static int target_framerate = 0;
-        public const int maximum_framerate = 360;
+        public const int maximum_framerate = 999;
+        static string typed_framerate;
+        static Vector2 number_position;
 
         // Insert the framelimiter menu option
         [HarmonyPatch(typeof(UIElement), "DrawGraphicsMenu")]
@@ -18,7 +20,10 @@ namespace GameMod
             public static void DrawFrameLimiterSlider(UIElement uie, ref Vector2 position)
             {
                 position.y += 62f;
-                Menus_UIElement_DrawMpOptions.SelectAndDrawSliderItem(uie, "FRAMERATE LIMIT", position, 282, target_framerate, 360, "SETS THE MAXIMUM FRAMERATE. THIS WILL BE OVERRIDDEN WHEN VSYNC IS ACTIVE");
+                number_position = position + Vector2.right * 90f;
+                Menus_UIElement_DrawMpOptions.SelectAndDrawSliderItem(uie, "FRAMERATE LIMIT", position, 282, target_framerate, maximum_framerate,
+                    "SETS THE MAXIMUM FRAMERATE (0 = NO LIMIT). CLICK THE NUMBER OR TYPE DIGITS TO ENTER IT. THIS WILL BE OVERRIDDEN WHEN VSYNC IS ACTIVE",
+                    value_text: typed_framerate == null ? null : typed_framerate.Length < 3 ? typed_framerate + "_" : typed_framerate);
 
             }
 
@@ -74,19 +79,35 @@ namespace GameMod
         {
             public static void UpdateFrameLimiterSlider(int menu_selection)
             {
+                if (menu_selection != 282 && typed_framerate != null)
+                    ApplyTypedFramerate();
                 switch (menu_selection)
                 {
                     case 282:
+                        if (typed_framerate != null)
+                        {
+                            EditTypedFramerate();
+                            break;
+                        }
+                        if (Input.GetMouseButtonDown(0) && IsMouseOnNumber())
+                        {
+                            typed_framerate = "";
+                            break;
+                        }
+                        string first_digit = FirstDigit(Input.inputString);
+                        if (first_digit != null)
+                        {
+                            typed_framerate = first_digit;
+                            break;
+                        }
                         if (MenuManager.option_dir && UIManager.PushedDir()){
                             target_framerate += UIManager.m_select_dir;
-                            Application.targetFrameRate = FramerateLimiter.target_framerate;
                             MenuManager.PlayCycleSound(1f, (float)UIManager.m_select_dir);
                             uConsole.Log("Set the target framerate to " + FramerateLimiter.target_framerate);
                         }
                         else{
                             if (Input.GetMouseButtonUp(0)){
                                 target_framerate = (int)(UIElement.SliderPos * maximum_framerate);
-                                Application.targetFrameRate = FramerateLimiter.target_framerate;
                                 MenuManager.PlaySelectSound(1f);
                                 uConsole.Log("Set the target framerate to " + FramerateLimiter.target_framerate);
                             }
@@ -95,6 +116,49 @@ namespace GameMod
                         }
                         break;
                 }
+            }
+
+            static void EditTypedFramerate()
+            {
+                foreach (char c in Input.inputString)
+                {
+                    if (c == '\b' && typed_framerate.Length > 0)
+                        typed_framerate = typed_framerate.Substring(0, typed_framerate.Length - 1);
+                    else if (c == '\n' || c == '\r')
+                    {
+                        ApplyTypedFramerate();
+                        return;
+                    }
+                    else if (c >= '0' && c <= '9' && typed_framerate.Length < 3)
+                        typed_framerate += c;
+                }
+                if (Input.GetMouseButtonDown(0) && !IsMouseOnNumber())
+                    ApplyTypedFramerate();
+            }
+
+            static void ApplyTypedFramerate()
+            {
+                int typed;
+                if (int.TryParse(typed_framerate, out typed))
+                {
+                    target_framerate = Mathf.Clamp(typed, 0, maximum_framerate);
+                    uConsole.Log("Set the target framerate to " + target_framerate);
+                }
+                typed_framerate = null;
+                MenuManager.PlaySelectSound(1f);
+            }
+
+            static bool IsMouseOnNumber()
+            {
+                return UIManager.m_menu_use_mouse && new Rect(number_position.x - 35f, number_position.y - 22f, 70f, 44f).Contains(UIManager.m_mouse_pos);
+            }
+
+            static string FirstDigit(string input)
+            {
+                foreach (char c in input)
+                    if (c >= '0' && c <= '9')
+                        return c.ToString();
+                return null;
             }
 
             public static void Postfix()
