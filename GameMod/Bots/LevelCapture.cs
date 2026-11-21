@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using Overload;
 using UnityEngine;
@@ -11,6 +12,7 @@ namespace GameMod.Bots
     {
         const uint MAGIC = 0x3147474Fu;
         const int VERSION = 1;
+        const int BAKE_VERSION = 4;
         const int BAKE_MASK = (1 << 0) | (1 << 9) | (1 << 14) | (1 << 15) | (1 << 17) | (1 << 23) | (1 << 26) | (1 << 31);
 
         public static string CacheDir
@@ -74,12 +76,18 @@ namespace GameMod.Bots
         public static string FailureOf(string levelKey)
         {
             string marker = Path.Combine(CacheDir, FileName(levelKey) + ".bakefail");
+            string capture = CapturePath(levelKey);
             try
             {
                 if (IsBaked(levelKey) || !File.Exists(marker))
                     return null;
+                if (File.Exists(capture) && File.GetLastWriteTimeUtc(marker) < File.GetLastWriteTimeUtc(capture))
+                    return null;
                 string[] lines = File.ReadAllLines(marker);
-                return lines.Length > 1 ? lines[1].Trim() : null;
+                int version;
+                if (lines.Length < 2 || !int.TryParse(lines[0].Trim(), out version) || version != BAKE_VERSION)
+                    return null;
+                return lines[1].Trim();
             }
             catch (Exception)
             {
@@ -163,6 +171,8 @@ namespace GameMod.Bots
             var vertices = new List<Vector3>();
             var indices = new List<int>();
             var layers = new List<byte>();
+            int unreadableMeshes = 0;
+            var unsupportedColliders = new Dictionary<string, int>();
             foreach (Collider collider in UnityEngine.Object.FindObjectsOfType<Collider>())
             {
                 if (collider == null || ((1 << collider.gameObject.layer) & BAKE_MASK) == 0 || collider.isTrigger)
@@ -175,7 +185,10 @@ namespace GameMod.Bots
                 {
                     Mesh mesh = meshCollider.sharedMesh;
                     if (mesh == null || !mesh.isReadable)
+                    {
+                        unreadableMeshes++;
                         continue;
+                    }
                     Vector3[] meshVertices = mesh.vertices;
                     int[] meshIndices = mesh.triangles;
                     if (meshVertices.Length == 0 || meshIndices.Length == 0)
@@ -185,8 +198,18 @@ namespace GameMod.Bots
                 }
                 var box = collider as BoxCollider;
                 if (box != null)
+                {
                     AddTriangles(BoxVertices(box), BOX_INDICES, box.transform.localToWorldMatrix, layer, vertices, indices, layers);
+                    continue;
+                }
+                string type = collider.GetType().Name;
+                int count;
+                unsupportedColliders.TryGetValue(type, out count);
+                unsupportedColliders[type] = count + 1;
             }
+            Debug.LogFormat("[Bots] {0}: {1} triangles, skipped {2} unreadable meshes and {3} other colliders ({4})",
+                levelKey, indices.Count / 3, unreadableMeshes, unsupportedColliders.Values.Sum(),
+                string.Join(", ", unsupportedColliders.Select(entry => entry.Key + " " + entry.Value).ToArray()));
             writer.Write(vertices.Count);
             foreach (Vector3 vertex in vertices)
                 WriteVector(writer, vertex);
