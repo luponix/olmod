@@ -85,9 +85,18 @@ namespace GameMod.Bots
             if (bots.Count == 0)
                 return;
             LevelCapture.RenameLegacyFiles();
+            string levelKey = MPJoinInProgress.NetworkMatchLevelName();
+            string failure = string.IsNullOrEmpty(levelKey) ? null : LevelCapture.FailureOf(levelKey);
+            if (failure != null)
+            {
+                UnityEngine.Debug.LogFormat("[Bots] no bots on {0}, its map data failed before: {1}", levelKey, failure);
+                notice = "THE BOTS CANNOT PLAY THIS MAP YET";
+                bots = new List<BotSlot>();
+                return;
+            }
             try
             {
-                StartOlbot();
+                StartOlbot(levelKey);
             }
             catch (Exception ex)
             {
@@ -97,7 +106,7 @@ namespace GameMod.Bots
             }
         }
 
-        static void StartOlbot()
+        static void StartOlbot(string levelKey)
         {
             string logDir = Path.Combine(Application.persistentDataPath, "BotLogs");
             Directory.CreateDirectory(logDir);
@@ -111,7 +120,6 @@ namespace GameMod.Bots
                 "-olbot-parent", Process.GetCurrentProcess().Id.ToString(),
                 "-olbot-geometry-cache", LevelCapture.CacheDir,
             };
-            string levelKey = MPJoinInProgress.NetworkMatchLevelName();
             if (replaceWithHumans)
             {
                 botCountPath = Path.Combine(logDir, "server-bot-count" + LevelCapture.InstanceTag + ".txt");
