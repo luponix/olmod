@@ -122,6 +122,8 @@
     <Compile Include="Hooks\LightManager.cs" />
     <Compile Include="Perf\AudioBudget.cs" />
     <Compile Include="Perf\Commands.cs" />
+    <Compile Include="Perf\FrameIntervals.cs" />
+    <Compile Include="Perf\FramePacer.cs" />
     <Compile Include="Perf\ParticleLifetime.cs" />
     <Compile Include="Perf\RemoteThunderboltLight.cs" />
     <Compile Include="Perf\RenderExperiments.cs" />
@@ -169,7 +171,6 @@
     <Compile Include="GameMod.cs" />
     <Compile Include="GfxQualitySettings.cs" />
     <Compile Include="GpuPerformance.cs" />
-    <Compile Include="GSyncFix.cs" />
     <Compile Include="Hotkeys.cs" />
     <Compile Include="JoystickCurveEditor.cs" />
     <Compile Include="JoystickRotationFix.cs" />

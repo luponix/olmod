@@ -15,6 +15,7 @@ namespace GameMod.Hooks
             LevelCapture.OnLevelStart();
             ParticleLifetime.Forget();
             RemoteThunderboltLight.Forget();
+            System.GC.Collect();
         }
     }
 

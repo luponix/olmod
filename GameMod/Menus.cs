@@ -690,7 +690,7 @@ namespace GameMod {
         }
 
         // Tweak of original SelectAndDrawSliderItem to support non-100 max, tooltip
-        public static void SelectAndDrawSliderItem(UIElement uie, string s, Vector2 pos, int selection, float amt, float max, string tool_tip, bool fade = false)
+        public static void SelectAndDrawSliderItem(UIElement uie, string s, Vector2 pos, int selection, float amt, float max, string tool_tip, bool fade = false, string value_text = null)
         {
             float num = 750f;
             int quad_index = UIManager.m_quad_index;
@@ -744,7 +744,10 @@ namespace GameMod {
             }
             uie.DrawStringSmallOverrideAlpha(s, pos - Vector2.right * (num * 0.5f + 15f), 0.75f, StringOffset.LEFT, color2, 450f);
             UIManager.DrawQuadUI(pos + Vector2.right * 90f - Vector2.up * 15f, 20f, 1.25f, color2, uie.m_alpha, 12);
-            uie.DrawDigitsThree(pos + Vector2.right * 90f, (int)(amt), 0.6f, StringOffset.CENTER, color, uie.m_alpha);
+            if (value_text == null)
+                uie.DrawDigitsThree(pos + Vector2.right * 90f, (int)(amt), 0.6f, StringOffset.CENTER, color, uie.m_alpha);
+            else
+                uie.DrawStringSmall(value_text, pos + Vector2.right * 90f, 0.6f, StringOffset.CENTER, color, uie.m_alpha);
             UIManager.DrawQuadUI(pos + Vector2.right * 90f + Vector2.up * 15f, 20f, 1.25f, color2, uie.m_alpha, 12);
             pos.x += num * 0.5f - 123f;
             if (flag)
@@ -2619,6 +2622,8 @@ namespace GameMod {
                     GpuPerf.DrawPage(__instance, ref position);
                     position.y += 62f;
                     ImpactMarks.DrawOption(__instance, position);
+                    position.y += 62f;
+                    Perf.FramePacer.DrawOption(__instance, position);
                     break;
             }
             position.y = -232.5f + 7f * 62f; // bottom row of the full pages, so the separator and page controls sit at the same height on every page
@@ -2796,6 +2801,7 @@ namespace GameMod {
                                 }
                                 GpuPerf.HandleSelection(UIManager.m_menu_selection);
                                 ImpactMarks.HandleSelection(UIManager.m_menu_selection);
+                                Perf.FramePacer.HandleSelection(UIManager.m_menu_selection);
                                 break;
                         }
                     }

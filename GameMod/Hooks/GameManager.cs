@@ -29,9 +29,25 @@ namespace GameMod.Hooks
     [HarmonyPatch(typeof(GameManager), "Update")]
     class GameManager_Update
     {
+        static void Prefix()
+        {
+            FrameIntervals.MarkUpdate();
+        }
+
         static void Postfix()
         {
             RenderExperiments.Tick();
+            FramePacer.StartOnce();
+        }
+    }
+
+    [HarmonyPatch(typeof(GameManager), "UpdateTargetFramerate")]
+    class GameManager_UpdateTargetFramerate
+    {
+        static bool Prefix()
+        {
+            FramePacer.ApplyTargetFramerate();
+            return false;
         }
     }
 

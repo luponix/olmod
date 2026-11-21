@@ -21,6 +21,7 @@ namespace GameMod.Perf
             uConsole.RegisterCommand("perf_projlight_max", "Keep only the N nearest projectile lights lit (0 = off)", RenderExperiments.CmdProjLightMax);
             uConsole.RegisterCommand("perf_lightflash_dist", "Skip explosion/muzzle light flashes farther than this from the camera (0 = off)", RenderExperiments.CmdLightFlashDist);
             uConsole.RegisterCommand("perf_ship_shadows_off", "1 = ship hulls stop casting realtime shadows (level shadows stay), 0 = engine default", RenderExperiments.CmdShipShadows);
+            uConsole.RegisterCommand("framepacing", "Frame limiter and frame interval recorder: framepacing [precise|engine|margin <ms>|stats|reset|dump [file]]", FramePacer.CmdFramePacing);
             uConsole.RegisterCommand("perf_shiplight_dist", "Cull ships' always-on point lights beyond this many meters from the camera (0 = off)", RenderExperiments.CmdShipLightDist);
         }
     }
