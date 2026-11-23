@@ -129,6 +129,8 @@ namespace GameMod
                 else
                 {
                     // Update
+                    existing.name = result.server.name;
+                    existing.version = result.server.version?.Replace("olmod ", "");
                     existing.serverNotes = result.server.serverNotes;
                     existing.online = result.server.online;
                     existing.gameStarted = result.game == null ? (DateTime?)null : result.game.gameStarted;
