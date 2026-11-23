@@ -104,9 +104,11 @@
     <Compile Include="AddOnLevelSort.cs" />
     <Compile Include="AmbientUnload.cs" />
     <Compile Include="AxisCountFix.cs" />
+    <Compile Include="MenuDriver.cs" />
     <Compile Include="MenuMusic.cs" />
     <Compile Include="Hooks\UIElement.cs" />
     <Compile Include="Hooks\UnityAudio.cs" />
+    <Compile Include="Hooks\Controls.cs" />
     <Compile Include="Hooks\GameManager.cs" />
     <Compile Include="Hooks\Player.cs" />
     <Compile Include="Hooks\Loc.cs" />

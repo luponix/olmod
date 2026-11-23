@@ -62,6 +62,7 @@ namespace GameMod.Hooks
             Hosting.Tick();
             MapView.Draw();
             ShipParticleCull.Tick();
+            MenuDriver.Tick();
         }
     }
 }
