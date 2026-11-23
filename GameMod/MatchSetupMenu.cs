@@ -433,7 +433,21 @@ namespace GameMod
                         string name = Bots.BotSettingsPage.Draft.Name;
                         bool entered = ProcessInputField(ref name, Loc.LS("BOT NAME"), false);
                         Bots.BotSettingsPage.TypeName(name, entered);
-                        break;
+                        if (entered)
+                            break;
+                    }
+                    else if (MenuManager.m_menu_micro_state == Bots.BotSettingsPage.MICRO_STATE && Bots.BotSettingsPage.IsRenamingPreset)
+                    {
+                        Controls.m_disable_menu_letter_keys = true;
+                        int selection = UIManager.m_menu_selection;
+                        string name = Bots.BotSettingsPage.PresetName;
+                        bool entered = ProcessInputField(ref name, Loc.LS("PRESET NAME"), false);
+                        Bots.BotSettingsPage.RenamePreset(name);
+                        if (entered)
+                        {
+                            MenuManager.SetDefaultSelection(selection);
+                            break;
+                        }
                     }
                     if (MenuManager.m_menu_micro_state == 2 && UIManager.m_menu_selection == 303)
                     {

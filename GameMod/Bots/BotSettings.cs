@@ -71,12 +71,19 @@ namespace GameMod.Bots
         }
     }
 
+    class BotPreset
+    {
+        public string Name;
+        public BotSettings Settings;
+    }
+
     class BotSettings
     {
         public const int MAX_BOTS = 15;
         public const int AUTO_TEAM = -1;
         public const int RANDOM = -2;
         public const int MAX_NAME_LENGTH = 17 - 5;
+        public const int MAX_PRESET_NAME_LENGTH = 16;
 
         public static readonly string[] TIER_FILES = { "trainee", "rookie", "hotshot", "ace", "insane", "insaneplus" };
         public static readonly string[] TIER_NAMES = { "TRAINEE", "ROOKIE", "HOTSHOT", "ACE", "INSANE", "INSANE+" };
@@ -162,16 +169,59 @@ namespace GameMod.Bots
             return settings;
         }
 
+        public BotSettings Copy()
+        {
+            return FromJson(ToJson());
+        }
+
         public string ToPrefsValue()
         {
-            return Convert.ToBase64String(Encoding.UTF8.GetBytes(ToJson().ToString(Newtonsoft.Json.Formatting.None)));
+            return Encode(ToJson());
         }
 
         public static BotSettings FromPrefsValue(string value)
         {
             if (string.IsNullOrEmpty(value))
                 return new BotSettings();
-            return FromJson(JToken.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(value))));
+            return FromJson(Decode(value));
+        }
+
+        public static string PresetsToPrefsValue(List<BotPreset> presets)
+        {
+            var array = new JArray();
+            foreach (BotPreset preset in presets)
+                array.Add(new JObject { { "name", preset.Name }, { "settings", preset.Settings.ToJson() } });
+            return Encode(array);
+        }
+
+        public static List<BotPreset> PresetsFromPrefsValue(string value)
+        {
+            var presets = new List<BotPreset>();
+            var array = string.IsNullOrEmpty(value) ? null : Decode(value) as JArray;
+            if (array == null)
+                return presets;
+            foreach (JToken preset in array)
+            {
+                string name = CleanPresetName(preset["name"].GetString(string.Empty));
+                presets.Add(new BotPreset { Name = name.Length > 0 ? name : "PRESET", Settings = FromJson(preset["settings"]) });
+            }
+            return presets;
+        }
+
+        static string Encode(JToken token)
+        {
+            return Convert.ToBase64String(Encoding.UTF8.GetBytes(token.ToString(Newtonsoft.Json.Formatting.None)));
+        }
+
+        static JToken Decode(string value)
+        {
+            return JToken.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(value)));
+        }
+
+        public static string CleanPresetName(string name)
+        {
+            name = name.Trim().ToUpperInvariant();
+            return name.Length > MAX_PRESET_NAME_LENGTH ? name.Substring(0, MAX_PRESET_NAME_LENGTH) : name;
         }
 
         public static string CleanName(string name)

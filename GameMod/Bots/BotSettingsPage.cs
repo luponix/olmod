@@ -16,6 +16,9 @@ namespace GameMod.Bots
         const int SELECTION_SECONDARY2 = 26;
         const int SELECTION_ADD = 27;
         const int SELECTION_SCROLLBAR = 28;
+        const int SELECTION_PRESET = 29;
+        const int SELECTION_PRESET_NEW = 30;
+        const int SELECTION_PRESET_DELETE = 31;
         const int SELECTION_ROW = 200;
         const int SELECTION_REMOVE = 300;
         const float FORM_TOP = -220f;
@@ -28,7 +31,7 @@ namespace GameMod.Bots
         const float TABLE_HALF_WIDTH = 400f;
         const float TABLE_TOP = 26f;
         const float ROW_PITCH = 38f;
-        const int ROWS_SHOWN = 7;
+        const int ROWS_SHOWN = 6;
         const float TABLE_BOTTOM = TABLE_TOP + ROW_PITCH * ROWS_SHOWN;
         const float SCROLLBAR_X = TABLE_HALF_WIDTH + 20f;
         const float NAME_X = -385f;
@@ -37,13 +40,38 @@ namespace GameMod.Bots
         const float LOADOUT_X = 125f;
         const float LOADOUT_STEP = 50f;
         const float REMOVE_X = 345f;
+        const float PRESET_Y = TABLE_BOTTOM + 44f;
+        const float PRESET_BUTTON_OFFSET = 100f;
 
-        public static BotSettings Settings = new BotSettings();
+        public static BotSettings Unsaved = new BotSettings();
+        public static List<BotPreset> Presets = new List<BotPreset>();
         public static BotSlot Draft = NewDraft();
+        static int presetIndex = -1;
         static BotSlot lastAdded;
         static int editedIndex = -1;
         static int firstRow;
         static bool isDraggingScrollbar;
+
+        public static BotSettings Settings
+        {
+            get { return SelectedPreset != null ? SelectedPreset.Settings : Unsaved; }
+        }
+
+        public static string SelectedPresetName
+        {
+            get { return SelectedPreset != null ? SelectedPreset.Name : string.Empty; }
+            set { presetIndex = Presets.FindIndex(p => p.Name == value); }
+        }
+
+        public static string PresetName
+        {
+            get { return SelectedPreset != null ? SelectedPreset.Name : string.Empty; }
+        }
+
+        public static bool IsRenamingPreset
+        {
+            get { return SelectedPreset != null && (UIManager.m_menu_selection == SELECTION_PRESET || UIManager.m_menu_selection == SELECTION_PRESET + 500); }
+        }
 
         static List<BotSlot> Slots
         {
@@ -79,28 +107,52 @@ namespace GameMod.Bots
             uie.DrawMenuSeparator(button + Vector2.up * 34f);
 
             DrawTable(uie);
-            uie.DrawMenuSeparator(new Vector2(0f, TABLE_BOTTOM + 24f));
+            uie.DrawMenuSeparator(new Vector2(0f, TABLE_BOTTOM + 14f));
+            DrawPresetRow(uie);
+        }
+
+        static void DrawPresetRow(UIElement uie)
+        {
+            Vector2 left = new Vector2(-COLUMN_X, PRESET_Y);
+            DrawOptionRow(uie, left, SELECTION_PRESET, Loc.LS("PRESET"), SelectedPreset == null ? Loc.LS("NONE") : SelectedPreset.Name, Presets.Count > 0, IsRenamingPreset);
+            MPServerBrowser_UIElement_Draw.SelectAndDrawSmallerItem(uie, Loc.LS("NEW PRESET"), new Vector2(COLUMN_X - PRESET_BUTTON_OFFSET, PRESET_Y), SELECTION_PRESET_NEW, false, 0.3f, 0.45f);
+            MPServerBrowser_UIElement_Draw.SelectAndDrawSmallerItem(uie, Loc.LS("DELETE PRESET"), new Vector2(COLUMN_X + PRESET_BUTTON_OFFSET, PRESET_Y), SELECTION_PRESET_DELETE, SelectedPreset == null, 0.3f, 0.45f);
+        }
+
+        static BotPreset SelectedPreset
+        {
+            get { return presetIndex >= 0 && presetIndex < Presets.Count ? Presets[presetIndex] : null; }
         }
 
         static void DrawNameRow(UIElement uie, Vector2 position)
         {
-            uie.TestMouseInRect(position, COLUMN_WIDTH * 0.5f, FORM_HALF_HEIGHT, SELECTION_NAME);
-            bool isHighlighted = UIManager.m_menu_selection == SELECTION_NAME;
+            DrawTextRow(uie, position, SELECTION_NAME, Loc.LS("BOT NAME"), Draft.PilotName);
+        }
+
+        static void DrawTextRow(UIElement uie, Vector2 position, int selection, string label, string text)
+        {
+            uie.TestMouseInRect(position, COLUMN_WIDTH * 0.5f, FORM_HALF_HEIGHT, selection);
+            bool isHighlighted = UIManager.m_menu_selection == selection;
             DrawFormBackground(uie, position, isHighlighted, 1f);
-            DrawFormLabel(uie, position, Loc.LS("BOT NAME"), isHighlighted, 1f);
+            DrawFormLabel(uie, position, label, isHighlighted, 1f);
             Vector2 value = ValuePosition(position);
             Color color = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui4;
             DrawValueBox(uie, value, isHighlighted, 1f);
             float maxWidth = 2f * VALUE_HALF_WIDTH - 40f;
-            uie.DrawStringSmall(Draft.PilotName, value, 0.55f, StringOffset.CENTER, color, 1f, maxWidth);
-            if (isHighlighted && (int)(Time.unscaledTime * 4f) % 2 == 0)
-            {
-                float textHalfWidth = Mathf.Min(UIManager.GetStringWidth(Draft.PilotName, 20f * 0.55f), maxWidth) * 0.5f;
-                uie.DrawStringSmall("_", value + Vector2.right * textHalfWidth, 0.55f, StringOffset.LEFT, color, 1f);
-            }
+            uie.DrawStringSmall(text, value, 0.55f, StringOffset.CENTER, color, 1f, maxWidth);
+            if (isHighlighted)
+                DrawCursor(uie, value, text, color, maxWidth);
         }
 
-        static void DrawOptionRow(UIElement uie, Vector2 position, int selection, string label, string value, bool isEnabled)
+        static void DrawCursor(UIElement uie, Vector2 position, string text, Color color, float maxWidth)
+        {
+            if ((int)(Time.unscaledTime * 4f) % 2 != 0)
+                return;
+            float textHalfWidth = Mathf.Min(UIManager.GetStringWidth(text, 20f * 0.55f), maxWidth) * 0.5f;
+            uie.DrawStringSmall("_", position + Vector2.right * textHalfWidth, 0.55f, StringOffset.LEFT, color, 1f);
+        }
+
+        static void DrawOptionRow(UIElement uie, Vector2 position, int selection, string label, string value, bool isEnabled, bool isTyping = false)
         {
             Vector2 valuePosition = ValuePosition(position);
             if (isEnabled)
@@ -117,6 +169,8 @@ namespace GameMod.Bots
             DrawValueBox(uie, valuePosition, isHighlighted, alpha);
             Color color = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui4;
             uie.DrawStringSmall(value, valuePosition, 0.55f, StringOffset.CENTER, color, alpha, 2f * VALUE_HALF_WIDTH - 60f);
+            if (isTyping)
+                DrawCursor(uie, valuePosition, value, color, 2f * VALUE_HALF_WIDTH - 60f);
             Color tab = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui2;
             Color arrow = isHighlighted ? UIManager.m_col_ui6 : UIManager.m_col_ub3;
             float tabHalfWidth = 10f;
@@ -280,11 +334,62 @@ namespace GameMod.Bots
             MenuManager.SetDefaultSelection(SELECTION_TIER);
         }
 
+        public static void RenamePreset(string typed)
+        {
+            BotPreset preset = SelectedPreset;
+            if (preset == null)
+                return;
+            preset.Name = BotSettings.CleanPresetName(typed);
+            SortPresets(preset);
+        }
+
+        static void SortPresets(BotPreset selected)
+        {
+            Presets.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
+            presetIndex = Presets.IndexOf(selected);
+        }
+
+        static void SelectPreset(int index)
+        {
+            bool isEnabled = Settings.Enabled;
+            presetIndex = index;
+            Settings.Enabled = isEnabled;
+            firstRow = 0;
+            StopEditing();
+        }
+
+        static string FreePresetName()
+        {
+            for (int number = 1; ; number++)
+                if (!Presets.Exists(p => p.Name == "PRESET" + number))
+                    return "PRESET" + number;
+        }
+
         public static void Select(int selection)
         {
             int direction = UIManager.m_select_dir;
             switch (selection)
             {
+                case SELECTION_PRESET:
+                    if (Presets.Count == 0)
+                        return;
+                    SelectPreset((presetIndex + 1 + direction + Presets.Count + 1) % (Presets.Count + 1) - 1);
+                    break;
+                case SELECTION_PRESET_NEW:
+                    var preset = new BotPreset { Name = FreePresetName(), Settings = Settings.Copy() };
+                    Presets.Add(preset);
+                    SortPresets(preset);
+                    MenuManager.SetDefaultSelection(SELECTION_PRESET);
+                    MenuManager.PlaySelectSound();
+                    return;
+                case SELECTION_PRESET_DELETE:
+                    if (SelectedPreset == null)
+                        return;
+                    Unsaved = SelectedPreset.Settings;
+                    Presets.RemoveAt(presetIndex);
+                    presetIndex = -1;
+                    MenuManager.PlaySelectSound();
+                    return;
                 case SELECTION_ADD:
                     if (editedIndex < 0 && Slots.Count >= BotSettings.MAX_BOTS)
                         return;
