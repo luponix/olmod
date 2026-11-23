@@ -214,12 +214,12 @@ namespace GameMod.Bots
             botsByConnection[connectionId] = slot;
             if (HasFixedTeam(slot))
                 lobbyData.m_team = MPTeams.AllTeams[slot.Team];
-            MPLoadouts.StoreNetworkLoadout(new MPLoadouts.LoadoutDataMessage {
+            MPLoadouts.NetworkLoadouts[connectionId] = new MPLoadouts.LoadoutDataMessage {
                 lobby_id = connectionId,
                 loadouts = new List<MPLoadouts.CustomLoadout> {
                     new MPLoadouts.CustomLoadout { weapons = slot.Primaries, missiles = slot.Secondaries }
                 }
-            });
+            };
             UnityEngine.Debug.LogFormat("[Bots] {0} joined on connection {1}, team {2}", slot.PilotName, connectionId, lobbyData.m_team);
         }
 

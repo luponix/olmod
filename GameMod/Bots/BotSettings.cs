@@ -35,24 +35,43 @@ namespace GameMod.Bots
         public BotSlot Resolve()
         {
             BotSlot slot = Clone();
-            slot.Tier = Pick(Tier, BotSettings.TIER_FILES.Length, BotSettings.RANDOM);
-            slot.Team = Pick(Team, MPTeams.NetworkMatchTeamCount, BotSettings.RANDOM);
-            slot.Primary1 = (WeaponType)Pick((int)Primary1, (int)WeaponType.NUM, (int)Primary2);
-            slot.Primary2 = (WeaponType)Pick((int)Primary2, (int)WeaponType.NUM, (int)slot.Primary1);
-            slot.Secondary1 = (MissileType)Pick((int)Secondary1, (int)MissileType.NUM, (int)Secondary2);
-            slot.Secondary2 = (MissileType)Pick((int)Secondary2, (int)MissileType.NUM, (int)slot.Secondary1);
+            slot.Tier = Pick(Tier, Enumerable.Range(0, BotSettings.TIER_FILES.Length).ToList(), BotSettings.RANDOM);
+            slot.Team = Pick(Team, Enumerable.Range(0, MPTeams.NetworkMatchTeamCount).ToList(), BotSettings.RANDOM);
+            List<int> primaries = BotSettings.RandomPrimaries();
+            List<int> secondaries = BotSettings.RandomSecondaries();
+            slot.Primary1 = (WeaponType)Pick((int)Primary1, primaries, (int)Primary2);
+            slot.Primary2 = (WeaponType)Pick((int)Primary2, primaries, (int)slot.Primary1);
+            slot.Secondary1 = (MissileType)Pick((int)Secondary1, secondaries, (int)Secondary2);
+            slot.Secondary2 = (MissileType)Pick((int)Secondary2, secondaries, (int)slot.Secondary1);
+            if (NetworkMatch.m_force_loadout == 1)
+                slot.ApplyForcedLoadout();
             return slot;
         }
 
-        static int Pick(int value, int count, int taken)
+        void ApplyForcedLoadout()
         {
-            if (value != BotSettings.RANDOM || count == 0)
+            Primary1 = NetworkMatch.m_force_w1;
+            Primary2 = NetworkMatch.m_force_w2;
+            if (NetworkMatch.m_force_m1 != MissileType.NUM)
+            {
+                Secondary1 = NetworkMatch.m_force_m1;
+                Secondary2 = NetworkMatch.m_force_m2;
+            }
+            else if (NetworkMatch.m_force_m2 != MissileType.NUM)
+            {
+                Secondary1 = NetworkMatch.m_force_m2;
+                Secondary2 = MissileType.NUM;
+            }
+        }
+
+        static int Pick(int value, List<int> pool, int taken)
+        {
+            if (value != BotSettings.RANDOM || pool.Count == 0)
                 return value;
-            int pick;
-            do
-                pick = UnityEngine.Random.Range(0, count);
-            while (pick == taken && count > 1);
-            return pick;
+            List<int> free = pool.Where(choice => choice != taken).ToList();
+            if (free.Count == 0)
+                free = pool;
+            return free[UnityEngine.Random.Range(0, free.Count)];
         }
 
         public List<WeaponType> Primaries
@@ -107,6 +126,20 @@ namespace GameMod.Bots
         public static List<int> LoadoutOptions(int count, bool isSecondSlot)
         {
             return isSecondSlot ? Options(count, count, RANDOM) : Options(count, RANDOM);
+        }
+
+        public static List<int> RandomPrimaries()
+        {
+            List<int> choosable = Enumerable.Range(0, (int)MPLoadouts.DefaultWeaponEnd).Where(w => w != (int)WeaponType.REFLEX).ToList();
+            List<int> allowed = choosable.Where(w => MPLoadouts.IsAllowed((WeaponType)w)).ToList();
+            return allowed.Count > 0 ? allowed : choosable;
+        }
+
+        public static List<int> RandomSecondaries()
+        {
+            List<int> choosable = Enumerable.Range(0, (int)MPLoadouts.DefaultMissileEnd).ToList();
+            List<int> allowed = choosable.Where(m => MPLoadouts.IsAllowed((MissileType)m)).ToList();
+            return allowed.Count > 0 ? allowed : choosable;
         }
 
         static List<int> Options(int count, params int[] extra)
