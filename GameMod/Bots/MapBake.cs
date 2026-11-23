@@ -81,7 +81,7 @@ namespace GameMod.Bots
                 if (string.IsNullOrEmpty(key) || (filters.Count > 0 && !filters.Exists(f => key.ToLowerInvariant().Contains(f))))
                     continue;
                 matching++;
-                if (!skipped.Contains(key) && !LevelCapture.IsBaked(key) && !File.Exists(LevelCapture.CapturePath(key)))
+                if (!skipped.Contains(key) && !LevelCapture.IsBaked(key) && !LevelCapture.HasCapture(key))
                     queue.Enqueue(new PendingLevel { Index = index, Key = key });
             }
             levelsTotal = queue.Count;

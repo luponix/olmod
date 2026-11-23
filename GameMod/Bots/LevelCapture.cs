@@ -11,8 +11,8 @@ namespace GameMod.Bots
     static class LevelCapture
     {
         const uint MAGIC = 0x3147474Fu;
-        const int VERSION = 1;
-        const int BAKE_VERSION = 4;
+        const int VERSION = 2;
+        const int BAKE_VERSION = 5;
         const int BAKE_MASK = (1 << 0) | (1 << 9) | (1 << 14) | (1 << 15) | (1 << 17) | (1 << 23) | (1 << 26) | (1 << 31);
 
         public static string CacheDir
@@ -110,7 +110,7 @@ namespace GameMod.Bots
             if (string.IsNullOrEmpty(levelKey))
                 return;
             Directory.CreateDirectory(CacheDir);
-            if (IsBaked(levelKey) || File.Exists(CapturePath(levelKey)))
+            if (IsBaked(levelKey) || HasCapture(levelKey))
                 return;
 
             var started = DateTime.UtcNow;
@@ -123,6 +123,22 @@ namespace GameMod.Bots
         public static string CapturePath(string levelKey)
         {
             return Path.Combine(CacheDir, FileName(levelKey) + ".olgeo");
+        }
+
+        public static bool HasCapture(string levelKey)
+        {
+            string path = CapturePath(levelKey);
+            if (!File.Exists(path))
+                return false;
+            try
+            {
+                using (var reader = new BinaryReader(File.OpenRead(path)))
+                    return reader.ReadUInt32() == MAGIC && reader.ReadInt32() == VERSION;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
         }
 
         public static bool IsBaked(string levelKey)
@@ -257,14 +273,21 @@ namespace GameMod.Bots
             }
 
             var seeds = new List<Vector3>();
-            foreach (LevelData.SpawnPoint[] points in new[] { levelData.m_player_spawn_points, levelData.m_item_spawn_points, levelData.m_mp_camera_points })
-                if (points != null)
-                    foreach (LevelData.SpawnPoint point in points)
+            int playerSpawns = 0;
+            LevelData.SpawnPoint[][] groups = { levelData.m_player_spawn_points, levelData.m_item_spawn_points, levelData.m_mp_camera_points };
+            for (int group = 0; group < groups.Length; group++)
+            {
+                if (groups[group] != null)
+                    foreach (LevelData.SpawnPoint point in groups[group])
                         if (point != null)
                             seeds.Add(point.position);
+                if (group == 0)
+                    playerSpawns = seeds.Count;
+            }
             writer.Write(seeds.Count);
             foreach (Vector3 seed in seeds)
                 WriteVector(writer, seed);
+            writer.Write(playerSpawns);
 
             writer.Flush();
             return stream.ToArray();
