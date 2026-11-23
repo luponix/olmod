@@ -14,6 +14,7 @@ namespace GameMod.Bots
         const string NOT_INSTALLED = "BOTS ARE NOT INSTALLED ON THIS SERVER";
         const string UNSUPPORTED = "THE BOTS DO NOT SUPPORT THIS OVERLOAD INSTALL";
         const string INSTALL_FAILED = "THE BOTS COULD NOT BE INSTALLED ON THIS SERVER";
+        const string ALLOW_UNKNOWN_FILES = "-bots-allow-unknown-files";
         static readonly TimeSpan STALE_LOCK = TimeSpan.FromMinutes(2);
         static readonly TimeSpan LOCK_WAIT = TimeSpan.FromSeconds(15);
         const int MOVE_ATTEMPTS = 10;
@@ -23,6 +24,8 @@ namespace GameMod.Bots
         public static string Detail { get; private set; }
 
         static LockFile heldLock;
+        static string rejectedPackageHash;
+        static string rejectedDetail;
 
         class InstallException : Exception
         {
@@ -65,6 +68,7 @@ namespace GameMod.Bots
             Failure = null;
             Detail = null;
             string folder = Olbot.PlayerFolder;
+            string packageHash = null;
             try
             {
                 if (!File.Exists(PackagePath))
@@ -81,7 +85,9 @@ namespace GameMod.Bots
                 }
                 if (Platform == null)
                     throw new InstallException(NOT_INSTALLED, "no bots for " + Application.platform);
-                string packageHash = HashFile(PackagePath);
+                packageHash = HashFile(PackagePath);
+                if (packageHash == rejectedPackageHash)
+                    throw new InstallException(UNSUPPORTED, rejectedDetail);
                 if (IsInstalled(folder, packageHash))
                     return true;
                 using (heldLock = Lock())
@@ -96,6 +102,11 @@ namespace GameMod.Bots
             }
             catch (InstallException ex)
             {
+                if (ex.Notice == UNSUPPORTED && packageHash != null)
+                {
+                    rejectedPackageHash = packageHash;
+                    rejectedDetail = ex.Message;
+                }
                 return Fail(ex.Notice, ex.Message);
             }
             catch (Exception ex)
@@ -158,6 +169,28 @@ namespace GameMod.Bots
                 JObject files = ReadManifest(zip)["platforms"][Platform] as JObject;
                 if (files == null)
                     throw new InstallException(NOT_INSTALLED, PackagePath + " has no " + Platform + " files");
+                int unknownFiles = 0;
+                foreach (JProperty file in files.Properties())
+                {
+                    string source = GameFilePath(gameRoot, file);
+                    if (!File.Exists(source))
+                        throw new InstallException(UNSUPPORTED, "missing " + source);
+                    string expectedHash = (string)file.Value[1];
+                    string actualHash = HashFile(source);
+                    if (!string.Equals(actualHash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                    {
+                        Debug.LogFormat("[Bots] unknown game file {0}: expected sha256 {1}, found {2}", source, expectedHash, actualHash);
+                        unknownFiles++;
+                    }
+                    heldLock.Refresh();
+                }
+                if (unknownFiles > 0)
+                {
+                    if (!Core.GameMod.FindArg(ALLOW_UNKNOWN_FILES))
+                        throw new InstallException(UNSUPPORTED, unknownFiles + " game files are unknown, start the server with " + ALLOW_UNKNOWN_FILES + " to use them anyway");
+                    Debug.LogFormat("[Bots] {0}: using {1} unknown game files", ALLOW_UNKNOWN_FILES, unknownFiles);
+                }
+
                 string prefix = Platform + "/";
                 foreach (ZipEntry entry in zip)
                 {
@@ -169,17 +202,17 @@ namespace GameMod.Bots
                 }
                 foreach (JProperty file in files.Properties())
                 {
-                    string source = Path.Combine(gameRoot, SafeRelative((string)file.Value[0]).Replace('/', Path.DirectorySeparatorChar));
-                    if (!File.Exists(source))
-                        throw new InstallException(UNSUPPORTED, "missing " + source);
-                    if (!string.Equals(HashFile(source), (string)file.Value[1], StringComparison.OrdinalIgnoreCase))
-                        throw new InstallException(UNSUPPORTED, source + " is not the expected file");
                     string target = TargetPath(building, file.Name);
-                    File.Copy(source, target, true);
+                    File.Copy(GameFilePath(gameRoot, file), target, true);
                     File.SetAttributes(target, FileAttributes.Normal);
                     heldLock.Refresh();
                 }
             }
+        }
+
+        static string GameFilePath(string gameRoot, JProperty file)
+        {
+            return Path.Combine(gameRoot, SafeRelative((string)file.Value[0]).Replace('/', Path.DirectorySeparatorChar));
         }
 
         static JObject ReadManifest(ZipFile zip)
