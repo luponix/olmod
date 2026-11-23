@@ -1,4 +1,5 @@
-﻿using Version = System.Version;
+﻿using System.Reflection;
+using Version = System.Version;
 
 namespace GameMod.VersionHandling {
 
@@ -20,7 +21,12 @@ namespace GameMod.VersionHandling {
 
                     // do not include revision unless explicitly set to non-zero in the assembly version
                     string maybeRevision = RunningVersion.Revision > 0 ? $".{RunningVersion.Revision}" : "";
-                    _fullVersionString = $"Pyro {RunningVersion.ToString(3)}{maybeRevision}{(Modded ? " **MODDED**" : "")}";
+                    string shownVersion = RunningVersion.ToString(3) + maybeRevision;
+                    // a release candidate names the coming version here, its assembly version stays below it so the updater still offers the release
+                    var informational = (AssemblyInformationalVersionAttribute[])typeof(OlmodVersion).Assembly.GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false);
+                    if (informational.Length > 0 && !string.IsNullOrEmpty(informational[0].InformationalVersion))
+                        shownVersion = informational[0].InformationalVersion;
+                    _fullVersionString = $"Pyro {shownVersion}{(Modded ? " **MODDED**" : "")}";
                 }
                 return _fullVersionString;
             }
