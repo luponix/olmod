@@ -17,6 +17,7 @@ namespace GameMod.Bots
         static readonly FieldInfo pregameWaitField = AccessTools.Field(typeof(NetworkMatch), "m_pregame_elapsed_seconds_waiting_before_countdown");
         const float ENGINE_PREGAME_WAIT = 60f;
         const float BOT_PREGAME_WAIT = 150f;
+        const float ONLY_BOTS_GRACE = 30f;
 
         static List<BotSlot> bots = new List<BotSlot>();
         static readonly Dictionary<int, BotSlot> botsByConnection = new Dictionary<int, BotSlot>();
@@ -28,6 +29,8 @@ namespace GameMod.Bots
         static int botCount = -1;
         static string notice;
         static float nextCheck;
+        static float onlyBotsSince = -1f;
+        static bool endedForOnlyBots;
 
         public static bool HasBots
         {
@@ -174,6 +177,7 @@ namespace GameMod.Bots
             if (olbot != null && olbot.HasExited)
                 OnOlbotExited();
             int humans = NetworkMatch.m_players.Keys.Count(id => !botsByConnection.ContainsKey(id));
+            EndIfOnlyBots(humans);
             if (notice != null && humans > 0)
             {
                 MPChatTools.SendTo(notice);
@@ -185,6 +189,23 @@ namespace GameMod.Bots
                 return;
             WriteBotCount(Mathf.Clamp(bots.Count + 1 - humans, 0, bots.Count));
             maxPlayersField.SetValue(null, hostMaxPlayers + (botsByConnection.Count > 0 ? 1 : 0));
+        }
+
+        static void EndIfOnlyBots(int humans)
+        {
+            if (humans > 0 || botsByConnection.Count == 0)
+            {
+                onlyBotsSince = -1f;
+                return;
+            }
+            if (onlyBotsSince < 0f)
+                onlyBotsSince = Time.unscaledTime;
+            MatchState state = NetworkMatch.GetMatchState();
+            if (endedForOnlyBots || Time.unscaledTime - onlyBotsSince < ONLY_BOTS_GRACE || state == MatchState.NONE || state >= MatchState.POSTGAME)
+                return;
+            endedForOnlyBots = true;
+            UnityEngine.Debug.LogFormat("[Bots] only bots are left after {0} s, ending the match in state {1}", ONLY_BOTS_GRACE, state);
+            NetworkMatch.End();
         }
 
         static void OnOlbotExited()
@@ -231,6 +252,8 @@ namespace GameMod.Bots
             botsByConnection.Clear();
             botCount = -1;
             notice = null;
+            onlyBotsSince = -1f;
+            endedForOnlyBots = false;
         }
 
         static bool holdingCountdown;

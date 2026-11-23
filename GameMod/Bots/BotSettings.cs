@@ -19,7 +19,7 @@ namespace GameMod.Bots
 
         public string PilotName
         {
-            get { return BotSettings.NAME_PREFIX + Name; }
+            get { return "BOT" + BotSettings.TierTag(Tier) + " " + Name; }
         }
 
         public string TierFile
@@ -76,8 +76,7 @@ namespace GameMod.Bots
         public const int MAX_BOTS = 15;
         public const int AUTO_TEAM = -1;
         public const int RANDOM = -2;
-        public const string NAME_PREFIX = "BOT ";
-        public const int MAX_NAME_LENGTH = 16 - 4;
+        public const int MAX_NAME_LENGTH = 17 - 5;
 
         public static readonly string[] TIER_FILES = { "trainee", "rookie", "hotshot", "ace", "insane", "insaneplus" };
         public static readonly string[] TIER_NAMES = { "TRAINEE", "ROOKIE", "HOTSHOT", "ACE", "INSANE", "INSANE+" };
@@ -113,6 +112,11 @@ namespace GameMod.Bots
         public static string TierName(int tier)
         {
             return tier == RANDOM ? "RANDOM" : TIER_NAMES[tier];
+        }
+
+        public static string TierTag(int tier)
+        {
+            return tier == RANDOM ? "?" : (TIER_FILES.Length - 1 - tier).ToString();
         }
 
         public JObject ToJson()
