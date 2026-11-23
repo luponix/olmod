@@ -710,6 +710,11 @@ namespace GameMod
     {
         static bool DrawLast(UIElement uie)
         {
+            if (Bots.LobbyBotsPage.IsOpen)
+            {
+                Bots.LobbyBotsPage.Draw(uie);
+                return false;
+            }
             if (MenuManager.m_menu_micro_state != 0)
                 return MenuManager.m_menu_micro_state == 1 ? DrawLastQuit(uie) : true;
             Vector2 position;
@@ -725,6 +730,7 @@ namespace GameMod
             uie.SelectAndDrawItem(Loc.LS("OPTIONS"), position - Vector2.right * 250f, 2, false, 0.75f, 0.75f);
             //position.y += 62f;
             uie.SelectAndDrawItem(Loc.LS("MULTIPLAYER MENU"), position + Vector2.right * 250f, 100, false, 0.75f, 0.75f);
+            Bots.LobbyBotsPage.DrawOpenButton(uie);
             return false;
         }
 

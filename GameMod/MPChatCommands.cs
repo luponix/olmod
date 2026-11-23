@@ -132,6 +132,8 @@ namespace GameMod {
             Test,
             SwitchTeam,
             ListPlayers,
+            AddBot,
+            KickBot,
         }
 
         // properties:
@@ -254,6 +256,12 @@ namespace GameMod {
                 cmd = Command.SwitchTeam;
             } else if (cmdName == "LP" || cmdName == "LISTPLAYERS") {
                 cmd = Command.ListPlayers;
+            } else if (cmdName == "ADDBOT") {
+                cmd = Command.AddBot;
+                needAuth = true;
+            } else if (cmdName == "KICKBOT") {
+                cmd = Command.KickBot;
+                needAuth = true;
             }
         }
 
@@ -348,6 +356,12 @@ namespace GameMod {
                     break;
                 case Command.ListPlayers:
                     result = DoListPlayers();
+                    break;
+                case Command.AddBot:
+                    result = DoAddBot();
+                    break;
+                case Command.KickBot:
+                    result = DoKickBot();
                     break;
                 default:
                     Debug.LogFormat("[ChatCmd] {0}: {1} {2} was not handled by server", cmd, cmdName, arg);
@@ -577,6 +591,9 @@ namespace GameMod {
                 ReturnTo(String.Format("{0} player {1} by {2}", banOp, selectedPlayerEntry.name, senderEntry.name), -1, selectedPlayerConnectionId);
             }
             if (doKick) {
+                if (GameMod.Bots.Hosting.IsBot(selectedPlayerConnectionId)) {
+                    GameMod.Bots.Hosting.StopReplacingWithHumans();
+                }
                 ReturnTo(String.Format("KICK player {0} by {1}", selectedPlayerEntry.name, senderEntry.name), -1, selectedPlayerConnectionId);
                 if (selectedPlayer != null) {
                     MPBanPlayers.KickPlayer(selectedPlayer);
@@ -766,6 +783,48 @@ namespace GameMod {
                 return false;
             }
 
+            return false;
+        }
+
+        public bool DoAddBot()
+        {
+            var request = new GameMod.Bots.BotSlot();
+            string[] parts = String.IsNullOrEmpty(arg) ? new string[0] : arg.Trim().Split(new[] { ' ' }, 2, StringSplitOptions.RemoveEmptyEntries);
+            int first = 0;
+            if (parts.Length > 0) {
+                int tier = GameMod.Bots.BotSettings.TierFromText(parts[0]);
+                if (tier >= 0) {
+                    request.Tier = tier;
+                    first = 1;
+                } else if (parts[0].All(Char.IsDigit)) {
+                    ReturnToSender("ADDBOT: the difficulty is 0 (INSANE+) to 5 (TRAINEE)");
+                    return false;
+                }
+            }
+            request.Name = parts.Length > first ? GameMod.Bots.BotSettings.CleanName(parts[first]).Trim() : String.Empty;
+            GameMod.Bots.BotSlot added;
+            string reason = GameMod.Bots.Hosting.Add(request, out added);
+            if (reason != null) {
+                ReturnToSender("ADDBOT: " + reason);
+                return false;
+            }
+            ReturnTo(String.Format("ADDBOT: {0} ({1}) added by {2}", added.PilotName, GameMod.Bots.BotSettings.TierName(added.Tier), senderEntry.name));
+            return false;
+        }
+
+        public bool DoKickBot()
+        {
+            if (String.IsNullOrEmpty(arg) || !SelectPlayer(arg)) {
+                ReturnToSender(String.Format("KICKBOT: bot {0} not found", arg));
+                return false;
+            }
+            if (!GameMod.Bots.Hosting.IsBot(selectedPlayerConnectionId)) {
+                ReturnToSender(String.Format("KICKBOT: {0} is not a bot", selectedPlayerEntry.name));
+                return false;
+            }
+            GameMod.Bots.Hosting.StopReplacingWithHumans();
+            ReturnTo(String.Format("KICKBOT: {0} kicked by {1}", selectedPlayerEntry.name, senderEntry.name), -1, selectedPlayerConnectionId);
+            MPBanPlayers.KickPlayer(selectedPlayerConnectionId, selectedPlayerEntry.name);
             return false;
         }
 

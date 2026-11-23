@@ -126,6 +126,17 @@ namespace GameMod.Bots
             return tier == RANDOM ? "?" : (TIER_FILES.Length - 1 - tier).ToString();
         }
 
+        public static int TierFromText(string text)
+        {
+            text = text.Trim().ToUpperInvariant();
+            if (text.StartsWith("BOT"))
+                text = text.Substring(3);
+            for (int tier = 0; tier < TIER_FILES.Length; tier++)
+                if (text == TierTag(tier) || text == TIER_NAMES[tier])
+                    return tier;
+            return -1;
+        }
+
         public JObject ToJson()
         {
             var bots = new JArray();

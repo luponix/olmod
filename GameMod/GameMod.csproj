@@ -298,6 +298,7 @@
     <Compile Include="Bots\InputStats.cs" />
     <Compile Include="Bots\BotSettings.cs" />
     <Compile Include="Bots\BotSettingsPage.cs" />
+    <Compile Include="Bots\LobbyBotsPage.cs" />
     <Compile Include="Bots\LevelCapture.cs" />
     <Compile Include="Bots\MapBake.cs" />
     <Compile Include="Bots\MapView.cs" />
