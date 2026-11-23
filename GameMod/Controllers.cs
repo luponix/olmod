@@ -471,11 +471,21 @@ namespace GameMod
             }
 
 
-            int enums_read = 0;
+            for (int i = (int)CCInputExt.TOGGLE_LOADOUT_PRIMARY; i < ControlsExt.MAX_ARRAY_SIZE; i++)
+            {
+                for (int n = 0; n < 2; n++)
+                {
+                    Controls.m_input_joy[n, i].m_controller_num = -1;
+                    Controls.m_input_joy[n, i].m_type = 0;
+                    Controls.m_input_joy[n, i].m_control_num = -1;
+                    Controls.m_input_joy[n, i].m_axis_pos = false;
+                    Controls.m_input_kc[n, i] = 0;
+                }
+            }
+
             // Read any new bindings that are past the original CCInput bounds in our pilot .xconfigmod 
             while (!sr.EndOfStream)
             {
-                enums_read++;
                 text = sr.ReadLine();
                 if (sr.EndOfStream)
                 {
@@ -509,30 +519,13 @@ namespace GameMod
                 }
             }
 
-            // This indicates that this config file doesnt contain information about the bound taunt keys so we need to initialise them
-            if(enums_read < 7)
-            {
-                for(int i = (int)CCInputExt.TAUNT_1; i <= (int)CCInputExt.TAUNT_6; i++)
-                {
-                    Controls.m_input_joy[0, i].m_controller_num = -1;
-                    Controls.m_input_joy[0, i].m_type = 0;
-                    Controls.m_input_joy[0, i].m_control_num = -1;
-                    Controls.m_input_joy[0, i].m_axis_pos = false;
-                    Controls.m_input_joy[1, i].m_controller_num = -1;
-                    Controls.m_input_joy[1, i].m_type = 0;
-                    Controls.m_input_joy[1, i].m_control_num = -1;
-                    Controls.m_input_joy[1, i].m_axis_pos = false;
-                    Controls.m_input_kc[0, i] = 0;
-                    Controls.m_input_kc[1, i] = 0;
-                }
-            }
-
             for (int m = (int)CCInputExt.TOGGLE_LOADOUT_PRIMARY; m < ControlsExt.MAX_ARRAY_SIZE; m++)
             {
                 for (int n = 0; n < 2; n++)
                 {
-                    if (Controls.m_input_joy[n, m].m_controller_num != -1)
-                        Controls.m_input_joy[n, m].m_controller_num = controllers[Controls.m_input_joy[n, m].m_controller_num];
+                    int controllerNum = Controls.m_input_joy[n, m].m_controller_num;
+                    if (controllerNum != -1)
+                        Controls.m_input_joy[n, m].m_controller_num = controllerNum >= 0 && controllerNum < controllers.Length ? controllers[controllerNum] : -1;
                 }
             }
         }
