@@ -793,7 +793,7 @@ namespace GameMod {
             int first = 0;
             if (parts.Length > 0) {
                 int tier = GameMod.Bots.BotSettings.TierFromText(parts[0]);
-                if (tier >= 0) {
+                if (tier != -1) {
                     request.Tier = tier;
                     first = 1;
                 } else if (parts[0].All(Char.IsDigit)) {
@@ -802,7 +802,16 @@ namespace GameMod {
                     return false;
                 }
             }
-            request.Name = parts.Length > first ? GameMod.Bots.BotSettings.CleanName(parts[first]).Trim() : String.Empty;
+            string[] fields = (parts.Length > first ? parts[first] : String.Empty).Split(':');
+            request.Name = GameMod.Bots.BotSettings.CleanName(fields[0]).Trim();
+            if (fields.Length > 1 && !GameMod.Bots.BotSettings.ReadLoadout(fields[1], request)) {
+                ReturnToSender("ADDBOT: write the loadout as WEAPON+WEAPON/MISSILE+MISSILE, for example IMPULSE+NONE/FALCON+RANDOM");
+                return false;
+            }
+            if (fields.Length > 2 && !GameMod.Bots.BotSettings.ReadTeam(fields[2], MPTeams.NetworkMatchTeamCount, request)) {
+                ReturnToSender(String.Format("ADDBOT: the team is AUTO, RANDOM or 1 to {0}", MPTeams.NetworkMatchTeamCount));
+                return false;
+            }
             GameMod.Bots.BotSlot added;
             string reason = GameMod.Bots.Hosting.Add(request, out added);
             if (reason != null) {

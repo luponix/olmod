@@ -297,6 +297,7 @@
     <Compile Include="Bots\Hosting.cs" />
     <Compile Include="Bots\InputStats.cs" />
     <Compile Include="Bots\BotSettings.cs" />
+    <Compile Include="Bots\BotForm.cs" />
     <Compile Include="Bots\BotSettingsPage.cs" />
     <Compile Include="Bots\LobbyBotsPage.cs" />
     <Compile Include="Bots\LevelCapture.cs" />

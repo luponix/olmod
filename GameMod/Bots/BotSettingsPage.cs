@@ -22,12 +22,6 @@ namespace GameMod.Bots
         const int SELECTION_ROW = 200;
         const int SELECTION_REMOVE = 300;
         const float FORM_TOP = -220f;
-        const float FORM_ROW_STEP = 44f;
-        const float FORM_HALF_HEIGHT = 19f;
-        const float BOX_HALF_HEIGHT = 15f;
-        const float COLUMN_X = 205f;
-        const float COLUMN_WIDTH = 400f;
-        const float VALUE_HALF_WIDTH = 115f;
         const float TABLE_HALF_WIDTH = 400f;
         const float TABLE_TOP = 26f;
         const float ROW_PITCH = 38f;
@@ -85,24 +79,10 @@ namespace GameMod.Bots
 
         public static void Draw(UIElement uie)
         {
-            Vector2 left = new Vector2(-COLUMN_X, FORM_TOP);
-            DrawNameRow(uie, left);
-            left.y += FORM_ROW_STEP;
-            DrawOptionRow(uie, left, SELECTION_TIER, Loc.LS("DIFFICULTY"), BotSettings.TierName(Draft.Tier), true);
-            left.y += FORM_ROW_STEP;
-            DrawOptionRow(uie, left, SELECTION_TEAM, Loc.LS("TEAM"), TeamName(Draft.Team), NetworkMatch.IsTeamMode(MenuManager.mms_mode));
-
-            Vector2 right = new Vector2(COLUMN_X, FORM_TOP);
-            DrawOptionRow(uie, right, SELECTION_PRIMARY1, Loc.LS("WEAPON 1"), WeaponName(Draft.Primary1), true);
-            right.y += FORM_ROW_STEP;
-            DrawOptionRow(uie, right, SELECTION_PRIMARY2, Loc.LS("WEAPON 2"), WeaponName(Draft.Primary2), true);
-            right.y += FORM_ROW_STEP;
-            DrawOptionRow(uie, right, SELECTION_SECONDARY1, Loc.LS("MISSILE 1"), MissileName(Draft.Secondary1), true);
-            right.y += FORM_ROW_STEP;
-            DrawOptionRow(uie, right, SELECTION_SECONDARY2, Loc.LS("MISSILE 2"), MissileName(Draft.Secondary2), true);
+            BotForm.Draw(uie, Draft, SELECTION_NAME, FORM_TOP, NetworkMatch.IsTeamMode(MenuManager.mms_mode));
 
             bool isEditing = editedIndex >= 0;
-            Vector2 button = new Vector2(0f, right.y + 46f);
+            Vector2 button = new Vector2(0f, FORM_TOP + BotForm.ROW_STEP * 3f + 46f);
             uie.SelectAndDrawItem(isEditing ? Loc.LS("UPDATE BOT") : Loc.LS("ADD BOT"), button, SELECTION_ADD, !isEditing && Slots.Count >= BotSettings.MAX_BOTS, 0.5f, 0.6f);
             uie.DrawMenuSeparator(button + Vector2.up * 34f);
 
@@ -113,107 +93,15 @@ namespace GameMod.Bots
 
         static void DrawPresetRow(UIElement uie)
         {
-            Vector2 left = new Vector2(-COLUMN_X, PRESET_Y);
-            DrawOptionRow(uie, left, SELECTION_PRESET, Loc.LS("PRESET"), SelectedPreset == null ? Loc.LS("NONE") : SelectedPreset.Name, Presets.Count > 0, IsRenamingPreset);
-            MPServerBrowser_UIElement_Draw.SelectAndDrawSmallerItem(uie, Loc.LS("NEW PRESET"), new Vector2(COLUMN_X - PRESET_BUTTON_OFFSET, PRESET_Y), SELECTION_PRESET_NEW, false, 0.3f, 0.45f);
-            MPServerBrowser_UIElement_Draw.SelectAndDrawSmallerItem(uie, Loc.LS("DELETE PRESET"), new Vector2(COLUMN_X + PRESET_BUTTON_OFFSET, PRESET_Y), SELECTION_PRESET_DELETE, SelectedPreset == null, 0.3f, 0.45f);
+            Vector2 left = new Vector2(-BotForm.COLUMN_X, PRESET_Y);
+            BotForm.DrawOptionRow(uie, left, SELECTION_PRESET, Loc.LS("PRESET"), SelectedPreset == null ? Loc.LS("NONE") : SelectedPreset.Name, Presets.Count > 0, IsRenamingPreset);
+            MPServerBrowser_UIElement_Draw.SelectAndDrawSmallerItem(uie, Loc.LS("NEW PRESET"), new Vector2(BotForm.COLUMN_X - PRESET_BUTTON_OFFSET, PRESET_Y), SELECTION_PRESET_NEW, false, 0.3f, 0.45f);
+            MPServerBrowser_UIElement_Draw.SelectAndDrawSmallerItem(uie, Loc.LS("DELETE PRESET"), new Vector2(BotForm.COLUMN_X + PRESET_BUTTON_OFFSET, PRESET_Y), SELECTION_PRESET_DELETE, SelectedPreset == null, 0.3f, 0.45f);
         }
 
         static BotPreset SelectedPreset
         {
             get { return presetIndex >= 0 && presetIndex < Presets.Count ? Presets[presetIndex] : null; }
-        }
-
-        static void DrawNameRow(UIElement uie, Vector2 position)
-        {
-            DrawTextRow(uie, position, SELECTION_NAME, Loc.LS("BOT NAME"), Draft.PilotName);
-        }
-
-        static void DrawTextRow(UIElement uie, Vector2 position, int selection, string label, string text)
-        {
-            uie.TestMouseInRect(position, COLUMN_WIDTH * 0.5f, FORM_HALF_HEIGHT, selection);
-            bool isHighlighted = UIManager.m_menu_selection == selection;
-            DrawFormBackground(uie, position, isHighlighted, 1f);
-            DrawFormLabel(uie, position, label, isHighlighted, 1f);
-            Vector2 value = ValuePosition(position);
-            Color color = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui4;
-            DrawValueBox(uie, value, isHighlighted, 1f);
-            float maxWidth = 2f * VALUE_HALF_WIDTH - 40f;
-            uie.DrawStringSmall(text, value, 0.55f, StringOffset.CENTER, color, 1f, maxWidth);
-            if (isHighlighted)
-                DrawCursor(uie, value, text, color, maxWidth);
-        }
-
-        static void DrawCursor(UIElement uie, Vector2 position, string text, Color color, float maxWidth)
-        {
-            if ((int)(Time.unscaledTime * 4f) % 2 != 0)
-                return;
-            float textHalfWidth = Mathf.Min(UIManager.GetStringWidth(text, 20f * 0.55f), maxWidth) * 0.5f;
-            uie.DrawStringSmall("_", position + Vector2.right * textHalfWidth, 0.55f, StringOffset.LEFT, color, 1f);
-        }
-
-        static void DrawOptionRow(UIElement uie, Vector2 position, int selection, string label, string value, bool isEnabled, bool isTyping = false)
-        {
-            Vector2 valuePosition = ValuePosition(position);
-            if (isEnabled)
-            {
-                uie.TestMouseInRect(position, COLUMN_WIDTH * 0.5f, FORM_HALF_HEIGHT, selection);
-                uie.TestMouseInRect(valuePosition - Vector2.right * VALUE_HALF_WIDTH * 0.5f, VALUE_HALF_WIDTH * 0.5f, FORM_HALF_HEIGHT, selection + 500, false);
-            }
-            bool isHighlighted = isEnabled && (UIManager.m_menu_selection == selection || UIManager.m_menu_selection == selection + 500);
-            if (isHighlighted)
-                MenuManager.option_dir = true;
-            float alpha = isEnabled ? 1f : 0.3f;
-            DrawFormBackground(uie, position, isHighlighted, alpha);
-            DrawFormLabel(uie, position, label, isHighlighted, alpha);
-            DrawValueBox(uie, valuePosition, isHighlighted, alpha);
-            Color color = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui4;
-            uie.DrawStringSmall(value, valuePosition, 0.55f, StringOffset.CENTER, color, alpha, 2f * VALUE_HALF_WIDTH - 60f);
-            if (isTyping)
-                DrawCursor(uie, valuePosition, value, color, 2f * VALUE_HALF_WIDTH - 60f);
-            Color tab = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui2;
-            Color arrow = isHighlighted ? UIManager.m_col_ui6 : UIManager.m_col_ub3;
-            float tabHalfWidth = 10f;
-            Vector2 arrowOffset = Vector2.right * (VALUE_HALF_WIDTH - tabHalfWidth);
-            UIManager.DrawQuadUI(valuePosition - arrowOffset, tabHalfWidth, BOX_HALF_HEIGHT, tab, uie.m_alpha * alpha, 13);
-            UIManager.DrawQuadUI(valuePosition + arrowOffset, tabHalfWidth, BOX_HALF_HEIGHT, tab, uie.m_alpha * alpha, 13);
-            UIManager.DrawSpriteUI(valuePosition - arrowOffset, 0.22f, 0.22f, arrow, uie.m_alpha * alpha, 81);
-            UIManager.DrawSpriteUI(valuePosition + arrowOffset, 0.22f, 0.22f, arrow, uie.m_alpha * alpha, 80);
-        }
-
-        static Vector2 ValuePosition(Vector2 row)
-        {
-            return row + Vector2.right * (COLUMN_WIDTH * 0.5f - VALUE_HALF_WIDTH - 8f);
-        }
-
-        static void DrawValueBox(UIElement uie, Vector2 position, bool isHighlighted, float alpha)
-        {
-            Color box = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui2;
-            box.a = alpha;
-            uie.DrawOutlineBackdrop(position, BOX_HALF_HEIGHT, 2f * (VALUE_HALF_WIDTH - BOX_HALF_HEIGHT), box, 2);
-        }
-
-        static void DrawFormBackground(UIElement uie, Vector2 position, bool isHighlighted, float alpha)
-        {
-            Color frame = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui2;
-            frame.a = alpha;
-            uie.DrawOutlineBackdrop(position, FORM_HALF_HEIGHT, COLUMN_WIDTH - 2f * FORM_HALF_HEIGHT, frame, 2);
-            if (isHighlighted)
-            {
-                Color bar = Color.Lerp(UIManager.m_col_ui5, UIManager.m_col_ui6, UIManager.m_select_flash * 0.3f);
-                bar.a = uie.m_alpha;
-                UIManager.DrawQuadBarHorizontal(position, FORM_HALF_HEIGHT, FORM_HALF_HEIGHT, COLUMN_WIDTH - 2f * FORM_HALF_HEIGHT, bar, 12);
-                return;
-            }
-            Color faint = UIManager.m_col_ub0;
-            faint.a = uie.m_alpha * 0.08f;
-            UIManager.DrawQuadBarHorizontal(position, FORM_HALF_HEIGHT, FORM_HALF_HEIGHT, COLUMN_WIDTH - 2f * FORM_HALF_HEIGHT, faint, 12);
-        }
-
-        static void DrawFormLabel(UIElement uie, Vector2 position, string label, bool isHighlighted, float alpha)
-        {
-            Color color = isHighlighted ? UIManager.m_col_ub3 : UIManager.m_col_ui2;
-            uie.DrawStringSmall(label, position - Vector2.right * (COLUMN_WIDTH * 0.5f - 12f), 0.55f, StringOffset.LEFT, color, alpha, COLUMN_WIDTH - 2f * VALUE_HALF_WIDTH - 30f);
         }
 
         static void DrawTable(UIElement uie)
@@ -269,7 +157,7 @@ namespace GameMod.Bots
             }
             uie.DrawStringSmall(slot.PilotName, new Vector2(NAME_X, y), 0.5f, StringOffset.LEFT, color, 1f, TIER_X - NAME_X - 70f);
             uie.DrawStringSmall(BotSettings.TierName(slot.Tier), new Vector2(TIER_X, y), 0.5f, StringOffset.CENTER, color, 1f, 120f);
-            string team = NetworkMatch.IsTeamMode(MenuManager.mms_mode) ? TeamName(slot.Team) : "-";
+            string team = NetworkMatch.IsTeamMode(MenuManager.mms_mode) ? BotForm.TeamName(slot.Team) : "-";
             uie.DrawStringSmall(team, new Vector2(TEAM_X, y), 0.5f, StringOffset.CENTER, color, 1f, 100f);
             DrawLoadoutIcon(uie, new Vector2(LOADOUT_X, y), (int)slot.Primary1, (int)WeaponType.NUM, 26, color);
             DrawLoadoutIcon(uie, new Vector2(LOADOUT_X + LOADOUT_STEP, y), (int)slot.Primary2, (int)WeaponType.NUM, 26, color);
@@ -368,6 +256,11 @@ namespace GameMod.Bots
         public static void Select(int selection)
         {
             int direction = UIManager.m_select_dir;
+            if (BotForm.Step(Draft, selection - SELECTION_NAME, direction, MPTeams.MenuManagerTeamCount))
+            {
+                MenuManager.PlayCycleSound(1f, direction);
+                return;
+            }
             switch (selection)
             {
                 case SELECTION_PRESET:
@@ -406,24 +299,6 @@ namespace GameMod.Bots
                     StopEditing();
                     MenuManager.PlaySelectSound();
                     return;
-                case SELECTION_TIER:
-                    Draft.Tier = Cycle(Draft.Tier, direction, BotSettings.TierOptions(), int.MinValue);
-                    break;
-                case SELECTION_TEAM:
-                    Draft.Team = Cycle(Draft.Team, direction, BotSettings.TeamOptions(MPTeams.MenuManagerTeamCount), int.MinValue);
-                    break;
-                case SELECTION_PRIMARY1:
-                    Draft.Primary1 = (WeaponType)Cycle((int)Draft.Primary1, direction, BotSettings.LoadoutOptions((int)WeaponType.NUM, false), (int)Draft.Primary2);
-                    break;
-                case SELECTION_PRIMARY2:
-                    Draft.Primary2 = (WeaponType)Cycle((int)Draft.Primary2, direction, BotSettings.LoadoutOptions((int)WeaponType.NUM, true), (int)Draft.Primary1);
-                    break;
-                case SELECTION_SECONDARY1:
-                    Draft.Secondary1 = (MissileType)Cycle((int)Draft.Secondary1, direction, BotSettings.LoadoutOptions((int)MissileType.NUM, false), (int)Draft.Secondary2);
-                    break;
-                case SELECTION_SECONDARY2:
-                    Draft.Secondary2 = (MissileType)Cycle((int)Draft.Secondary2, direction, BotSettings.LoadoutOptions((int)MissileType.NUM, true), (int)Draft.Secondary1);
-                    break;
                 default:
                     if (selection >= SELECTION_REMOVE && selection < SELECTION_REMOVE + Slots.Count)
                     {
@@ -474,15 +349,6 @@ namespace GameMod.Bots
             return draft;
         }
 
-        static int Cycle(int value, int direction, List<int> options, int taken)
-        {
-            int index = options.IndexOf(value);
-            do
-                index = (index + options.Count + direction) % options.Count;
-            while (options[index] == taken && options[index] >= 0 && options.Count > 1);
-            return options[index];
-        }
-
         static string FreeName()
         {
             for (int number = 1; ; number++)
@@ -490,31 +356,5 @@ namespace GameMod.Bots
                     return number.ToString();
         }
 
-        static string TeamName(int team)
-        {
-            if (team == BotSettings.AUTO_TEAM)
-                return Loc.LS("AUTO");
-            if (team == BotSettings.RANDOM)
-                return Loc.LS("RANDOM");
-            return Loc.LS("TEAM") + " " + (team + 1);
-        }
-
-        static string WeaponName(WeaponType weapon)
-        {
-            if (weapon == WeaponType.NUM)
-                return Loc.LS("NONE");
-            if ((int)weapon == BotSettings.RANDOM)
-                return Loc.LS("RANDOM");
-            return Player.GetWeaponNameNoDefault(weapon);
-        }
-
-        static string MissileName(MissileType missile)
-        {
-            if (missile == MissileType.NUM)
-                return Loc.LS("NONE");
-            if ((int)missile == BotSettings.RANDOM)
-                return Loc.LS("RANDOM");
-            return Player.GetMissileNameNoDefault(missile);
-        }
     }
 }

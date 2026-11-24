@@ -170,6 +170,8 @@ namespace GameMod.Bots
             if (text.StartsWith("BOT"))
                 text = text.Substring(3);
             text = text.Trim('[', ']');
+            if (text == TierTag(RANDOM) || text == TierName(RANDOM))
+                return RANDOM;
             for (int tier = 0; tier < TIER_FILES.Length; tier++)
                 if (text == TierTag(tier) || text == TIER_NAMES[tier])
                     return tier;
@@ -319,6 +321,70 @@ namespace GameMod.Bots
                 name = name.Replace(c.ToString(), string.Empty);
             name = name.ToUpperInvariant();
             return name.Length > MAX_NAME_LENGTH ? name.Substring(0, MAX_NAME_LENGTH) : name;
+        }
+
+        public static string AddBotCommand(BotSlot slot)
+        {
+            string loadout = WeaponText((int)slot.Primary1) + "+" + WeaponText((int)slot.Primary2) + "/" + MissileText((int)slot.Secondary1) + "+" + MissileText((int)slot.Secondary2);
+            return "/ADDBOT " + TierName(slot.Tier) + " " + slot.Name.Trim() + ":" + loadout + ":" + TeamText(slot.Team);
+        }
+
+        public static bool ReadLoadout(string text, BotSlot slot)
+        {
+            string[] groups = text.Split('/');
+            if (groups.Length != 2)
+                return false;
+            string[] primaries = groups[0].Split('+');
+            string[] secondaries = groups[1].Split('+');
+            if (primaries.Length != 2 || secondaries.Length != 2)
+                return false;
+            int primary1, primary2, secondary1, secondary2;
+            if (!TryChoice(primaries[0], LoadoutOptions((int)WeaponType.NUM, false), WeaponText, out primary1)
+                || !TryChoice(primaries[1], LoadoutOptions((int)WeaponType.NUM, true), WeaponText, out primary2)
+                || !TryChoice(secondaries[0], LoadoutOptions((int)MissileType.NUM, false), MissileText, out secondary1)
+                || !TryChoice(secondaries[1], LoadoutOptions((int)MissileType.NUM, true), MissileText, out secondary2))
+                return false;
+            slot.Primary1 = (WeaponType)primary1;
+            slot.Primary2 = (WeaponType)primary2;
+            slot.Secondary1 = (MissileType)secondary1;
+            slot.Secondary2 = (MissileType)secondary2;
+            return true;
+        }
+
+        public static bool ReadTeam(string text, int teamCount, BotSlot slot)
+        {
+            int team;
+            if (!TryChoice(text, TeamOptions(teamCount), TeamText, out team))
+                return false;
+            slot.Team = team;
+            return true;
+        }
+
+        static bool TryChoice(string text, List<int> options, Func<int, string> name, out int choice)
+        {
+            choice = options[0];
+            foreach (int option in options)
+                if (string.Equals(name(option), text.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    choice = option;
+                    return true;
+                }
+            return false;
+        }
+
+        static string WeaponText(int weapon)
+        {
+            return weapon == RANDOM ? "RANDOM" : weapon == (int)WeaponType.NUM ? "NONE" : ((WeaponType)weapon).ToString();
+        }
+
+        static string MissileText(int missile)
+        {
+            return missile == RANDOM ? "RANDOM" : missile == (int)MissileType.NUM ? "NONE" : ((MissileType)missile).ToString();
+        }
+
+        static string TeamText(int team)
+        {
+            return team == AUTO_TEAM ? "AUTO" : team == RANDOM ? "RANDOM" : (team + 1).ToString();
         }
 
         static int TierOrStrongest(int tier)
