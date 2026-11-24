@@ -268,6 +268,45 @@ namespace GameMod.Bots
             return JToken.Parse(Encoding.UTF8.GetString(Convert.FromBase64String(value)));
         }
 
+        static readonly string[][] BASE_NAME_SETS = {
+            new[] { "DIABLO", "MEPHISTO", "BAAL", "ANDARIEL", "DURIEL", "AZMODAN", "AKARA", "LILITH",
+                "INARIUS", "TYRAEL", "IZUAL", "MALTHAEL", "LEORIC", "AMPLISA", "DECKARD" },
+            new[] { "BANELING", "HYDRALISK", "ULTRALISK", "MUTALISK", "ROACH", "INFESTOR", "LURKER", "QUEEN",
+                "VIPER", "CORRUPTOR", "BROODLORD", "GHOST", "STALKER", "ARCHON", "COLOSSUS" },
+        };
+
+        static BotPreset BasePreset(string name, params int[] tiers)
+        {
+            var settings = new BotSettings();
+            string[] nameSet = BASE_NAME_SETS[UnityEngine.Random.Range(0, BASE_NAME_SETS.Length)];
+            List<string> names = nameSet.OrderBy(n => UnityEngine.Random.value).ToList();
+            for (int i = 0; i < tiers.Length; i++)
+                settings.Slots.Add(new BotSlot {
+                    Name = names[i],
+                    Tier = tiers[i],
+                    Primary1 = (WeaponType)RANDOM,
+                    Primary2 = (WeaponType)RANDOM,
+                    Secondary1 = (MissileType)RANDOM,
+                    Secondary2 = (MissileType)RANDOM,
+                });
+            return new BotPreset { Name = name, Settings = settings };
+        }
+
+        public static void AddBasePresets(List<BotPreset> presets)
+        {
+            var basePresets = new List<BotPreset> {
+                BasePreset("EASY", 0, 1, 1, 2),
+                BasePreset("MEDIUM", 2, 3, 3, 4),
+                BasePreset("HARD", 4, 5, 5, 6),
+                BasePreset("NIGHTMARE", 6, 6, 7, 7),
+                BasePreset("MIXED", 0, 1, 2, 3, 4, 5, 6, 7),
+            };
+            foreach (BotPreset preset in basePresets)
+                if (!presets.Exists(p => p.Name == preset.Name))
+                    presets.Add(preset);
+            presets.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
+        }
+
         public static string CleanPresetName(string name)
         {
             name = name.Trim().ToUpperInvariant();
