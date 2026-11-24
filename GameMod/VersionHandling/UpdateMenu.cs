@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.Linq;
+using System.Text.RegularExpressions;
 using HarmonyLib;
 using Overload;
 using UnityEngine;
@@ -38,7 +40,19 @@ namespace GameMod.VersionHandling
         // wants from the atlas.
         private const int SOLID = 199;           // AtlasIndex0.NONE
 
-        private static List<string> changelog;
+        private enum LineKind { Release, Heading, Title, Bullet, Body, Blank }
+
+        private struct ChangelogLine
+        {
+            public LineKind kind;
+            public string text;
+            public bool continued;
+            public string[] columns;
+        }
+
+        private static readonly Regex valueRow = new Regex(@"^(\s*[^:/]+:)\s+([0-9~.,%]+(?:\s*/\s*[0-9~.,%]+)+)$");
+
+        private static List<ChangelogLine> changelog;
         private static int firstLine;
         private static int selection = SEL_BACK;
         private static bool popupDrawn;
@@ -308,16 +322,49 @@ namespace GameMod.VersionHandling
                 changelog = WrapChangelog(BOX_HALF_WIDTH * 2f - 60f);
 
             int last = Mathf.Min(firstLine + VISIBLE_LINES, changelog.Count);
-            Vector2 pos = new Vector2(-BOX_HALF_WIDTH + 30f, -155f);
-            for (int i = firstLine; i < last; i++)
+            float left = -BOX_HALF_WIDTH + 30f;
+            float right = BOX_HALF_WIDTH - 30f;
+            float y = -155f;
+            for (int i = firstLine; i < last; i++, y += 20f)
             {
-                ui.DrawStringSmall(changelog[i], pos, 0.4f, StringOffset.LEFT, UIManager.m_col_ui2, 1f);
-                pos.y += 20f;
+                ChangelogLine line = changelog[i];
+                float indent, scale;
+                Color color;
+                GetLineStyle(line.kind, out indent, out scale, out color);
+
+                bool bulleted = line.kind == LineKind.Title || line.kind == LineKind.Bullet;
+                if (bulleted && !line.continued)
+                    UIManager.DrawQuadUI(new Vector2(left + indent - 12f, y), 3f, 3f, color, ui.m_alpha, SOLID);
+
+                ui.DrawStringSmall(line.text, new Vector2(left + indent, y), scale, StringOffset.LEFT, color, 1f);
+                if (line.columns != null)
+                    DrawColumns(ui, line.columns, left + indent + 140f, y, scale, color);
+
+                if (line.kind == LineKind.Release)
+                {
+                    float ruleStart = left + UIManager.GetStringWidth(line.text, 20f * scale) + 12f;
+                    UIManager.DrawQuadUI(new Vector2((ruleStart + right) * 0.5f, y), (right - ruleStart) * 0.5f, 1f,
+                        UIManager.m_col_ui3, 0.6f * ui.m_alpha, SOLID);
+                }
             }
 
             if (changelog.Count > VISIBLE_LINES)
                 ui.DrawStringSmall(last + "/" + changelog.Count, new Vector2(BOX_HALF_WIDTH - 30f, 110f),
                     0.35f, StringOffset.RIGHT, UIManager.m_col_ui0, 1f);
+        }
+
+        private static void DrawColumns(UIElement ui, string[] columns, float x, float y, float scale, Color color)
+        {
+            const float COLUMN_WIDTH = 60f;
+            UIManager.m_fixed_width_digits = true;
+            for (int i = 0; i < columns.Length; i++)
+            {
+                float columnLeft = x + COLUMN_WIDTH * i;
+                if (i > 0)
+                    ui.DrawStringSmall("/", new Vector2(columnLeft + 10f, y), scale, StringOffset.CENTER, color, 1f);
+                ui.DrawStringSmall(columns[i], new Vector2(columnLeft + COLUMN_WIDTH, y), scale, StringOffset.RIGHT, color, 1f);
+            }
+            UIManager.m_fixed_width_digits = false;
         }
 
         private static void DrawPopupButtons(UIElement ui)
@@ -404,55 +451,102 @@ namespace GameMod.VersionHandling
         // Every release between the running version and the newest one, newest first, as lines
         // that fit the popup. The published text is markdown for the website, so the markers
         // that carry no meaning here are dropped rather than shown.
-        private static List<string> WrapChangelog(float width)
+        private static List<ChangelogLine> WrapChangelog(float width)
         {
-            var lines = new List<string>();
+            var lines = new List<ChangelogLine>();
             if (Releases == null)
                 return lines;
 
             foreach (SelfUpdate.Release release in Releases)
             {
                 if (lines.Count > 0)
-                    lines.Add("");
-                lines.Add("PYRO " + release.name);
+                    AddWrapped(lines, LineKind.Blank, "", width);
+                AddWrapped(lines, LineKind.Release, "PYRO " + release.name, width);
                 foreach (string raw in release.changelog.Split('\n'))
-                {
-                    string line = Clean(raw);
-                    if (line.Length == 0 && (lines.Count == 0 || lines[lines.Count - 1].Length == 0))
-                        continue;
-                    AddWrapped(lines, line, width);
-                }
+                    AddSourceLine(lines, raw, width);
             }
             return lines;
         }
 
-        private static string Clean(string line)
+        private static void AddSourceLine(List<ChangelogLine> lines, string raw, float width)
         {
-            string text = line.Replace("**", "").Replace("`", "").TrimEnd();
-            string bare = text.Trim();
-            if (bare.Length > 0 && bare.Replace("-", "").Length == 0)
-                return ""; // a rule under a heading, which has no line to sit under here
-            return text.ToUpperInvariant();
-        }
+            string line = raw.Replace("`", "").TrimEnd().ToUpperInvariant();
+            string bare = line.TrimStart();
+            int leading = line.Length - bare.Length;
 
-        private static void AddWrapped(List<string> lines, string line, float width)
-        {
-            if (UIManager.GetStringWidth(line, 20f * 0.4f) <= width)
+            if (bare.Length > 0 && bare.Replace("-", "").Length == 0)
+                return; // a rule under a heading, which has no line to sit under here
+
+            if (bare.Length == 0)
             {
-                lines.Add(line);
+                LineKind previous = lines[lines.Count - 1].kind;
+                if (previous != LineKind.Blank && previous != LineKind.Release)
+                    AddWrapped(lines, LineKind.Blank, "", width);
                 return;
             }
 
-            // keep the indent the published text uses: it is what marks a feature's body
-            string indent = line.Substring(0, line.Length - line.TrimStart().Length);
-            string current = "";
-            foreach (string word in line.Trim().Split(' '))
+            if (leading == 0 && bare.StartsWith("**") && bare.EndsWith("**"))
             {
-                string candidate = current.Length == 0 ? indent + word : current + " " + word;
-                if (current.Length > 0 && UIManager.GetStringWidth(candidate, 20f * 0.4f) > width)
+                AddWrapped(lines, LineKind.Heading, bare.Replace("**", ""), width);
+                return;
+            }
+
+            if (bare.StartsWith("- **"))
+            {
+                string rest = bare.Substring(4);
+                int close = rest.IndexOf("**");
+                if (close >= 0)
                 {
-                    lines.Add(current);
-                    current = indent + "  " + word;
+                    AddWrapped(lines, LineKind.Title, rest.Substring(0, close).TrimEnd(':'), width);
+                    string sameLineBody = rest.Substring(close + 2).TrimStart(':', ' ').Replace("**", "");
+                    if (sameLineBody.Length > 0)
+                        AddWrapped(lines, LineKind.Body, sameLineBody, width);
+                    return;
+                }
+            }
+
+            if (bare.StartsWith("- "))
+            {
+                AddWrapped(lines, LineKind.Bullet, bare.Substring(2).Replace("**", ""), width);
+                return;
+            }
+
+            string nesting = new string(' ', Mathf.Max(0, leading - 8));
+            Match row = valueRow.Match(nesting + bare);
+            if (row.Success)
+            {
+                string[] values = row.Groups[2].Value.Split('/').Select(value => value.Trim()).ToArray();
+                lines.Add(new ChangelogLine { kind = LineKind.Body, text = row.Groups[1].Value, columns = values });
+                return;
+            }
+            AddWrapped(lines, LineKind.Body, nesting + bare.Replace("**", ""), width);
+        }
+
+        private static void AddWrapped(List<ChangelogLine> lines, LineKind kind, string text, float width)
+        {
+            float indent, scale;
+            Color color;
+            GetLineStyle(kind, out indent, out scale, out color);
+            float fontSize = 20f * scale;
+            float available = width - indent;
+
+            if (UIManager.GetStringWidth(text, fontSize) <= available)
+            {
+                lines.Add(new ChangelogLine { kind = kind, text = text });
+                return;
+            }
+
+            string nesting = text.Substring(0, text.Length - text.TrimStart().Length);
+            string current = "";
+            bool continued = false;
+            foreach (string word in text.Trim().Split(' '))
+            {
+                string candidate = current.Length == 0 ? nesting + word : current + " " + word;
+                if (current.Length > 0 && UIManager.GetStringWidth(candidate, fontSize) > available)
+                {
+                    lines.Add(new ChangelogLine { kind = kind, text = current, continued = continued });
+                    current = nesting + word;
+                    continued = true;
                 }
                 else
                 {
@@ -460,7 +554,29 @@ namespace GameMod.VersionHandling
                 }
             }
             if (current.Length > 0)
-                lines.Add(current);
+                lines.Add(new ChangelogLine { kind = kind, text = current, continued = continued });
+        }
+
+        private static void GetLineStyle(LineKind kind, out float indent, out float scale, out Color color)
+        {
+            switch (kind)
+            {
+                case LineKind.Release:
+                    indent = 0f; scale = 0.45f; color = UIManager.m_col_white2;
+                    break;
+                case LineKind.Heading:
+                    indent = 0f; scale = 0.45f; color = UIManager.m_col_ui6;
+                    break;
+                case LineKind.Title:
+                    indent = 24f; scale = 0.42f; color = UIManager.m_col_hi5;
+                    break;
+                case LineKind.Bullet:
+                    indent = 24f; scale = 0.4f; color = UIManager.m_col_ui5;
+                    break;
+                default:
+                    indent = 44f; scale = 0.4f; color = UIManager.m_col_ui3;
+                    break;
+            }
         }
     }
 
