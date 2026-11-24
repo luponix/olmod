@@ -150,9 +150,9 @@ namespace GameMod
         {
             foreach (var code in codes)
             {
-                if (code.opcode == OpCodes.Call && code.operand == AccessTools.Method(typeof(AudioSource), "Play"))
+                if (code.Calls(AccessTools.Method(typeof(AudioSource), "Play", System.Type.EmptyTypes)))
                 {
-                    yield return new CodeInstruction(OpCodes.Nop);
+                    yield return new CodeInstruction(OpCodes.Pop);
                 }
                 else
                 {
