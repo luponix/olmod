@@ -104,8 +104,8 @@ namespace GameMod.Bots
         public const int MAX_NAME_LENGTH = 17 - 5;
         public const int MAX_PRESET_NAME_LENGTH = 16;
 
-        public static readonly string[] TIER_FILES = { "trainee", "rookie", "hotshot", "ace", "insane", "insaneplus" };
-        public static readonly string[] TIER_NAMES = { "TRAINEE", "ROOKIE", "HOTSHOT", "ACE", "INSANE", "INSANE+" };
+        public static readonly string[] TIER_FILES = { "trainee", "rookie", "hotshot", "ace", "insane", "insaneplus", "insaneplusplus" };
+        public static readonly string[] TIER_NAMES = { "TRAINEE", "ROOKIE", "HOTSHOT", "ACE", "INSANE", "INSANE+", "INSANE++" };
 
         public List<BotSlot> Slots = new List<BotSlot>();
         public bool Enabled = true;
