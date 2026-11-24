@@ -852,7 +852,7 @@ namespace GameMod
 
                 static void Postfix(UIElement __instance, Vector2 pos, PlayerLobbyData pld, bool bg_bar, float highlight_width, float name_offset, float max_width = -1f)
                 {
-                    if (!active | string.IsNullOrEmpty(pld.m_player_id) | pld.m_name.ToUpper().Equals(GameManager.m_local_player.m_mp_name.ToUpper()) | Bots.LobbyBotsPage.IsBot(pld))
+                    if (!active | string.IsNullOrEmpty(pld.m_player_id) | pld.m_name.ToUpper().Equals(GameManager.m_local_player.m_mp_name.ToUpper()))
                         return;
 
                     bool muted = ExtendedConfig.Section_AudiotauntMutedPlayers.ids.Contains(pld.m_player_id);

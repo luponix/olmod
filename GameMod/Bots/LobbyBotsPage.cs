@@ -63,7 +63,7 @@ namespace GameMod.Bots
         {
             if (MenuManager.m_menu_state != MenuState.MP_PRE_MATCH_MENU || !IsBot(player) || !CanManageBots)
                 return;
-            MPServerBrowser_UIElement_Draw.SelectAndDrawSmallerItem(uie, Loc.LS("REMOVE"), position + Vector2.right * (highlightWidth - 30f), SELECTION_REMOVE + player.m_id, false, 0.14f, 0.4f);
+            MPServerBrowser_UIElement_Draw.SelectAndDrawSmallerItem(uie, Loc.LS("REMOVE"), position + Vector2.right * (highlightWidth - 90f), SELECTION_REMOVE + player.m_id, false, 0.14f, 0.4f);
         }
 
         public static bool BeforeLobbyUpdate()
