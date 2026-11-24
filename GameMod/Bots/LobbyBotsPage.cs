@@ -19,7 +19,7 @@ namespace GameMod.Bots
         const float BOX_HALF_HEIGHT = 175f;
         const float EDGE_HALF = 1.5f;
         const float FORM_TOP = -95f;
-        static readonly Regex botName = new Regex(@"^BOT\[[0-9?]+\] ");
+        static readonly Regex botName = new Regex(@"^\[[0-9?]+\] BOT ");
         static readonly FieldInfo privateMatchDataField = typeof(NetworkMatch).GetField("m_private_data", BindingFlags.NonPublic | BindingFlags.Static);
 
         static BotSlot draft = new BotSlot { Name = string.Empty };

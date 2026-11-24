@@ -101,7 +101,7 @@ namespace GameMod.Bots
         public const int MAX_BOTS = 15;
         public const int AUTO_TEAM = -1;
         public const int RANDOM = -2;
-        public const int MAX_NAME_LENGTH = 17 - 7;
+        public const int MAX_NAME_LENGTH = 17 - 8;
         public const int MAX_PRESET_NAME_LENGTH = 16;
 
         public static readonly string[] TIER_FILES = { "trainee", "rookie", "hotshot", "ace", "insane", "brutal", "merciless", "nightmare" };
@@ -161,7 +161,7 @@ namespace GameMod.Bots
 
         public static string TierLabel(int tier)
         {
-            return "BOT[" + TierTag(tier) + "]";
+            return "[" + TierTag(tier) + "] BOT";
         }
 
         public static int TierFromText(string text)
