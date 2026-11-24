@@ -797,7 +797,8 @@ namespace GameMod {
                     request.Tier = tier;
                     first = 1;
                 } else if (parts[0].All(Char.IsDigit)) {
-                    ReturnToSender("ADDBOT: the difficulty is 0 (INSANE++) to 6 (TRAINEE)");
+                    int top = GameMod.Bots.BotSettings.TIER_FILES.Length - 1;
+                    ReturnToSender(String.Format("ADDBOT: the difficulty is 0 ({0}) to {1} ({2})", GameMod.Bots.BotSettings.TierName(0), top, GameMod.Bots.BotSettings.TierName(top)));
                     return false;
                 }
             }

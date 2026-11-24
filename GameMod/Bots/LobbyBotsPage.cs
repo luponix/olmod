@@ -15,7 +15,7 @@ namespace GameMod.Bots
         const int SELECTION_ADD = 43;
         const int SELECTION_REMOVE = 22000;
         const int SELECTION_BACK = 100;
-        static readonly Regex botName = new Regex(@"^BOT[0-9?] ");
+        static readonly Regex botName = new Regex(@"^BOT\[[0-9?]+\] ");
         static readonly FieldInfo privateMatchDataField = typeof(NetworkMatch).GetField("m_private_data", BindingFlags.NonPublic | BindingFlags.Static);
 
         static string name = string.Empty;
@@ -53,7 +53,7 @@ namespace GameMod.Bots
             Vector2 position = new Vector2(0f, 170f + 62f * 2);
             uie.DrawTextEntryLabeled(position - Vector2.right * 250f, SELECTION_NAME, Loc.LS("BOT NAME"), name, false);
             uie.SelectAndDrawStringOptionItem(Loc.LS("DIFFICULTY"), position + Vector2.right * 250f, SELECTION_TIER,
-                "BOT" + BotSettings.TierTag(tier) + " " + BotSettings.TierName(tier), string.Empty, 0.75f);
+                BotSettings.TierLabel(tier) + " " + BotSettings.TierName(tier), string.Empty, 0.75f);
             position.y += 62f;
             uie.SelectAndDrawItem(Loc.LS("ADD BOT"), position - Vector2.right * 250f, SELECTION_ADD, false, 0.75f, 0.75f);
             uie.SelectAndDrawItem(Loc.LS("BACK"), position + Vector2.right * 250f, SELECTION_BACK, false, 0.75f, 0.75f);
@@ -140,7 +140,7 @@ namespace GameMod.Bots
             }
             else if (selection == SELECTION_ADD)
             {
-                SendCommand(("/ADDBOT " + BotSettings.TierTag(tier) + " " + name.Trim()).Trim());
+                SendCommand(("/ADDBOT " + BotSettings.TierName(tier) + " " + name.Trim()).Trim());
                 name = string.Empty;
             }
         }

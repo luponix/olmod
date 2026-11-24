@@ -19,7 +19,7 @@ namespace GameMod.Bots
 
         public string PilotName
         {
-            get { return "BOT" + BotSettings.TierTag(Tier) + " " + Name; }
+            get { return BotSettings.TierLabel(Tier) + " " + Name; }
         }
 
         public string TierFile
@@ -101,7 +101,7 @@ namespace GameMod.Bots
         public const int MAX_BOTS = 15;
         public const int AUTO_TEAM = -1;
         public const int RANDOM = -2;
-        public const int MAX_NAME_LENGTH = 17 - 5;
+        public const int MAX_NAME_LENGTH = 17 - 7;
         public const int MAX_PRESET_NAME_LENGTH = 16;
 
         public static readonly string[] TIER_FILES = { "trainee", "rookie", "hotshot", "ace", "insane", "insaneplus", "insaneplusplus" };
@@ -156,7 +156,12 @@ namespace GameMod.Bots
 
         public static string TierTag(int tier)
         {
-            return tier == RANDOM ? "?" : (TIER_FILES.Length - 1 - tier).ToString();
+            return tier == RANDOM ? "?" : tier.ToString();
+        }
+
+        public static string TierLabel(int tier)
+        {
+            return "BOT[" + TierTag(tier) + "]";
         }
 
         public static int TierFromText(string text)
@@ -164,6 +169,7 @@ namespace GameMod.Bots
             text = text.Trim().ToUpperInvariant();
             if (text.StartsWith("BOT"))
                 text = text.Substring(3);
+            text = text.Trim('[', ']');
             for (int tier = 0; tier < TIER_FILES.Length; tier++)
                 if (text == TierTag(tier) || text == TIER_NAMES[tier])
                     return tier;
@@ -202,7 +208,7 @@ namespace GameMod.Bots
                     continue;
                 settings.Slots.Add(new BotSlot {
                     Name = name,
-                    Tier = OneOf(bot["tier"].GetInt(2), TierOptions(), 2),
+                    Tier = TierOrStrongest(bot["tier"].GetInt(2)),
                     Team = OneOf(bot["team"].GetInt(AUTO_TEAM), TeamOptions(MPTeams.Max), AUTO_TEAM),
                     Primary1 = (WeaponType)OneOf(bot["w1"].GetInt(0), LoadoutOptions((int)WeaponType.NUM, false), 0),
                     Primary2 = (WeaponType)OneOf(bot["w2"].GetInt((int)WeaponType.NUM), LoadoutOptions((int)WeaponType.NUM, true), (int)WeaponType.NUM),
@@ -274,6 +280,11 @@ namespace GameMod.Bots
                 name = name.Replace(c.ToString(), string.Empty);
             name = name.ToUpperInvariant();
             return name.Length > MAX_NAME_LENGTH ? name.Substring(0, MAX_NAME_LENGTH) : name;
+        }
+
+        static int TierOrStrongest(int tier)
+        {
+            return tier >= TIER_FILES.Length ? TIER_FILES.Length - 1 : OneOf(tier, TierOptions(), 2);
         }
 
         static int OneOf(int value, List<int> options, int fallback)
