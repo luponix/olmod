@@ -187,6 +187,7 @@
     <Compile Include="MPAnticheat.cs" />
     <Compile Include="MPAudioTaunts.cs" />
     <Compile Include="MPAutomap.cs" />
+    <Compile Include="MouseWheel.cs" />
     <Compile Include="MPAutoSelection.cs" />
     <Compile Include="MPAutoSelectionUI.cs" />
     <Compile Include="MPBanPlayers.cs" />

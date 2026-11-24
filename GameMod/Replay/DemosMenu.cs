@@ -57,10 +57,10 @@ namespace GameMod.Replay
                         // frame timing, and CheckPaging's UIPulse flashes the whole screen
                         // once per tick. The wheel is this menu's; the paging keys stay the
                         // engine's.
-                        float wheel = Input.GetAxis("Mouse ScrollWheel");
-                        if (wheel != 0f)
+                        int wheel = MouseWheel.Step();
+                        if (wheel != 0)
                         {
-                            ScrollListTo(MenuManager.m_list_items_first + (wheel < 0f ? 1 : -1));
+                            ScrollListTo(MenuManager.m_list_items_first + wheel);
                         }
                         else
                         {

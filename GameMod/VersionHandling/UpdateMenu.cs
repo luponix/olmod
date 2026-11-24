@@ -436,10 +436,10 @@ namespace GameMod.VersionHandling
             int step = 0;
             if (Controls.JustPressed(CCInput.MENU_UP)) step -= 1;
             if (Controls.JustPressed(CCInput.MENU_DOWN)) step += 1;
-            if (Controls.JustPressed(CCInput.MENU_PGUP)) step -= VISIBLE_LINES;
-            if (Controls.JustPressed(CCInput.MENU_PGDN)) step += VISIBLE_LINES;
-            float wheel = Input.GetAxis("Mouse ScrollWheel");
-            if (wheel != 0f) step += wheel < 0f ? 1 : -1;
+            bool isPaging = !MouseWheel.IsTurning;
+            if (isPaging && Controls.JustPressed(CCInput.MENU_PGUP)) step -= VISIBLE_LINES;
+            if (isPaging && Controls.JustPressed(CCInput.MENU_PGDN)) step += VISIBLE_LINES;
+            step += MouseWheel.Step();
             if (step == 0)
                 return;
 

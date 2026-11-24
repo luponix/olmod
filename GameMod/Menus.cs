@@ -1221,17 +1221,13 @@ namespace GameMod {
 
                     if (MenuManager.m_menu_micro_state == 0)
                     {
-                        float scroll_wheel_delta = Input.GetAxis("Mouse ScrollWheel");
-                        if (scroll_wheel_delta != 0f)
-                            Menus.mms_mp_general_scroll_offset = Math.Max(0, Menus.mms_mp_general_scroll_offset + (scroll_wheel_delta < 0f ? 1 : -1));
+                        Menus.mms_mp_general_scroll_offset = Math.Max(0, Menus.mms_mp_general_scroll_offset + MouseWheel.Step());
                         ScrollGeneralTabWithSelection();
                     }
                     else if (MenuManager.m_menu_micro_state == 3 && MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT > MPAudioTaunts.TAUNTS_MAX_VISIBLE)
                     {
-                        float scroll_wheel_delta = Input.GetAxis("Mouse ScrollWheel");
-                        if (scroll_wheel_delta != 0f)
-                            Menus.mms_taunt_scroll_offset = Mathf.Clamp(Menus.mms_taunt_scroll_offset + (scroll_wheel_delta < 0f ? 1 : -1),
-                                0, MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT - MPAudioTaunts.TAUNTS_MAX_VISIBLE);
+                        Menus.mms_taunt_scroll_offset = Mathf.Clamp(Menus.mms_taunt_scroll_offset + MouseWheel.Step(),
+                            0, MPAudioTaunts.AMOUNT_OF_TAUNTS_PER_CLIENT - MPAudioTaunts.TAUNTS_MAX_VISIBLE);
                         ScrollTauntTabWithSelection();
                     }
                     previous_selection = UIManager.m_menu_selection;

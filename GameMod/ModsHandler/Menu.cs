@@ -78,9 +78,9 @@ namespace GameMod.ModsHandler
 
                     if (timer > 0.25f)
                     {
-                        float wheel = Input.GetAxis("Mouse ScrollWheel");
-                        if (wheel != 0f)
-                            ScrollTo(firstRow + (wheel < 0f ? 1 : -1));
+                        int wheel = MouseWheel.Step();
+                        if (wheel != 0)
+                            ScrollTo(firstRow + wheel);
                         ScrollWithSelection();
                     }
 

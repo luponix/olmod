@@ -179,10 +179,10 @@ namespace GameMod.Bots
             if (UIManager.m_menu_selection < 0 && Input.GetMouseButtonDown(0))
                 StopEditing();
             Vector2 mouse = UIManager.m_mouse_pos;
-            float wheel = Input.mouseScrollDelta.y;
+            int wheel = MouseWheel.Step();
             bool isOverTable = Mathf.Abs(mouse.x) < SCROLLBAR_X + 14f && mouse.y > TABLE_TOP && mouse.y < TABLE_BOTTOM;
-            if (UIManager.m_menu_use_mouse && isOverTable && wheel != 0f)
-                firstRow = Mathf.Clamp(firstRow - (wheel > 0f ? 1 : -1), 0, HiddenRows);
+            if (UIManager.m_menu_use_mouse && isOverTable && wheel != 0)
+                firstRow = Mathf.Clamp(firstRow + wheel, 0, HiddenRows);
         }
 
         public static int ScrollWithSelection(int previousSelection)
